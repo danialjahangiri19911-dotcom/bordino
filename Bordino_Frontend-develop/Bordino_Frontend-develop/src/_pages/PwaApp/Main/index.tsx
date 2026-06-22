@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
+
 import { useRouter } from "next/navigation";
 
 import DailyTasks from "./DailyTasks";
 import PromoCarousel from "./PromoCarousel";
 import { DAILY_TASKS_MOCK_DATA, SPECIAL_CHALLENGE } from "./mockData";
 import Stack from "@mui/material/Stack";
+import HafezDrawer from "@pages/PwaApp/Hafez/HafezDrawer";
 
 import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
 import { LOTTERY_GUIDE } from "@/constants/routes";
@@ -20,6 +23,7 @@ export default function Main() {
 	const { remainingTime } = useExtractLotteries();
 	const { user } = useUserStore();
 	const { push } = useRouter();
+	const [hafezOpen, setHafezOpen] = useState(false);
 
 	// useEffect(() => {
 	// 	if (user?.registrationStep === "ProfileSetup") {
@@ -46,7 +50,7 @@ export default function Main() {
 
 				<DailyTasks tasks={DAILY_TASKS_MOCK_DATA} />
 
-				<PromoCarousel />
+				<PromoCarousel onHafezClick={() => setHafezOpen(true)} />
 
 				<DailyTasks
 					tasks={SPECIAL_CHALLENGE}
@@ -54,6 +58,7 @@ export default function Main() {
 					title="چالش ویژه 🔥"
 				/>
 			</Stack>
+			<HafezDrawer open={hafezOpen} onClose={() => setHafezOpen(false)} />
 		</PwaAppPageLayout>
 	);
 }

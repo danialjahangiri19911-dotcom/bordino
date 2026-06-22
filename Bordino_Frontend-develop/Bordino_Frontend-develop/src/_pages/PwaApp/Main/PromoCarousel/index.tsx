@@ -164,7 +164,11 @@ function PromoCard({ slide, onButtonClick }: Readonly<{ slide: SlideSpec; onButt
 	);
 }
 
-export default function PromoCarousel() {
+interface PromoCarouselProps {
+	onHafezClick?: () => void;
+}
+
+export default function PromoCarousel({ onHafezClick }: PromoCarouselProps) {
 	const [active, setActive] = useState(0);
 	const { push } = useRouter();
 
@@ -184,7 +188,13 @@ export default function PromoCarousel() {
 						<SwiperSlide key={slide.key}>
 							<PromoCard
 								slide={slide}
-								onButtonClick={slide.href ? () => push(slide.href!) : undefined}
+								onButtonClick={
+									slide.key === "hafez"
+										? onHafezClick
+										: slide.href
+											? () => push(slide.href!)
+											: undefined
+								}
 							/>
 						</SwiperSlide>
 					))}
