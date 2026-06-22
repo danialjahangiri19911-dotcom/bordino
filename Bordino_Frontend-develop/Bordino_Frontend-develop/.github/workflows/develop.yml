@@ -1,0 +1,74 @@
+name: Bordino Frontend CICD Stage Server
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  NEXT_PUBLIC_API_BASE_URL : https://api.dev.bordino.co/api/v1/
+  NEXT_PUBLIC_REFRESH_URL : https://api.dev.bordino.co/
+
+jobs:
+  build:
+    runs-on: bordino-frontend-dev
+
+    strategy:
+      matrix:
+        node-version: [22.11.0]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+              
+      - name: Clean old dependencies and builds.
+        run: |
+          if [ -d "node_modules" ] || [ -d ".next" ]; then
+            echo "Removing old dependencies and build files..."
+            rm -rf node_modules .next
+            echo "Cleanup complete."
+          else
+            echo "No old dependencies or build files to remove. "
+          fi
+      - name: whoami
+        run: whoami
+      - name: Install dependencies
+        run: yarn
+        
+      - name: Build the project for develop
+        run: yarn build
+
+      - name: Prepare deployment directory
+        run: |
+          DEPLOY_DIR="/home/$(whoami)/Frontend/Bordino_Frontend"
+          BACKUP_DIR="/home/$(whoami)/CI-CD/Frontend/backup"
+          mkdir -p $DEPLOY_DIR $BACKUP_DIR
+
+      - name: Backup current deployment if it exists
+        run: |
+          DEPLOY_DIR="/home/$(whoami)/Frontend/Bordino_Frontend"
+          BACKUP_DIR="/home/$(whoami)/CI-CD/Frontend/backup"
+          if [ -d "$DEPLOY_DIR" ]; then
+            tar -cvf "$BACKUP_DIR/frontend-$(date +%m-%d-%Y_%H-%M-%S).tar" -C "$DEPLOY_DIR" .
+            ls -t "$BACKUP_DIR" | tail -n +2 | xargs -I {} rm -f "$BACKUP_DIR/{}"
+          fi
+
+      - name: Delete old deployment files
+        run: rm -rf /home/$(whoami)/Frontend/Bordino_Frontend/*
+
+      - name: Copy built files to the deployment directory
+        run: |
+          DEPLOY_DIR="/home/$(whoami)/Frontend/Bordino_Frontend"
+          shopt -s dotglob
+          cp -r .next "$DEPLOY_DIR"
+          cp -r public "$DEPLOY_DIR"
+          cp next.config.mjs "$DEPLOY_DIR"
+          cp package.json "$DEPLOY_DIR"
+          cp -r node_modules "$DEPLOY_DIR"
+
+      - name: Restart application
+        run: sudo service frontend restart

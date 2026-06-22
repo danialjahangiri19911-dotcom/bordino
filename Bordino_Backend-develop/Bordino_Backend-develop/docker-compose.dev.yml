@@ -1,0 +1,188 @@
+services:
+  db:
+    image: postgres:17.2-alpine
+    container_name: bordino_postgres
+    env_file:
+      - ./confs/envs/db/.env
+      - ./confs/envs/compose/.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    restart: unless-stopped
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: bordino_redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    env_file:
+      - ./confs/envs/compose/.env
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3.12.1-management-alpine
+    container_name: bordino_rabbitmq
+    hostname: bordino-rabbit
+    env_file:
+      - ./confs/envs/compose/.env
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-logs:/var/log/rabbitmq
+      - ./confs/rabbitmq/myrabbit.conf:/etc/rabbitmq/advanced.config:ro
+    secrets:
+      - rabbitmq_passphrase
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  django:
+    build:
+      context: .
+      target: runtime
+      args:
+        ENVIRONMENT: dev
+      cache_from:
+        - bordino_django:latest
+    image: bordino_django:dev
+    command: ./run web_entrypoint.dev
+    container_name: bordino_django
+    env_file:
+      - ./confs/envs/compose/.env
+      - ./main_app/.env
+      - ./confs/envs/celery/.env
+    volumes:
+      - .:/app:delegated
+      - static-files:/app/static
+      - media-files:/app/media
+    ports:
+      - "127.0.0.1:${DJANGO_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  celery-worker:
+    build:
+      context: .
+      target: runtime
+      args:
+        ENVIRONMENT: dev
+      cache_from:
+        - bordino_django:latest
+    image: bordino_django:dev
+    command: ./run celery_entrypoint.worker
+    container_name: bordino_celery_worker
+    env_file:
+      - ./confs/envs/compose/.env
+      - ./confs/envs/celery/.env
+      - ./main_app/.env
+    volumes:
+      - .:/app:delegated
+      - media-files:/app/media
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      django:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "python -m celery -A apps.tasks inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  celery-beat:
+    build:
+      context: .
+      target: runtime
+      args:
+        ENVIRONMENT: dev
+      cache_from:
+        - bordino_django:latest
+    image: bordino_django:dev
+    command: ./run celery_beat_entrypoint
+    container_name: bordino_celery_beat
+    env_file:
+      - ./confs/envs/celery/.env
+      - ./main_app/.env
+    volumes:
+      - .:/app:delegated
+      - celery-beat-schedule:/app/celerybeat-schedule
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      django:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  rabbitmq-data:
+    driver: local
+  rabbitmq-logs:
+    driver: local
+  static-files:
+    driver: local
+  media-files:
+    driver: local
+  celery-beat-schedule:
+    driver: local
+
+secrets:
+  rabbitmq_passphrase:
+    file: ./confs/rabbitmq/passphrase.txt
+
+networks:
+  default:
+    name: bordino_network
+    driver: bridge

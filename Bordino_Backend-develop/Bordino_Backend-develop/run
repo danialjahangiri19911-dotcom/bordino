@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# ###############
+# Pre-Commit
+# #####
+function pre_commit.init() {
+  pre-commit install
+  pre-commit install --hook-type pre-push
+  pre-commit install --hook-type commit-msg
+}
+
+function pre_commit.run_for_all() {
+  pre-commit run --all-files
+}
+
+function web_entrypoint.dev() {
+  ./confs/web_entrypoint_dev.sh
+}
+
+function web_entrypoint.prod() {
+  ./confs/web_entrypoint.sh
+}
+
+function celery_entrypoint.worker() {
+  python -m celery -A apps.tasks worker --loglevel=info
+}
+
+function celery_beat_entrypoint() {
+  ./confs/celery_beat/start.sh
+}
+
+# ###############
+# Run (should be at the end of the file)
+# #####
+eval "${1}" "${@:2}"

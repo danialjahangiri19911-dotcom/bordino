@@ -1,0 +1,931 @@
+msgid ""
+msgstr ""
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-04-25 23:08+0000\n"
+"Language: fa\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: apps/django_helper/admin/base.py:23
+msgid "Other Data"
+msgstr ""
+
+#: apps/django_helper/models/base.py:8
+msgid "Create Time"
+msgstr "زمان ایجاد"
+
+#: apps/django_helper/models/base.py:9
+msgid "Update Time"
+msgstr "آخرین به‌روزرسانی"
+
+#: apps/django_helper/utils/validators/uppercase.py:7
+msgid "The symbol must be in uppercase."
+msgstr ""
+
+#: apps/lottery/admin/lottery.py:28 apps/lottery/admin/lottery_wheel.py:25
+#: apps/lottery/models/lottery.py:34 apps/lottery/models/lottery_wheel.py:23
+msgid "Tokens Whitelist"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:14
+msgid "Draft"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:15 apps/lottery/models/lottery_wheel.py:14
+#: apps/lottery/models/ticket.py:13
+#, fuzzy
+#| msgid "Is Active"
+msgid "Active"
+msgstr "فعال است؟"
+
+#: apps/lottery/models/lottery.py:16 apps/wallet/models/transactions/base.py:13
+msgid "Completed"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:17 apps/wallet/models/transactions/base.py:15
+msgid "Cancelled"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:20
+#: apps/wallet/models/transactions/lottery_prize.py:15
+#: apps/wallet/models/transactions/lottery_ticket.py:30
+msgid "Lottery"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:21
+#, fuzzy
+#| msgid "Categories"
+msgid "Lotteries"
+msgstr "دسته‌بندی‌ها"
+
+#: apps/lottery/models/lottery.py:27 apps/lottery/models/lottery_wheel.py:17
+#: apps/lottery/models/lottery_wheel_prize.py:22
+#: apps/lottery/models/ticket.py:31 apps/users/models/category.py:11
+msgid "name"
+msgstr "نام"
+
+#: apps/lottery/models/lottery.py:29 apps/lottery/models/lottery_wheel.py:19
+#: apps/wallet/models/token.py:31 apps/wallet/models/wallet.py:22
+msgid "Owner"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:38
+#: apps/wallet/models/currency_wallet_account.py:35
+msgid "Balance"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:46
+msgid "ticket_price"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:49 apps/lottery/models/lottery_wheel.py:38
+#: apps/lottery/models/ticket.py:50 apps/wallet/models/base_preset_wallet.py:37
+#: apps/wallet/models/base_wallet_account.py:21
+#: apps/wallet/models/transactions/base.py:21
+msgid "Status"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:55
+msgid "Start Date"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:60
+msgid "End Date"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:71
+msgid "End date must be after start date"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:76
+msgid "Active lotteries must have start and end dates"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:79
+msgid "Start date cannot be in the future"
+msgstr ""
+
+#: apps/lottery/models/lottery.py:81
+msgid "End date must be in the future"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel.py:10
+#: apps/lottery/models/lottery_wheel_spin.py:26
+#: apps/wallet/models/transactions/lottery_wheel_prize.py:15
+msgid "Lottery Wheel"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel.py:11
+msgid "Lottery Wheels"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel.py:15
+#, fuzzy
+#| msgid "Is Active"
+msgid "Inactive"
+msgstr "فعال است؟"
+
+#: apps/lottery/models/lottery_wheel.py:27
+msgid "Cost Per Spin"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel.py:30
+msgid "Max Spins"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel.py:34
+msgid "Max Spins Per Customer"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:10
+msgid "Lottery Wheel Prize"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:11
+msgid "Lottery Wheel Prizes"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:14
+msgid "Cash"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:15
+msgid "Recharge"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:25
+#: apps/lottery/models/prize_rule.py:23
+#: apps/wallet/models/transactions/lottery_prize.py:26
+msgid "Prize Amount"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:30
+msgid "probability"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_prize.py:36
+msgid "Prize Type"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_spin.py:10
+msgid "Lottery Wheel Spin"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_spin.py:11
+msgid "Lottery Wheel Spins"
+msgstr ""
+
+#: apps/lottery/models/lottery_wheel_spin.py:32
+#: apps/users/models/customer.py:26 apps/wallet/models/base_preset_wallet.py:20
+#: apps/wallet/models/transactions/lottery_ticket.py:16
+#: apps/wallet/models/transactions/lottery_wheel_prize.py:29
+#: apps/wallet/models/wallet.py:18
+msgid "Customer"
+msgstr "مشتری"
+
+#: apps/lottery/models/lottery_wheel_spin.py:35
+msgid "Count"
+msgstr ""
+
+#: apps/lottery/models/prize_rule.py:9
+msgid "Prize Rule"
+msgstr ""
+
+#: apps/lottery/models/prize_rule.py:10
+msgid "Prize Rules"
+msgstr ""
+
+#: apps/lottery/models/prize_rule.py:20
+msgid "Match Count"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:9
+msgid "Referral Reward Configuration"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:10
+msgid "Referral Reward Configurations"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:14
+#: apps/wallet/models/transactions/referral.py:27
+msgid "Referral Level"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:15
+msgid "1 for direct inviter, 2 for inviter's inviter, etc."
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:19
+msgid "Token Reward Percentage"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:21
+msgid "Percentage of required tokens to reward"
+msgstr ""
+
+#: apps/lottery/models/referral_reward_config.py:23
+#: apps/users/models/user.py:51
+msgid "Is Active"
+msgstr "فعال است؟"
+
+#: apps/lottery/models/ticket.py:14
+msgid "Winner"
+msgstr ""
+
+#: apps/lottery/models/ticket.py:15
+msgid "Expired"
+msgstr ""
+
+#: apps/lottery/models/ticket.py:18
+#: apps/wallet/models/transactions/lottery_ticket.py:37
+msgid "Ticket"
+msgstr ""
+
+#: apps/lottery/models/ticket.py:19
+msgid "Tickets"
+msgstr ""
+
+#: apps/lottery/models/ticket.py:36
+msgid "lottery"
+msgstr ""
+
+#: apps/lottery/models/ticket.py:42
+#, fuzzy
+#| msgid "Customer"
+msgid "customer"
+msgstr "مشتری"
+
+#: apps/lottery/models/ticket.py:68
+msgid "The 'numbers' field must contain exactly 6 integers."
+msgstr ""
+
+#: apps/lottery/serializers/lottery_wheel_spin/crud.py:63
+msgid "Maximum spins for this wheel has been reached"
+msgstr ""
+
+#: apps/lottery/serializers/lottery_wheel_spin/crud.py:74
+msgid "You have reached your maximum spins for this wheel"
+msgstr ""
+
+#: apps/lottery/serializers/lottery_wheel_spin/crud.py:80
+msgid "your balance is not enough"
+msgstr ""
+
+#: apps/lottery/serializers/ticket/crud.py:54
+msgid "Token is not associated with this lottery."
+msgstr ""
+
+#: apps/lottery/serializers/ticket/crud.py:62
+msgid "Insufficient token balance. Required: {}, Available: {}"
+msgstr ""
+
+#: apps/lottery/serializers/ticket/crud.py:72
+msgid "Invalid numbers. Required: 6, Provided: {}"
+msgstr ""
+
+#: apps/lottery/serializers/ticket/crud.py:78
+msgid "Lottery must be active to purchase tickets."
+msgstr ""
+
+#: apps/lottery/services/lottery/lottery_wheel.py:31
+msgid "Lottery wheel must have at least one prize"
+msgstr ""
+
+#: apps/lottery/services/lottery/lottery_wheel.py:35
+msgid "Total probability of all prizes must equal 100"
+msgstr ""
+
+#: apps/lottery/services/lottery/lottery_winner.py:29
+msgid "Only active lotteries can be completed"
+msgstr ""
+
+#: apps/lottery/services/lottery/lottery_winner.py:32
+msgid "Cannot process winners before lottery end date"
+msgstr ""
+
+#: apps/lottery/services/lottery/lottery_winner.py:35
+msgid "Lottery must have prize rules defined"
+msgstr ""
+
+#: apps/lottery/services/ticket/purchase.py:144
+msgid "Failed to process ticket purchase: {}"
+msgstr ""
+
+#: apps/user_management/serializers/customer/step1_profile_setup_registration.py:38
+#, fuzzy
+#| msgid "User already exists."
+msgid "Customer Already Exist."
+msgstr "کاربر از قبل موجود است"
+
+#: apps/user_management/serializers/customer/step1_profile_setup_registration.py:55
+msgid "Failed to create a customer. Please try again later."
+msgstr "ایجاد مشتری با مشکل مواجه شد. لطفاً بعداً دوباره تلاش کنید."
+
+#: apps/user_management/serializers/customer/step1_profile_setup_registration.py:57
+msgid "The customer account has been created successfully."
+msgstr "حساب مشتری با موفقیت ایجاد شد."
+
+#: apps/user_management/serializers/customer/step2_daily_usage_time.py:26
+#, fuzzy
+#| msgid "The category provided does not  exist."
+msgid "The usage provided does not exist."
+msgstr "دسته‌بندی ارسال شده وجود ندارد."
+
+#: apps/user_management/serializers/customer/step3_usage_goal.py:30
+msgid "Select multiple signup reasons."
+msgstr ""
+
+#: apps/user_management/serializers/customer/step4_interest_selection.py:31
+msgid "Select multiple categories."
+msgstr ""
+
+#: apps/user_management/serializers/customer/utils/correctstep.py:11
+msgid "Invalid step. start with step 1"
+msgstr "مرحله نامعتبر است. با مرحله ۱ شروع کنید"
+
+#: apps/user_management/serializers/customer/utils/correctstep.py:18
+#, python-brace-format
+msgid "Registration already completed. Current step: {registration_step}"
+msgstr ""
+"مرحله ثبت نام به اتمام رسیده است. مرحله ثبت نام فعلی: {registration_step}"
+
+#: apps/user_management/serializers/otp/resend_otp.py:29
+msgid "verification code has been sent to the phone number"
+msgstr "کد تأیید به شماره تلفن ارسال شد."
+
+#: apps/user_management/serializers/otp/utils/otp_exist.py:26
+#: apps/user_management/serializers/otp/utils/otp_validate.py:25
+msgid "The phone number provided does not registered yet."
+msgstr "شماره تلفن ارائه‌شده هنوز ثبت نام نشده است."
+
+#: apps/user_management/serializers/otp/utils/otp_exist.py:35
+#: apps/user_management/serializers/otp/utils/otp_validate.py:39
+msgid "User data is missing."
+msgstr "اطلاعات کاربر وجود ندارد."
+
+#: apps/user_management/serializers/otp/utils/otp_exist.py:46
+#, python-brace-format
+msgid ""
+"OTP already exists. Please wait {ttl} seconds for the current OTP to expire."
+msgstr ""
+"رمز یک‌بارمصرف در حال حاضر وجود دارد. لطفاً {ttl} ثانیه صبر کنید تا رمز فعلی "
+"منقضی شود."
+
+#: apps/user_management/serializers/otp/utils/otp_validate.py:48
+msgid "OTP not found or expired."
+msgstr "رمز یک‌بارمصرف یافت نشد یا منقضی شده است."
+
+#: apps/user_management/serializers/otp/utils/otp_validate.py:52
+msgid "OTP has already been used."
+msgstr "رمز یک‌بارمصرف قبلا استفاده شده است."
+
+#: apps/user_management/serializers/otp/utils/otp_validate.py:56
+msgid "Invalid OTP code."
+msgstr "کد OTP نامعتبر است."
+
+#: apps/user_management/serializers/user/login.py:33
+msgid "The account has been activated successfully"
+msgstr "حساب کاربری با موفقیت فعال شد."
+
+#: apps/user_management/serializers/user/registration.py:34
+msgid "Failed to create an account. Please try again later."
+msgstr "ایجاد حساب کاربری با مشکل مواجه شد. لطفاً دوباره تلاش کنید."
+
+#: apps/user_management/serializers/user/registration.py:39
+msgid "A new user has been registered, and an OTP has been sent."
+msgstr "کاربر جدید ثبت شد و رمز یک‌بارمصرف ارسال گردید."
+
+#: apps/user_management/serializers/user/registration.py:43
+msgid "User already exists."
+msgstr "کاربر از قبل موجود است"
+
+#: apps/user_management/serializers/user/utils/user_username_dup.py:30
+#: apps/users/models/user.py:47
+msgid "A user with that username already exists."
+msgstr "کاربری با نام کاربری مشابه موجود است."
+
+#: apps/user_management/views/customer/utils/current_customer.py:20
+#, fuzzy
+#| msgid "customer does not exist"
+msgid "customer does not exist."
+msgstr "مشتری وجود ندارد."
+
+#: apps/users/admin/customer.py:23
+#, fuzzy
+#| msgid "favorite categories"
+msgid "Favorite Categories"
+msgstr "دسته‌بندی‌های مورد علاقه"
+
+#: apps/users/admin/customer.py:28 apps/users/models/signup_reason.py:13
+#, fuzzy
+#| msgid "signup reason"
+msgid "Signup Reasons"
+msgstr "دلیل ثبت نام"
+
+#: apps/users/models/category.py:8
+msgid "Category"
+msgstr "دسته‌بندی"
+
+#: apps/users/models/category.py:9
+msgid "Categories"
+msgstr "دسته‌بندی‌ها"
+
+#: apps/users/models/category.py:18
+#, fuzzy
+#| msgid "Category"
+msgid "Parent Category"
+msgstr "دسته‌بندی"
+
+#: apps/users/models/customer.py:27
+msgid "Customers"
+msgstr "مشتریان"
+
+#: apps/users/models/customer.py:30
+msgid "Male"
+msgstr "مرد"
+
+#: apps/users/models/customer.py:31
+msgid "Female"
+msgstr "زن"
+
+#: apps/users/models/customer.py:32
+msgid "Unset"
+msgstr "مشخص نشده"
+
+#: apps/users/models/customer.py:35
+msgid "OTP Verification"
+msgstr ""
+
+#: apps/users/models/customer.py:36
+msgid "Profile Setup"
+msgstr ""
+
+#: apps/users/models/customer.py:37
+#, fuzzy
+#| msgid "daily usage minutes"
+msgid "Daily Usage Time"
+msgstr "مدت زمان استفاده روزانه"
+
+#: apps/users/models/customer.py:39
+msgid "Interest Selection"
+msgstr ""
+
+#: apps/users/models/customer.py:43
+msgid "gender"
+msgstr "جنسیت"
+
+#: apps/users/models/customer.py:48
+msgid "birthdate"
+msgstr "تاریخ تولد"
+
+#: apps/users/models/customer.py:53
+msgid "favorite categories"
+msgstr "دسته‌بندی‌های مورد علاقه"
+
+#: apps/users/models/customer.py:61
+msgid "image"
+msgstr "تصویر"
+
+#: apps/users/models/customer.py:65
+msgid "registration step"
+msgstr "مرحلهٔ ثبت‌نام"
+
+#: apps/users/models/customer.py:75
+msgid "invited by"
+msgstr "دعوت شده توسط"
+
+#: apps/users/models/customer.py:79
+msgid "consecutive active days"
+msgstr "روزهای فعال متوالی"
+
+#: apps/users/models/customer.py:82
+msgid "max consecutive days"
+msgstr "حداکثر روزهای متوالی"
+
+#: apps/users/models/customer.py:85
+msgid "last active date"
+msgstr "تاریخ آخرین فعالیت"
+
+#: apps/users/models/customer.py:92
+msgid "daily usage minutes"
+msgstr "مدت زمان استفاده روزانه"
+
+#: apps/users/models/customer.py:99
+#, fuzzy
+#| msgid "signup reason"
+msgid "signup reasons"
+msgstr "دلیل ثبت نام"
+
+#: apps/users/models/dailyusage.py:8
+#, fuzzy
+#| msgid "daily usage minutes"
+msgid "Daily usage"
+msgstr "مدت زمان استفاده روزانه"
+
+#: apps/users/models/dailyusage.py:9
+#, fuzzy
+#| msgid "daily usage minutes"
+msgid "Daily usages"
+msgstr "مدت زمان استفاده روزانه"
+
+#: apps/users/models/dailyusage.py:12
+msgid "Unknown"
+msgstr "فعلا نمی‌دونم"
+
+#: apps/users/models/dailyusage.py:13
+msgid "Normal"
+msgstr "عادی"
+
+#: apps/users/models/dailyusage.py:14
+msgid "Moderate"
+msgstr "متوسط"
+
+#: apps/users/models/dailyusage.py:15
+msgid "High"
+msgstr "زیاد"
+
+#: apps/users/models/dailyusage.py:18
+#, fuzzy
+#| msgid "daily usage minutes"
+msgid "daily usage duration"
+msgstr "مدت زمان استفاده روزانه"
+
+#: apps/users/models/dailyusage.py:23
+msgid "reward points"
+msgstr ""
+
+#: apps/users/models/file.py:7
+msgid "File"
+msgstr "فایل"
+
+#: apps/users/models/file.py:8
+msgid "Files"
+msgstr "فایل‌ها"
+
+#: apps/users/models/file.py:11
+msgid "file"
+msgstr "فایل"
+
+#: apps/users/models/file.py:15
+msgid "uploaded at"
+msgstr "به‌روزرسانی در"
+
+#: apps/users/models/signup_reason.py:8
+#, fuzzy
+#| msgid "Reason 1"
+msgid "Reason"
+msgstr "برنده شدن در قرعه‌کشی‌های بزرگ"
+
+#: apps/users/models/signup_reason.py:12
+#, fuzzy
+#| msgid "signup reason"
+msgid "Signup Reason"
+msgstr "دلیل ثبت نام"
+
+#: apps/users/models/sponsor.py:12 apps/wallet/models/base_preset_wallet.py:19
+#: apps/wallet/models/wallet.py:17
+msgid "Sponsor"
+msgstr "اسپانسر"
+
+#: apps/users/models/sponsor.py:13
+msgid "Sponsors"
+msgstr "اسپانسر‌ها"
+
+#: apps/users/models/user.py:18
+msgid "Use a digit number starting with 9."
+msgstr "از یک شماره عددی که با ۹ شروع می‌شود استفاده کنید."
+
+#: apps/users/models/user.py:27 apps/wallet/models/base_preset_wallet.py:24
+msgid "User"
+msgstr "کاربر"
+
+#: apps/users/models/user.py:28
+msgid "Users"
+msgstr "کاربران"
+
+#: apps/users/models/user.py:31
+msgid "phone number"
+msgstr "شماره تلفن"
+
+#: apps/users/models/user.py:37
+msgid "username"
+msgstr "نام کاربری"
+
+#: apps/users/models/user.py:43
+msgid "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
+msgstr ""
+"الزامی. حداکثر ۱۵۰ کاراکتر. تنها از حروف، ارقام و @/./+/-/_ استفاده شود."
+
+#: apps/users/models/user.py:50
+msgid "Is Admin"
+msgstr "ادمین است؟"
+
+#: apps/wallet/models/base_preset_wallet.py:21
+#: apps/wallet/models/base_preset_wallet.py:25
+msgid "System"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:28
+#: apps/wallet/models/base_wallet_account.py:12
+msgid "Valid"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:29
+#: apps/wallet/models/base_wallet_account.py:13
+msgid "Suspend"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:30
+msgid "Invalid"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:32
+#: apps/wallet/models/currency.py:18 apps/wallet/models/token.py:22
+msgid "Name"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:34 apps/wallet/models/wallet.py:25
+msgid "Wallet Type"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:43
+msgid "Activatoin By"
+msgstr ""
+
+#: apps/wallet/models/base_preset_wallet.py:48
+msgid "default"
+msgstr ""
+
+#: apps/wallet/models/base_wallet_account.py:14
+msgid "Blocked"
+msgstr ""
+
+#: apps/wallet/models/base_wallet_account.py:15
+msgid "Terminated"
+msgstr ""
+
+#: apps/wallet/models/base_wallet_account.py:34
+msgid "Wallet type does not match the preset wallet type."
+msgstr ""
+
+#: apps/wallet/models/currency.py:9
+#: apps/wallet/models/currency_preset_wallet.py:31
+msgid "Currency"
+msgstr ""
+
+#: apps/wallet/models/currency.py:10
+msgid "Currencies"
+msgstr ""
+
+#: apps/wallet/models/currency.py:13 apps/wallet/models/token.py:15
+msgid "Symbol"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:10
+msgid "Currency Preset Wallet"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:11
+msgid "Currency Preset Wallets"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:21
+msgid "Deposit"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:22
+msgid "Withdraw"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:23
+msgid "Purchase"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:24
+#: apps/wallet/models/token_preset_wallet.py:22
+msgid "Transfer In"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:25
+#: apps/wallet/models/token_preset_wallet.py:23
+msgid "Transfer Out"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:26
+msgid "Receive From Exchange"
+msgstr ""
+
+#: apps/wallet/models/currency_preset_wallet.py:39
+#: apps/wallet/models/token_preset_wallet.py:28
+msgid "actions"
+msgstr ""
+
+#: apps/wallet/models/currency_wallet_account.py:11
+msgid "Currency Wallet Account"
+msgstr ""
+
+#: apps/wallet/models/currency_wallet_account.py:12
+msgid "Currency Wallet Accounts"
+msgstr ""
+
+#: apps/wallet/models/currency_wallet_account.py:25
+#: apps/wallet/models/token_wallet_account.py:18
+msgid "Preset Wallet"
+msgstr ""
+
+#: apps/wallet/models/currency_wallet_account.py:31
+#: apps/wallet/models/token_wallet_account.py:24
+#: apps/wallet/models/wallet.py:13
+msgid "Wallet"
+msgstr ""
+
+#: apps/wallet/models/currency_wallet_account.py:37
+msgid "Primary"
+msgstr ""
+
+#: apps/wallet/models/token.py:11 apps/wallet/models/token_wallet_account.py:32
+#: apps/wallet/models/transactions/lottery_ticket.py:44
+#: apps/wallet/models/transactions/referral.py:25
+#: apps/wallet/models/transactions/token.py:30
+msgid "Token"
+msgstr ""
+
+#: apps/wallet/models/token.py:12
+msgid "Tokens"
+msgstr ""
+
+#: apps/wallet/models/token.py:26
+msgid "logo"
+msgstr ""
+
+#: apps/wallet/models/token.py:36
+msgid "Price"
+msgstr ""
+
+#: apps/wallet/models/token_preset_wallet.py:10
+msgid "Token Preset Wallet"
+msgstr ""
+
+#: apps/wallet/models/token_preset_wallet.py:11
+msgid "Token Preset Wallets"
+msgstr ""
+
+#: apps/wallet/models/token_preset_wallet.py:21
+msgid "Exchange"
+msgstr ""
+
+#: apps/wallet/models/token_preset_wallet.py:32
+msgid "Refund Percentage"
+msgstr ""
+
+#: apps/wallet/models/token_wallet_account.py:12
+msgid "Token Wallet Account"
+msgstr ""
+
+#: apps/wallet/models/token_wallet_account.py:13
+msgid "Token Wallet Accounts"
+msgstr ""
+
+#: apps/wallet/models/token_wallet_account.py:35
+#: apps/wallet/models/transactions/lottery_ticket.py:48
+#: apps/wallet/models/transactions/token.py:34
+msgid "Amount"
+msgstr ""
+
+#: apps/wallet/models/transactions/base.py:12
+msgid "Pending"
+msgstr ""
+
+#: apps/wallet/models/transactions/base.py:14
+msgid "Failed"
+msgstr ""
+
+#: apps/wallet/models/transactions/base.py:24
+msgid "Description"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_prize.py:8
+msgid "Lottery Prize Transaction"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_prize.py:9
+msgid "Lottery Prize Transactions"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_prize.py:22
+msgid "Winning Ticket"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_ticket.py:9
+msgid "Lottery Ticket Transaction"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_ticket.py:10
+msgid "Lottery Ticket Transactions"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_ticket.py:23
+#: apps/wallet/models/transactions/token.py:16
+msgid "Source Wallet"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_wheel_prize.py:8
+msgid "Lottery Wheel Prize Transaction"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_wheel_prize.py:9
+msgid "Lottery Wheel Prize Transactions"
+msgstr ""
+
+#: apps/wallet/models/transactions/lottery_wheel_prize.py:22
+msgid "Prize"
+msgstr ""
+
+#: apps/wallet/models/transactions/referral.py:10
+msgid "Referral Reward Transaction"
+msgstr ""
+
+#: apps/wallet/models/transactions/referral.py:11
+msgid "Referral Reward Transactions"
+msgstr ""
+
+#: apps/wallet/models/transactions/referral.py:17
+msgid "Referrer"
+msgstr ""
+
+#: apps/wallet/models/transactions/referral.py:23
+msgid "Ticket Buyer"
+msgstr ""
+
+#: apps/wallet/models/transactions/referral.py:26
+msgid "Reward Tokens Amount"
+msgstr ""
+
+#: apps/wallet/models/transactions/token.py:9
+msgid "Token Transaction"
+msgstr ""
+
+#: apps/wallet/models/transactions/token.py:10
+msgid "Token Transactions"
+msgstr ""
+
+#: apps/wallet/models/transactions/token.py:23
+msgid "Destination Wallet"
+msgstr ""
+
+#: apps/wallet/models/wallet.py:14
+msgid "Wallets"
+msgstr ""
+
+#: apps/wallet/models/wallet.py:19
+msgid "Mixed"
+msgstr ""
+
+#: apps/wallet/serializers/lottery_ticket_transaction/minimal.py:26
+#, python-brace-format
+msgid "Buy {count} Tickets"
+msgstr "خرید {count} بلیط"
+
+#: apps/wallet/serializers/lottery_ticket_transaction/minimal.py:27
+msgid "Buy Ticket"
+msgstr "خرید بلیط"
+
+#: apps/wallet/services/transaction.py:56
+msgid "Lottery ticket purchase: {}"
+msgstr ""
+
+#: apps/wallet/services/transaction.py:70
+msgid "Lottery prize for ticket: {}"
+msgstr ""
+
+#: apps/wallet/services/transaction.py:84
+msgid "Lottery wheel prize: {}"
+msgstr ""
+
+#: apps/user_management/services/customer/customer_update.py:180
+msgid "Token wallet account not provided. Cannot award complete profile points."
+msgstr ""
+
+#: apps/user_management/services/customer/customer_update.py:193
+msgid "Token wallet account does not have points token (L). Cannot award complete profile points."
+msgstr ""
+
+#, python-brace-format
+#~ msgid "Invalid step. Current step: {registration_step}"
+#~ msgstr "مرحله ثبت نام اشتباه است. مرحلهٔ فعلی {registration_step}"
+
+#~ msgid "Reason 2"
+#~ msgstr "بازی و سرگرمی"
+
+#~ msgid "Reason 3"
+#~ msgstr "کسب تخفیفات و مزایای خرید"
+
+#~ msgid "Reason 4"
+#~ msgstr "یادگیری و توسعه مهارت‌ها"
+
+#~ msgid "Reason 5"
+#~ msgstr "استفاده از محتوای آموزشی یا مفید"
+
+#~ msgid "Reason 6"
+#~ msgstr "دلایل دیگر"

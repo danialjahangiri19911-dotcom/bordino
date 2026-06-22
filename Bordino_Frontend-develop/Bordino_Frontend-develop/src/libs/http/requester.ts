@@ -1,0 +1,91 @@
+import type { ResponseApiData } from "./interfaces";
+import { emitError } from "./useErrorListeners";
+import settings from "@libs/settings";
+import axios, { type AxiosError, type AxiosResponse } from "axios";
+
+import { AUTH_URLS, CUSTOMER_URLS } from "@/api/urls";
+
+const requester = axios.create({
+	baseURL: settings.apiBaseUrl,
+	timeout: 2 * 60 * 1000,
+	withCredentials: false,
+});
+
+export type ApiError<T> = {
+	status?: number;
+	message?: string;
+	response?: {
+		data?: ResponseApiData<T>;
+		status?: number;
+	};
+};
+
+const DISABLE_SHOW_ERROR_CLIENT_PATHS = [
+	"/pwa/otp",
+	"/pwa/main",
+	"/pwa/wallet",
+];
+
+const DISABLE_401_ERRORS = ["/pwa/register"];
+
+export type RequestError<Res = ResponseApiData<unknown>> = AxiosError<Res>;
+export type RequestSuccess<Res = ResponseApiData<unknown>> = AxiosResponse<Res>;
+
+export const isRequestError = axios.isAxiosError;
+
+export const standardErrorMessage = (
+	e: RequestError<{ errors: Record<string, string[]> }>,
+): string => {
+	const errors = e?.response?.data?.errors;
+	if (errors && typeof errors === "object") {
+		return Object.entries(errors)
+			.map(([key, messages]) =>
+				Array.isArray(messages)
+					? `${key}: ${messages.join(", ")}`
+					: `${key}: ${messages}`,
+			)
+			.join(" | ");
+	}
+	if (Array.isArray(errors)) {
+		return (errors as string[]).join(", ");
+	}
+	return typeof errors === "string" ? errors : "An unexpected error occurred";
+};
+
+requester.interceptors.response.use(
+	(response) => response,
+	(error: RequestError<{ errors: Record<string, string[]> }>) => {
+		const errorMessage = standardErrorMessage(error);
+
+		const currentPath = window.location.pathname;
+		const shouldDisableError = DISABLE_SHOW_ERROR_CLIENT_PATHS.some((path) =>
+			currentPath.includes(path),
+		);
+
+		const has401Err = DISABLE_401_ERRORS.some((path) =>
+			currentPath.includes(path),
+		);
+
+		if (has401Err && error.status === 401) {
+			return;
+		}
+
+		if (error.config?.url === CUSTOMER_URLS.PROFILE && error.status === 404) {
+			return Promise.reject(error);
+		}
+
+		// خطاهای resend-otp (مثل «۶۰ ثانیه صبر کنید») را به‌صورت سراسری toast نکن؛
+		// این اطلاعات از طریق شمارش معکوسِ صفحه‌ی OTP نمایش داده می‌شود.
+		if (error.config?.url === AUTH_URLS.RESEND_OTP) {
+			return Promise.reject(error);
+		}
+
+		if (!shouldDisableError) {
+			emitError(errorMessage);
+		}
+
+		return Promise.reject(error);
+	},
+);
+
+export default requester;

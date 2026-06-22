@@ -1,0 +1,7 @@
+from apps.wallet.admin.transactions.activity import ActivityTransactionAdmin
+from apps.wallet.admin.transactions.currency import CurrencyTransactionAdmin
+from apps.wallet.admin.transactions.lottery_prize import LotteryPrizeTransactionAdmin
+from apps.wallet.admin.transactions.lottery_ticket import LotteryTicketTransactionAdmin
+from apps.wallet.admin.transactions.lottery_wheel_prize import LotteryWheelPrizeTransactionAdmin
+from apps.wallet.admin.transactions.referral import ReferralRewardTransactionAdmin
+from apps.wallet.admin.transactions.token import TokenTransactionAdmin

@@ -1,0 +1,45 @@
+# ───────── Dependencies ─────────
+**/node_modules/
+**/.venv/
+**/venv/
+**/.yarn/
+**/.pnp.*
+
+# ───────── Python ─────────
+**/__pycache__/
+*.py[cod]
+*$py.class
+**/.mypy_cache/
+**/.pytest_cache/
+**/.ruff_cache/
+
+# ───────── Next.js / build / cache ─────────
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.turbo/
+**/*.tsbuildinfo
+
+# ───────── Logs ─────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/coverage/
+
+# ───────── Env / secrets ─────────
+**/.env
+**/.env.*
+!**/.env.sample
+!**/.env.example
+
+# ───────── Media uploads (server) ─────────
+**/media/uploads/
+**/staticfiles/
+
+# ───────── OS / Editor ─────────
+.DS_Store
+Thumbs.db
+.idea/
+*.swp

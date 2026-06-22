@@ -1,0 +1,1 @@
+from apps.entertainment.admin.fortune_reading import FortuneReadingAdmin

@@ -1,0 +1,29 @@
+import { IconWrapper } from "@libs/components/icons/SvgWrapper";
+import type { BaseSvgInterfaces } from "@libs/components/icons/interfaces";
+
+export default function HomeIcon(props: Readonly<BaseSvgInterfaces>) {
+	return (
+		<IconWrapper {...props}>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 20 20"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<path
+					d="M7.51675 2.36664L3.02508 5.86664C2.27508 6.44997 1.66675 7.69164 1.66675 8.63331V14.8083C1.66675 16.7416 3.24175 18.325 5.17508 18.325H14.8251C16.7584 18.325 18.3334 16.7416 18.3334 14.8166V8.74997C18.3334 7.74164 17.6584 6.44997 16.8334 5.87497L11.6834 2.26664C10.5167 1.44997 8.64175 1.49164 7.51675 2.36664Z"
+					strokeWidth="1.2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				/>
+				<path
+					d="M10 14.9917V12.4917"
+					strokeWidth="1.2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				/>
+			</svg>
+		</IconWrapper>
+	);
+}

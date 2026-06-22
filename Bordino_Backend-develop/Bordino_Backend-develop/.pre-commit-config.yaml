@@ -1,0 +1,38 @@
+exclude: ^(.*index.md|requirements|.*static|.*assets|.*migrations|.*__init__.py)
+default_stages: [ commit ]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        args: [ "--unsafe" ]
+      - id: end-of-file-fixer
+        stages: [ commit ]
+      - id: trailing-whitespace
+        stages: [ commit ]
+      - id: check-merge-conflict
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.10.0-1
+    hooks:
+      - id: shfmt
+        args: [ --indent, "2", --write ]
+        stages: [ commit ]
+
+  - repo: https://github.com/mrtazz/checkmake.git
+    rev: 0.2.2
+    hooks:
+      - id: checkmake
+        args: [ --config, "./.checkmake.ini" ]
+
+  - repo: local
+    hooks:
+      - id: make-format
+        name: Make format
+        entry: make
+        args: [format]
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

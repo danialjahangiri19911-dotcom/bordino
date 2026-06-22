@@ -1,0 +1,1 @@
+from apps.entertainment.models.fortune_reading import FortuneReading

@@ -1,0 +1,14 @@
+{
+	"useTabs": true,
+	"importOrder": [
+		"^react",
+		"^next",
+		"<THIRD_PARTY_MODULES>",
+		"^@/",
+		"^[./].*\\.svg(\\?url)?$",
+		"^[./].*\\.css$"
+	],
+	"importOrderSeparation": true,
+	"importOrderSortSpecifiers": true,
+	"plugins": ["@trivago/prettier-plugin-sort-imports"]
+}

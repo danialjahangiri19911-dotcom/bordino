@@ -1,0 +1,47 @@
+{
+	"name": "Lottery",
+	"short_name": "Lottery",
+	"start_url": "/pwa",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#0070f3",
+	"orientation": "portrait",
+	"description": "Lottery Platform PWA",
+	"icons": [
+		{
+			"src": "/media/logo.svg",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/media/logo.svg",
+			"sizes": "384x384",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/media/logo.svg",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	],
+	"screenshots": [
+		{
+			"src": "/media/screenshot1.png",
+			"sizes": "1280x720",
+			"type": "image/png"
+		}
+	],
+	"categories": ["entertainment", "games", "lottery"],
+	"shortcuts": [
+		{
+			"name": "Play Lottery",
+			"short_name": "Play",
+			"description": "Start playing lottery",
+			"url": "/pwa",
+			"icons": [{ "src": "/media/logo.svg", "sizes": "96x96" }]
+		}
+	]
+}

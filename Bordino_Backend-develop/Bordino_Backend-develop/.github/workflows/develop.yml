@@ -1,0 +1,57 @@
+name: Bordino Backend CICD Stage Server
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-and-deploy:
+    runs-on: bordino-backend-dev
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Copy environment files
+      run: |
+        echo "Copying environment files from server storage..."
+        BASE_DIR="/home/bordino/Backend"
+        
+        cp "${BASE_DIR}/confs/compose/.env" "confs/envs/compose/.env"
+        cp "${BASE_DIR}/confs/db/.env" "confs/envs/db/.env"
+        cp "${BASE_DIR}/confs/main_app/.env" "main_app/.env"
+        cp "${BASE_DIR}/confs/celery/.env" "confs/envs/celery/.env"
+        
+        echo "Environment files copied successfully"
+
+    - name: Build Docker images
+      run: |
+        echo "Building new Docker images..."
+        docker compose --env-file=./confs/envs/compose/.env build --no-cache
+
+    - name: Stop and replace containers
+      run: |
+        echo "Stopping old containers and starting new ones..."
+        docker compose --env-file=./confs/envs/compose/.env down
+        docker compose --env-file=./confs/envs/compose/.env up -d --force-recreate
+
+    - name: Verify deployment
+      run: |
+        echo "Verifying deployment..."
+        docker compose --env-file=./confs/envs/compose/.env ps
+
+    - name: Clean up unused Docker images
+      run: |
+        echo "Cleaning up old Docker images..."
+        docker image prune -f
+        docker buildx prune -f

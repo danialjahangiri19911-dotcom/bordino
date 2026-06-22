@@ -1,0 +1,2 @@
+from apps.user_management.repositories.customer.command import CustomerCommandRepository
+from apps.user_management.repositories.customer.query import CustomerQueryRepository
