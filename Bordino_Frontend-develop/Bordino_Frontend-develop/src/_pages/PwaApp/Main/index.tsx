@@ -44,9 +44,9 @@ export default function Main() {
 					remainingTime={remainingTime}
 				/>
 
-				<PromoCarousel />
-
 				<DailyTasks tasks={DAILY_TASKS_MOCK_DATA} />
+
+				<PromoCarousel />
 
 				<DailyTasks
 					tasks={SPECIAL_CHALLENGE}

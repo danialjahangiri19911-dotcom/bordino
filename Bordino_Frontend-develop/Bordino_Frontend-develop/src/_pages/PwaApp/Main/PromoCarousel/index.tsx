@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import Box from "@libs/components/atoms/Box";
 import "swiper/css";
+import { Autoplay } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
 const ACTIVE_DOT = "#E64056";
@@ -169,9 +170,12 @@ export default function PromoCarousel() {
 		<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
 			<Box sx={{ width: "100%" }}>
 				<Swiper
+					modules={[Autoplay]}
+					autoplay={{ delay: 5000, disableOnInteraction: false }}
+					loop
 					slidesPerView={1}
 					spaceBetween={16}
-					onSlideChange={(swiper) => setActive(swiper.activeIndex)}
+					onSlideChange={(swiper) => setActive(swiper.realIndex)}
 					style={{ width: "100%" }}
 				>
 					{SLIDES.map((slide) => (
