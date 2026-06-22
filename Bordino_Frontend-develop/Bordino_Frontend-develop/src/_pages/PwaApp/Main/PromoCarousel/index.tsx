@@ -1,12 +1,10 @@
 "use client";
 
-// پیاده‌سازی «Component 17» از فیگما (node 963:25250): اسلایدر بنریِ صفحه‌ی اصلی
-// با دو اسلاید (فال حافظ / گردونه شانس) + نقطه‌های pagination.
-// نکته: چون پروژه stylis-plugin-rtl دارد و مقادیر left/right را فلیپ می‌کند،
-// برای موقعیت‌دهیِ absolute و textAlign از inline style استفاده شده تا چیدمان
-// دقیقاً مثل فیگما (عکس چپ، متن راست) بماند.
 import { useState } from "react";
 
+import { useRouter } from "next/navigation";
+
+import { HAFEZ } from "@/constants/routes";
 import Box from "@libs/components/atoms/Box";
 import "swiper/css";
 import { Autoplay } from "swiper/modules";
@@ -37,6 +35,7 @@ interface SlideSpec {
 	subtitle: string;
 	buttonText: string;
 	buttonTextColor: string;
+	href?: string;
 	ellipses: EllipseSpec[];
 }
 
@@ -50,6 +49,7 @@ const SLIDES: SlideSpec[] = [
 		subtitle: "بیا بریم فال حافظ امروزتو بگیریم",
 		buttonText: "بریم",
 		buttonTextColor: "#E64056",
+		href: "/pwa/hafez",
 		ellipses: [
 			{ left: -2, top: 0, w: 152, h: 106, color: "#FF0505", opacity: 0.6, blur: 25 },
 			{ left: 10, top: 96, w: 123, h: 10, color: "#BB1D1D" },
@@ -72,7 +72,7 @@ const SLIDES: SlideSpec[] = [
 	},
 ];
 
-function PromoCard({ slide }: Readonly<{ slide: SlideSpec }>) {
+function PromoCard({ slide, onButtonClick }: Readonly<{ slide: SlideSpec; onButtonClick?: () => void }>) {
 	return (
 		<div
 			style={{
@@ -141,6 +141,7 @@ function PromoCard({ slide }: Readonly<{ slide: SlideSpec }>) {
 				</div>
 				<div style={{ marginTop: 4 }}>
 					<span
+						onClick={onButtonClick}
 						style={{
 							display: "inline-flex",
 							alignItems: "center",
@@ -165,6 +166,7 @@ function PromoCard({ slide }: Readonly<{ slide: SlideSpec }>) {
 
 export default function PromoCarousel() {
 	const [active, setActive] = useState(0);
+	const { push } = useRouter();
 
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
@@ -180,7 +182,10 @@ export default function PromoCarousel() {
 				>
 					{SLIDES.map((slide) => (
 						<SwiperSlide key={slide.key}>
-							<PromoCard slide={slide} />
+							<PromoCard
+								slide={slide}
+								onButtonClick={slide.href ? () => push(slide.href!) : undefined}
+							/>
 						</SwiperSlide>
 					))}
 				</Swiper>

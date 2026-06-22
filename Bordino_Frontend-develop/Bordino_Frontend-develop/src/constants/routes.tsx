@@ -88,3 +88,15 @@ export const LOTTERY_GUIDE = {
 	path: `${LOTTERY.path}/guide`,
 	icon: "",
 };
+
+export const HAFEZ = {
+	title: "فال حافظ",
+	path: `${APP_HOME.path}/hafez`,
+	icon: "",
+};
+
+export const HAFEZ_RESULT = {
+	title: "نتیجه فال حافظ",
+	path: `${APP_HOME.path}/hafez/result`,
+	icon: "",
+};
