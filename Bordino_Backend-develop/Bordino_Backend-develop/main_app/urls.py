@@ -18,5 +18,16 @@ urlpatterns += [
 ]
 
 if settings.DEBUG:
+    from django.urls import re_path
+
+    from main_app.media_serve import serve_media_with_range
+
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Range-capable media serving so the browser can seek in audio/video.
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            serve_media_with_range,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]

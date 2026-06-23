@@ -33,12 +33,12 @@ export default function HafezResultPage() {
 				flexDirection: "column",
 			}}
 		>
-			{/* نوار بازگشت */}
+			{/* نوار بازگشت — در RTL با flex-start سمت راست قرار می‌گیرد (مثل فیگما) */}
 			<div
 				style={{
 					display: "flex",
 					alignItems: "center",
-					justifyContent: "flex-end",
+					justifyContent: "flex-start",
 					padding: "12px 16px",
 					direction: "rtl",
 				}}
@@ -133,37 +133,40 @@ export default function HafezResultPage() {
 				{/* نتیجه فال */}
 				{parsed && (
 					<>
-						{/* تصویر کاغذ وینتیج با شعر */}
-						<div style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
-							<img
-								src="/media/App/hafez/paper.png"
-								alt=""
-								style={{ width: "100%", display: "block", objectFit: "cover" }}
-							/>
-
+						{/*
+						 * قاب با border-image (نه‌-اسلایس): گوشه‌ها و نوارهای بالا/پایین
+						 * ثابت می‌مانند و فقط بخش وسطِ قاب به‌صورت عمودی کشیده می‌شود،
+						 * پس ارتفاع باکس با طول غزل تطبیق می‌یابد بدون اینکه تزئینات له شوند.
+						 * مقادیر slice از روی ابعاد واقعی paper.png (۱۰۷۴×۱۷۹۱) تخمین زده شده.
+						 */}
+						<div
+							style={{
+								background: "#FCFAF5",
+								borderStyle: "solid",
+								borderColor: "transparent",
+								borderWidth: "64px 50px 62px 52px",
+								borderImageSource: "url(/media/App/hafez/paper.png)",
+								borderImageSlice: "240 185 235 195",
+								borderImageRepeat: "stretch",
+							}}
+						>
 							{/* عنوان غزل */}
 							<div
 								style={{
-									position: "absolute",
-									top: 16,
-									right: 16,
 									fontSize: 14,
 									fontWeight: 500,
 									color: TEXT_DARK,
+									textAlign: "center",
 									direction: "rtl",
+									marginBottom: 8,
 								}}
 							>
 								{fortune?.question}
 							</div>
 
-							{/* دو ستون شعر */}
+							{/* دو ستون شعر — در جریان عادی، پس باکس با شعر بزرگ/کوچک می‌شود */}
 							<div
 								style={{
-									position: "absolute",
-									top: 40,
-									left: 16,
-									right: 16,
-									bottom: 16,
 									display: "flex",
 									flexDirection: "row",
 									gap: 8,
@@ -173,13 +176,13 @@ export default function HafezResultPage() {
 								<div
 									style={{
 										flex: 1,
-										fontSize: 11,
+										fontSize: 18,
 										fontWeight: 400,
-										lineHeight: "24px",
+										lineHeight: "44px",
 										color: "#000",
 										textAlign: "center",
 										whiteSpace: "pre-line",
-										fontFamily: "serif",
+										fontFamily: "'IranNastaliq', serif",
 									}}
 								>
 									{parsed.rightCol.join("\n")}
@@ -187,13 +190,13 @@ export default function HafezResultPage() {
 								<div
 									style={{
 										flex: 1,
-										fontSize: 11,
+										fontSize: 18,
 										fontWeight: 400,
-										lineHeight: "24px",
+										lineHeight: "44px",
 										color: "#000",
 										textAlign: "center",
 										whiteSpace: "pre-line",
-										fontFamily: "serif",
+										fontFamily: "'IranNastaliq', serif",
 									}}
 								>
 									{parsed.leftCol.join("\n")}

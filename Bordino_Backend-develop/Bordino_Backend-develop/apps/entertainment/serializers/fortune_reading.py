@@ -12,7 +12,12 @@ class FortuneReadingSerializer(BaseModelSerializer):
         if not obj.audio_url:
             return None
         request = self.context.get("request")
-        path = f"{settings.MEDIA_URL}{obj.audio_url}"
+        # MEDIA_URL is "media/" (no leading slash); without one
+        # build_absolute_uri would resolve it relative to the API path.
+        media_url = settings.MEDIA_URL
+        if not media_url.startswith("/"):
+            media_url = "/" + media_url
+        path = f"{media_url}{obj.audio_url}"
         if request:
             return request.build_absolute_uri(path)
         return path

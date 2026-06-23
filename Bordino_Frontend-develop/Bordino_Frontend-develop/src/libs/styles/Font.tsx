@@ -36,12 +36,18 @@ export function Fonts() {
             font-family: 'shabnam';
             font-style: normal;
             font-weight: ${font.fontWeight};
-            src: 
+            src:
                  url(${font.files.ttf}) format('truetype')
           }
-                
+
         `,
 				)}
+				@font-face {
+					font-family: 'IranNastaliq';
+					font-style: normal;
+					font-weight: normal;
+					src: url(/fonts/IranNastaliq.ttf) format('truetype');
+				}
 				* {
 					font-family: "shabnam", sans-serif;
 				}
