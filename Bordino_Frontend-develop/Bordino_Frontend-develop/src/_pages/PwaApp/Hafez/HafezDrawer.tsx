@@ -92,24 +92,26 @@ export default function HafezDrawer({ open, onClose }: Props) {
 						gap: 12,
 					}}
 				>
-					{/* ردیف بالا: آیکون و عنوان کنار هم، سمت راست (مثل فیگما) */}
+					{/* ردیف بالا: آیکون و عنوان کنار هم، سمت راست (مثل فیگما).
+					    کانتکست RTL است؛ flex-start یعنی راست. ترتیب: آیکون راست، متن چپ. */}
 					<div
 						style={{
 							display: "flex",
+							direction: "rtl",
 							flexDirection: "row",
 							alignItems: "center",
-							justifyContent: "flex-end",
+							justifyContent: "flex-start",
 							gap: 8,
 						}}
 					>
-						<span style={{ fontSize: 20, fontWeight: 700, color: TITLE_COLOR }}>
-							فال حافظ
-						</span>
 						<img
 							src="/media/App/hafez/icon.png"
 							alt=""
 							style={{ width: 40, height: 40, objectFit: "contain" }}
 						/>
+						<span style={{ fontSize: 20, fontWeight: 700, color: TITLE_COLOR }}>
+							فال حافظ
+						</span>
 					</div>
 
 					{/* خط جدا‌کننده */}
