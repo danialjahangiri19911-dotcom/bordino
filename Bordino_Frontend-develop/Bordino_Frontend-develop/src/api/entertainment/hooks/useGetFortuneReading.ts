@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { ENTERTAINMENT_URLS } from "@/api/urls";
-import useGet from "@/libs/http/useGet";
+import requester from "@/libs/http/requester";
 import type { FortuneReading } from "../types/fortuneReadingType";
 
 export default function useGetFortuneReading() {
@@ -9,23 +9,22 @@ export default function useGetFortuneReading() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(false);
 
-	const { get } = useGet<FortuneReading>({
-		onSuccess: (data) => {
-			setFortune(data);
-			setLoading(false);
-		},
-		onError: () => {
-			setError(true);
-			setLoading(false);
-		},
-	});
-
-	const fetchFortune = useCallback(() => {
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const fetchFortune = useCallback(async () => {
 		setLoading(true);
 		setError(false);
 		setFortune(null);
-		get(ENTERTAINMENT_URLS.RANDOM_FORTUNE);
-	}, [get]);
+		try {
+			const { data } = await requester.get<FortuneReading>(
+				ENTERTAINMENT_URLS.RANDOM_FORTUNE,
+			);
+			setFortune(data);
+		} catch {
+			setError(true);
+		} finally {
+			setLoading(false);
+		}
+	}, []); // stable reference — no external deps that change
 
 	return { fortune, loading, error, fetchFortune };
 }
