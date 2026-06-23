@@ -3,7 +3,7 @@ import { emitError } from "./useErrorListeners";
 import settings from "@libs/settings";
 import axios, { type AxiosError, type AxiosResponse } from "axios";
 
-import { AUTH_URLS, CUSTOMER_URLS } from "@/api/urls";
+import { ACTIVITY_URLS, AUTH_URLS, CUSTOMER_URLS } from "@/api/urls";
 
 const requester = axios.create({
 	baseURL: settings.apiBaseUrl,
@@ -77,6 +77,13 @@ requester.interceptors.response.use(
 		// خطاهای resend-otp (مثل «۶۰ ثانیه صبر کنید») را به‌صورت سراسری toast نکن؛
 		// این اطلاعات از طریق شمارش معکوسِ صفحه‌ی OTP نمایش داده می‌شود.
 		if (error.config?.url === AUTH_URLS.RESEND_OTP) {
+			return Promise.reject(error);
+		}
+
+		// ثبت اکشن‌های امتیازی (سودوکو/بازی‌ها) پس‌زمینه‌ای است؛ اگر امتیازی
+		// برای آن اکشن تنظیم نشده باشد بک‌اند خطا می‌دهد، ولی نباید بازی را
+		// با toast سراسری قطع کند.
+		if (error.config?.url === ACTIVITY_URLS.RECORD_ACTION) {
 			return Promise.reject(error);
 		}
 
