@@ -2,6 +2,7 @@ export interface FortuneReadingData {
 	type: "hafez";
 	question: string; // عنوان غزل مثل «غزل ۷۱»
 	result: string;   // مصراع‌ها + \n===\n + تفسیر
+	audio_url: string | null;
 }
 
 /** شکل واقعی response از API — همه endpoint ها در این wrapper می‌آیند */

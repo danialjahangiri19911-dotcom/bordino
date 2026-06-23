@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 
 import { ENTERTAINMENT_URLS } from "@/api/urls";
-import requester from "@/libs/http/requester";
 import useAuthStore from "@/libs/stores/authStore";
+import { fetchWithAuth } from "@/libs/http/query";
 import type { FortuneReading, FortuneReadingData } from "../types/fortuneReadingType";
 
 export default function useGetFortuneReading() {
@@ -15,18 +15,13 @@ export default function useGetFortuneReading() {
 		setError(false);
 		setFortune(null);
 		try {
-			// Read token at call time (same pattern as query.ts:63) — keeps callback stable
 			const { accessToken } = useAuthStore.getState();
-			const { data } = await requester.get<FortuneReading>(
+			const { data } = await fetchWithAuth(
 				ENTERTAINMENT_URLS.RANDOM_FORTUNE,
-				{
-					headers: accessToken
-						? { Authorization: `Bearer ${accessToken}` }
-						: undefined,
-				},
+				accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
 			);
 			// همه endpoint ها در { is_successful, result, ... } wrap می‌شوند
-			setFortune(data.result);
+			setFortune((data as FortuneReading).result);
 		} catch {
 			setError(true);
 		} finally {

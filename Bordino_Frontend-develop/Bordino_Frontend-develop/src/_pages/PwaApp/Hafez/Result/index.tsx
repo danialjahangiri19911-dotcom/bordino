@@ -230,6 +230,15 @@ export default function HafezResultPage() {
 							</p>
 						</div>
 
+						{/* پخش صوت */}
+						{fortune?.audio_url && (
+							<audio
+								controls
+								src={fortune.audio_url}
+								style={{ width: "100%", direction: "ltr" }}
+							/>
+						)}
+
 						{/* دکمه‌های عملیاتی */}
 						<div
 							style={{

@@ -29,6 +29,13 @@ class FortuneReading(AbstractBaseModel):
         null=True,
         help_text=_("The fortune reading result or interpretation"),
     )
+    audio_url = models.CharField(
+        verbose_name=_("Audio Path"),
+        max_length=300,
+        blank=True,
+        null=True,
+        help_text=_("Relative path to local MP3 file under MEDIA_ROOT"),
+    )
 
     def __str__(self):
         return f"{self.id} - {self.type} - {self.create_time}"

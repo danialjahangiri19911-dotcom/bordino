@@ -100,6 +100,8 @@ async function fetchWithAuth(url: string, headers?: Record<string, string>) {
 	}
 }
 
+export { fetchWithAuth };
+
 function createDefaultFetcher(url: string, headers?: Record<string, string>) {
 	async function fetcher() {
 		return await fetchWithAuth(url, headers ?? undefined);
