@@ -3,10 +3,10 @@ import { useCallback, useState } from "react";
 import { ENTERTAINMENT_URLS } from "@/api/urls";
 import requester from "@/libs/http/requester";
 import useAuthStore from "@/libs/stores/authStore";
-import type { FortuneReading } from "../types/fortuneReadingType";
+import type { FortuneReading, FortuneReadingData } from "../types/fortuneReadingType";
 
 export default function useGetFortuneReading() {
-	const [fortune, setFortune] = useState<FortuneReading | null>(null);
+	const [fortune, setFortune] = useState<FortuneReadingData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(false);
 
@@ -25,7 +25,8 @@ export default function useGetFortuneReading() {
 						: undefined,
 				},
 			);
-			setFortune(data);
+			// همه endpoint ها در { is_successful, result, ... } wrap می‌شوند
+			setFortune(data.result);
 		} catch {
 			setError(true);
 		} finally {
