@@ -45,3 +45,7 @@ export const GAME_URLS = {
 export const ACTIVITY_URLS = {
 	RECORD_ACTION: "activity/record-action/",
 };
+
+export const ENTERTAINMENT_URLS = {
+	RANDOM_FORTUNE: "entertainment/fortune-reading/",
+};

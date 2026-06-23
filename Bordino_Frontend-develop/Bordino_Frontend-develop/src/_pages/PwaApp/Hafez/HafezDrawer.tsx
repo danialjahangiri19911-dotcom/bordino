@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { HAFEZ_RESULT, MAIN_APP } from "@/constants/routes";
+import { HAFEZ_RESULT } from "@/constants/routes";
 
 interface Props {
 	open: boolean;
@@ -20,17 +20,28 @@ export default function HafezDrawer({ open, onClose }: Props) {
 	if (!open) return null;
 
 	return (
+		/*
+		 * محدود‌کننده: همان max-width/centering که PageWrapper دارد.
+		 * position: fixed + left: 50% + translateX(-50%) مطمئن می‌کند
+		 * روی ناحیه خاکستری کنار صفحه نمی‌رود.
+		 */
 		<div
 			style={{
 				position: "fixed",
-				inset: 0,
+				top: 0,
+				bottom: 0,
+				left: "50%",
+				transform: "translateX(-50%)",
+				width: "100%",
+				maxWidth: 600,
 				zIndex: 1200,
 				display: "flex",
 				flexDirection: "column",
 				justifyContent: "flex-end",
+				pointerEvents: "auto",
 			}}
 		>
-			{/* Dark backdrop */}
+			{/* Dark backdrop — همان محدوده */}
 			<div
 				onClick={onClose}
 				style={{
@@ -40,7 +51,7 @@ export default function HafezDrawer({ open, onClose }: Props) {
 				}}
 			/>
 
-			{/* Bottom sheet — 395px, matches Figma */}
+			{/* Bottom sheet: 395px طبق فیگما */}
 			<div
 				style={{
 					position: "relative",
@@ -48,11 +59,9 @@ export default function HafezDrawer({ open, onClose }: Props) {
 					height: 395,
 					background: "#FFFFFF",
 					borderRadius: "24px 24px 0 0",
-					display: "flex",
-					flexDirection: "column",
 				}}
 			>
-				{/* Panda image — y=19 from sheet top, horizontally centered (Figma: x=131 of 390) */}
+				{/* تصویر پاندا — y=19 از بالای شیت (طبق فیگما)، وسط‌چین */}
 				<div
 					style={{
 						position: "absolute",
@@ -71,7 +80,7 @@ export default function HafezDrawer({ open, onClose }: Props) {
 					/>
 				</div>
 
-				{/* Content starts at y=162 (matching Figma frame offset) */}
+				{/* محتوا از y=162 طبق فیگما */}
 				<div
 					style={{
 						position: "absolute",
@@ -83,7 +92,7 @@ export default function HafezDrawer({ open, onClose }: Props) {
 						gap: 12,
 					}}
 				>
-					{/* Header row: title right, icon left */}
+					{/* ردیف بالا: عنوان راست، آیکون چپ */}
 					<div
 						style={{
 							display: "flex",
@@ -102,10 +111,10 @@ export default function HafezDrawer({ open, onClose }: Props) {
 						/>
 					</div>
 
-					{/* Separator */}
+					{/* خط جدا‌کننده */}
 					<div style={{ height: 1, background: "#EBEBEB" }} />
 
-					{/* Description */}
+					{/* متن راهنما */}
 					<p
 						style={{
 							margin: 0,
@@ -120,7 +129,7 @@ export default function HafezDrawer({ open, onClose }: Props) {
 						نیت کن و روی دکمه‌ی گرفتن فال بزن. امیدوارم فال تو با دلت هم‌خوانی داشته باشه.
 					</p>
 
-					{/* Buttons */}
+					{/* دکمه‌ها */}
 					<div
 						style={{
 							display: "flex",

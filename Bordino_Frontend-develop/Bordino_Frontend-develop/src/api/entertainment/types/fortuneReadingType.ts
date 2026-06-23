@@ -1,0 +1,22 @@
+export interface FortuneReading {
+	type: "hafez";
+	question: string; // عنوان غزل مثل «غزل ۷۱»
+	result: string;   // مصراع‌ها + \n===\n + تفسیر
+}
+
+/** مصراع‌ها را به دو ستون راست/چپ تقسیم می‌کند */
+export function parseHafezResult(result: string): {
+	rightCol: string[];
+	leftCol: string[];
+	interpretation: string;
+} {
+	const [poemPart = "", interpretation = ""] = result.split("\n===\n");
+	const lines = poemPart.split("\n").filter((l) => l.trim());
+	const rightCol: string[] = [];
+	const leftCol: string[] = [];
+	lines.forEach((line, i) => {
+		if (i % 2 === 0) rightCol.push(line);
+		else leftCol.push(line);
+	});
+	return { rightCol, leftCol, interpretation: interpretation.trim() };
+}
