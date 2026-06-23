@@ -28,33 +28,33 @@ export function GameOverDialog({
 	onExit,
 }: GameOverDialogProps) {
 	return (
-		<Dialog open={open} onClose={onExit}>
-			<DialogTitle sx={{ fontFamily: '"Special Elite", cursive' }}>
-				Game Over
+		<Dialog open={open} onClose={onExit} dir="rtl">
+			<DialogTitle>
+				پایان بازی
 				<IconButton
-					aria-label="close"
+					aria-label="بستن"
 					onClick={onExit}
 					sx={{ position: "absolute", right: 8, top: 8 }}
 				>
 					<CloseIcon />
 				</IconButton>
 			</DialogTitle>
-			<DialogContent sx={{ fontFamily: '"Special Elite", cursive' }}>
+			<DialogContent>
 				<Paper sx={{ p: 2, bgcolor: DeepOrange200 }}>
 					<Typography variant="h6" align="center">
-						{mistakes >= maxMistakes ? "Too many mistakes!" : "Time's up!"}
+						{mistakes >= maxMistakes ? "خطاهای زیاد!" : "زمان تمام شد!"}
 					</Typography>
 					<Typography variant="body1" align="center" sx={{ mt: 1 }}>
-						Would you like to try again?
+						می‌خواهی دوباره تلاش کنی؟
 					</Typography>
 				</Paper>
 			</DialogContent>
 			<DialogActions>
 				<Button onClick={onNewGame} variant="contained">
-					New Game
+					بازی جدید
 				</Button>
 				<Button onClick={onExit} variant="outlined">
-					Exit to Menu
+					خروج به منو
 				</Button>
 			</DialogActions>
 		</Dialog>
@@ -73,24 +73,22 @@ export function ExitConfirmDialog({
 	onCancel,
 }: ExitConfirmDialogProps) {
 	return (
-		<Dialog open={open} onClose={onCancel}>
-			<DialogTitle sx={{ fontFamily: '"Special Elite", cursive' }}>
-				Exit to menu?
+		<Dialog open={open} onClose={onCancel} dir="rtl">
+			<DialogTitle>
+				خروج به منو؟
 				<IconButton
-					aria-label="close"
+					aria-label="بستن"
 					onClick={onCancel}
 					sx={{ position: "absolute", right: 8, top: 8 }}
 				>
 					<CloseIcon />
 				</IconButton>
 			</DialogTitle>
-			<DialogContent sx={{ fontFamily: '"Special Elite", cursive' }}>
-				Your current progress will be lost.
-			</DialogContent>
+			<DialogContent>پیشرفت فعلی بازی از بین می‌رود.</DialogContent>
 			<DialogActions>
-				<Button onClick={onCancel}>Cancel</Button>
+				<Button onClick={onCancel}>انصراف</Button>
 				<Button onClick={onConfirm} variant="contained" color="primary">
-					Exit
+					خروج
 				</Button>
 			</DialogActions>
 		</Dialog>
@@ -115,6 +113,7 @@ export function VictoryMessage({
 	if (!difficulty) return null;
 	return (
 		<Paper
+			dir="rtl"
 			sx={{
 				mt: 2,
 				p: 2,
@@ -124,25 +123,25 @@ export function VictoryMessage({
 			}}
 		>
 			<Typography variant="h6" align="center">
-				🎉 Puzzle solved! 🎉
+				🎉 آفرین! حل شد 🎉
 			</Typography>
 			{difficulty === "easy" && !mediumUnlocked && completions.easy === 1 && (
 				<Typography variant="body2" align="center" sx={{ mt: 1 }}>
-					Congratulations! Medium difficulty is now unlocked.
+					تبریک! سطح «متوسط» باز شد.
 				</Typography>
 			)}
 			{difficulty === "medium" && completions.medium === 1 && (
 				<Typography variant="body2" align="center" sx={{ mt: 1 }}>
-					Great! One more Medium win to unlock Hard.
+					عالی بود! یک برد دیگر در «متوسط» تا باز شدن «سخت».
 				</Typography>
 			)}
 			{difficulty === "medium" && completions.medium === 2 && hardUnlocked && (
 				<Typography variant="body2" align="center" sx={{ mt: 1 }}>
-					Amazing! Hard difficulty is now unlocked.
+					فوق‌العاده! سطح «سخت» باز شد.
 				</Typography>
 			)}
 			<Button variant="contained" onClick={onContinue} sx={{ mt: 2 }}>
-				Continue
+				ادامه
 			</Button>
 		</Paper>
 	);

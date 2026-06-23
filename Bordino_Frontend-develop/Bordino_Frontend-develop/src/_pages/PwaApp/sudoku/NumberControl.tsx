@@ -3,6 +3,8 @@ import React from "react";
 import { CircularProgress } from "./CircularProgress";
 import { NumberButton } from "./styles";
 
+import { toFa } from "@/libs/games/sudoku/faDigits";
+
 export interface NumberControlProps {
 	number: number;
 	completion: number;
@@ -24,7 +26,7 @@ export function NumberControl({
 			onClick={onClick}
 			onDoubleClick={onDoubleClick}
 		>
-			<div>{number}</div>
+			<div>{toFa(number)}</div>
 			<CircularProgress percent={completion} />
 		</NumberButton>
 	);

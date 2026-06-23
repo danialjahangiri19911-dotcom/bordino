@@ -88,7 +88,7 @@ export function useSudoku() {
 			const remaining = Math.max(0, deserialized.timeRemaining - timeElapsed);
 
 			if (remaining <= 0 && deserialized.status === "playing") {
-				toast.info("Your previous game expired.");
+				toast.info("بازی قبلی شما منقضی شد.");
 				return;
 			}
 			deserialized.timeRemaining = remaining;
@@ -131,11 +131,11 @@ export function useSudoku() {
 
 		const status = newGameQuery.error.response?.status;
 		if (status === 404 || status === 400) {
-			toast.error("This difficulty is not available.");
+			toast.error("این سطح در دسترس نیست.");
 		} else if (status === 500) {
-			toast.error("Server error. Please try again later.");
+			toast.error("خطای سرور. لطفاً بعداً دوباره تلاش کنید.");
 		} else {
-			toast.error("Failed to load game configuration.");
+			toast.error("بارگذاری تنظیمات بازی ناموفق بود.");
 		}
 		setRequestedDifficulty(null);
 	}, [newGameQuery.error, requestedDifficulty]);
@@ -182,7 +182,7 @@ export function useSudoku() {
 		}
 
 		if (limitsChanged) {
-			toast.info("Game limits updated to match current configuration.");
+			toast.info("محدودیت‌های بازی با تنظیمات فعلی به‌روزرسانی شد.");
 		}
 	}, [
 		resumeQuery.config,
@@ -200,7 +200,7 @@ export function useSudoku() {
 		if (!resumeQuery.error || isResumeCheckDone) return;
 		setIsResumeCheckDone(true);
 		toast.warn(
-			"Could not verify game configuration – continuing with saved limits.",
+			"تأیید تنظیمات بازی ممکن نشد؛ با محدودیت‌های ذخیره‌شده ادامه می‌دهیم.",
 		);
 	}, [resumeQuery.error, isResumeCheckDone]);
 

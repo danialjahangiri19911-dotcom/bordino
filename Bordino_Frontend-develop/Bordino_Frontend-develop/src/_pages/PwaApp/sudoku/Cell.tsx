@@ -2,6 +2,7 @@ import React from "react";
 
 import { CellButton, NoteGrid, NoteNumber } from "./styles";
 
+import { toFa } from "@/libs/games/sudoku/faDigits";
 import { range } from "@/libs/games/sudoku/generation";
 import {
 	ControlNumberColor,
@@ -49,12 +50,12 @@ export function Cell({
 				<NoteGrid>
 					{range(9).map((i) => (
 						<NoteNumber key={i}>
-							{notes.has((i + 1) as CellValue) ? i + 1 : ""}
+							{notes.has((i + 1) as CellValue) ? toFa(i + 1) : ""}
 						</NoteNumber>
 					))}
 				</NoteGrid>
 			) : (
-				value || ""
+				(value && toFa(value)) || ""
 			)}
 		</CellButton>
 	);

@@ -31,7 +31,6 @@ export default function SudokuPage() {
 		timeRemaining,
 		maxMistakes,
 		canUndo,
-		canRedo,
 		isLoadingConfig,
 		remainingHints,
 		generateGame,
@@ -41,7 +40,6 @@ export default function SudokuPage() {
 		toggleNote,
 		hint,
 		undo,
-		redo,
 		exitToMenu,
 	} = useSudoku();
 
@@ -133,6 +131,7 @@ export default function SudokuPage() {
 				timeRemaining={timeRemaining}
 				mistakes={mistakes}
 				maxMistakes={maxMistakes}
+				difficulty={difficulty}
 				onExitClick={handleExitClick}
 			/>
 
@@ -155,12 +154,10 @@ export default function SudokuPage() {
 			<ActionButtons
 				remainingHints={remainingHints}
 				canUndo={canUndo}
-				canRedo={canRedo}
 				status={status}
 				selectedCoords={selectedCoords}
 				board={board}
 				onUndo={undo}
-				onRedo={redo}
 				onErase={eraseCell}
 				onHint={hint}
 			/>

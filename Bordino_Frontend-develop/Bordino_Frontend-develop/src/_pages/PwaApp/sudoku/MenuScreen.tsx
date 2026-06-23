@@ -5,6 +5,8 @@ import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
 
+import { toFa } from "@/libs/games/sudoku/faDigits";
+
 interface MenuScreenProps {
 	completions: { easy: number; medium: number };
 	mediumUnlocked: boolean;
@@ -20,6 +22,7 @@ export function MenuScreen({
 }: MenuScreenProps) {
 	return (
 		<Container
+			dir="rtl"
 			maxWidth="sm"
 			sx={{
 				display: "flex",
@@ -30,39 +33,30 @@ export function MenuScreen({
 				py: 4,
 			}}
 		>
-			<Typography
-				variant="h4"
-				gutterBottom
-				fontFamily='"Special Elite", cursive'
-			>
-				Sudoku Evolved
+			<Typography variant="h4" gutterBottom fontWeight={700}>
+				سودوکو
 			</Typography>
-			<Typography
-				variant="body1"
-				paragraph
-				align="center"
-				fontFamily='"Special Elite", cursive'
-			>
-				Discover the next evolution of Sudoku. Beat Easy to unlock Medium, beat
-				Medium twice to unlock Hard.
+			<Typography variant="body1" paragraph align="center">
+				سطح بازی را انتخاب کن. با بردن «آسان»، «متوسط» باز می‌شود و با دو برد در
+				«متوسط»، «سخت» باز می‌شود.
 			</Typography>
 
 			<Box sx={{ width: "100%", maxWidth: 300, mt: 4 }}>
 				<Typography variant="h6" gutterBottom align="center">
-					Select Difficulty
+					انتخاب سطح
 				</Typography>
 
 				<Button
 					fullWidth
 					variant="contained"
 					size="large"
-					sx={{ mb: 2, fontFamily: '"Special Elite", cursive' }}
+					sx={{ mb: 2 }}
 					onClick={() => onSelectDifficulty("easy")}
 				>
-					Easy
+					آسان
 					{completions.easy > 0 && (
-						<Typography variant="caption" sx={{ ml: 1 }}>
-							({completions.easy} {completions.easy === 1 ? "win" : "wins"})
+						<Typography variant="caption" sx={{ mr: 1 }}>
+							({toFa(completions.easy)} برد)
 						</Typography>
 					)}
 				</Button>
@@ -71,15 +65,15 @@ export function MenuScreen({
 					fullWidth
 					variant={mediumUnlocked ? "contained" : "outlined"}
 					size="large"
-					sx={{ mb: 2, fontFamily: '"Special Elite", cursive' }}
+					sx={{ mb: 2 }}
 					disabled={!mediumUnlocked}
 					onClick={() => mediumUnlocked && onSelectDifficulty("medium")}
 				>
-					Medium
-					{!mediumUnlocked && " (Locked)"}
+					متوسط
+					{!mediumUnlocked && " (قفل)"}
 					{mediumUnlocked && completions.medium > 0 && (
-						<Typography variant="caption" sx={{ ml: 1 }}>
-							({completions.medium}/2 wins)
+						<Typography variant="caption" sx={{ mr: 1 }}>
+							({toFa(completions.medium)}/۲ برد)
 						</Typography>
 					)}
 				</Button>
@@ -88,12 +82,11 @@ export function MenuScreen({
 					fullWidth
 					variant={hardUnlocked ? "contained" : "outlined"}
 					size="large"
-					sx={{ fontFamily: '"Special Elite", cursive' }}
 					disabled={!hardUnlocked}
 					onClick={() => hardUnlocked && onSelectDifficulty("hard")}
 				>
-					Hard
-					{!hardUnlocked && " (Locked)"}
+					سخت
+					{!hardUnlocked && " (قفل)"}
 				</Button>
 			</Box>
 		</Container>

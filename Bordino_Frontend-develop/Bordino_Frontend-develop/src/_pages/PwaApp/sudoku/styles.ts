@@ -107,7 +107,7 @@ export const NumberPadContainer = styled("div")({
 	alignItems: "center",
 	flexWrap: "wrap",
 	justifyContent: "center",
-	fontFamily: '"Special Elite", cursive',
+	fontFamily: "inherit",
 	transition: "filter .5s ease-in-out",
 	width: "100%",
 });
