@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import useGetFortuneReading from "@/api/entertainment/hooks/useGetFortuneReading";
 import { parseHafezResult } from "@/api/entertainment/types/fortuneReadingType";
-import { HAFEZ } from "@/constants/routes";
+import { MAIN_APP } from "@/constants/routes";
 
 const PAGE_BG = "#F9F9F9";
 const TEXT_DARK = "#353535";
@@ -15,12 +15,21 @@ const BTN_RED = "#E64056";
 const BTN_BLUE_TEXT = "#235789";
 
 export default function HafezResultPage() {
-	const { push } = useRouter();
+	const { push, back } = useRouter();
 	const { fortune, loading, error, fetchFortune } = useGetFortuneReading();
 
 	useEffect(() => {
 		fetchFortune();
 	}, [fetchFortune]);
+
+	// به صفحه‌ی قبلی (مثل خانه) برگرد؛ اگر تاریخچه‌ای نبود (لود مستقیم) به خانه برو
+	const handleBack = () => {
+		if (typeof window !== "undefined" && window.history.length > 1) {
+			back();
+		} else {
+			push(MAIN_APP.path);
+		}
+	};
 
 	const parsed = fortune ? parseHafezResult(fortune.result) : null;
 
@@ -44,7 +53,7 @@ export default function HafezResultPage() {
 				}}
 			>
 				<button
-					onClick={() => push(HAFEZ.path)}
+					onClick={handleBack}
 					style={{
 						display: "flex",
 						alignItems: "center",
