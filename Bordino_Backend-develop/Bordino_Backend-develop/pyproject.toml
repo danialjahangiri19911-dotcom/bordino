@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bordino-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "Bordino Backend - Django REST API"
 authors = ["Pejman Ghafouri <pejman.ghafouri@mehrparsict.com>"]
 readme = "README.md"
