@@ -92,13 +92,14 @@ export default function HafezDrawer({ open, onClose }: Props) {
 						gap: 12,
 					}}
 				>
-					{/* ردیف بالا: عنوان راست، آیکون چپ */}
+					{/* ردیف بالا: آیکون و عنوان کنار هم، سمت راست (مثل فیگما) */}
 					<div
 						style={{
 							display: "flex",
-							flexDirection: "row-reverse",
+							flexDirection: "row",
 							alignItems: "center",
-							justifyContent: "space-between",
+							justifyContent: "flex-end",
+							gap: 8,
 						}}
 					>
 						<span style={{ fontSize: 20, fontWeight: 700, color: TITLE_COLOR }}>
