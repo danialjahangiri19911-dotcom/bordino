@@ -11,7 +11,7 @@ import styled from "@libs/styles/styled";
 
 import { HeaderWrapper } from "@/_pages/PwaApp/Wallet";
 import { FEMALE, MALE } from "@/constants/imagePaths";
-import { MAIN_APP, PROFILE, REGISTER } from "@/constants/routes";
+import { GAME_NET, PROFILE, REGISTER } from "@/constants/routes";
 import useAuthStore from "@/libs/stores/authStore";
 import useUserStore from "@/libs/stores/userStore";
 
@@ -75,11 +75,11 @@ function PwaAppPageLayout({
 						{rightAction}
 
 						<Box display="flex" alignItems="center" gap={1.5}>
-							<Link href={MAIN_APP.path}>
+							<Link href={GAME_NET.path}>
 								<Image
 									width={24}
 									height={24}
-									alt="home"
+									alt="wheel"
 									src="/media/App/fairy-wheel.svg"
 								/>
 							</Link>

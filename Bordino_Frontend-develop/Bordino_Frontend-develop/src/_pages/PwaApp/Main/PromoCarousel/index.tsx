@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { HAFEZ } from "@/constants/routes";
+import { GAME_NET } from "@/constants/routes";
 import Box from "@libs/components/atoms/Box";
 import "swiper/css";
 import { Autoplay } from "swiper/modules";
@@ -65,6 +65,7 @@ const SLIDES: SlideSpec[] = [
 		subtitle: "یه چرخش هیجان‌انگیز.",
 		buttonText: "جایزه بگیر",
 		buttonTextColor: "#235789",
+		href: GAME_NET.path,
 		ellipses: [
 			{ left: 206, top: 65, w: 152, h: 79, color: "#204E7B" },
 			{ left: -90, top: 10, w: 152, h: 79, color: "#204E7B" },
@@ -72,9 +73,10 @@ const SLIDES: SlideSpec[] = [
 	},
 ];
 
-function PromoCard({ slide, onButtonClick }: Readonly<{ slide: SlideSpec; onButtonClick?: () => void }>) {
+function PromoCard({ slide, onActivate }: Readonly<{ slide: SlideSpec; onActivate?: () => void }>) {
 	return (
 		<div
+			onClick={onActivate}
 			style={{
 				position: "relative",
 				width: "100%",
@@ -82,6 +84,7 @@ function PromoCard({ slide, onButtonClick }: Readonly<{ slide: SlideSpec; onButt
 				borderRadius: 16,
 				overflow: "hidden",
 				background: slide.bg,
+				cursor: onActivate ? "pointer" : "default",
 			}}
 		>
 			{slide.ellipses.map((e, i) => (
@@ -141,7 +144,10 @@ function PromoCard({ slide, onButtonClick }: Readonly<{ slide: SlideSpec; onButt
 				</div>
 				<div style={{ marginTop: 4 }}>
 					<span
-						onClick={onButtonClick}
+						onClick={(e) => {
+							e.stopPropagation();
+							onActivate?.();
+						}}
 						style={{
 							display: "inline-flex",
 							alignItems: "center",
@@ -188,7 +194,7 @@ export default function PromoCarousel({ onHafezClick }: PromoCarouselProps) {
 						<SwiperSlide key={slide.key}>
 							<PromoCard
 								slide={slide}
-								onButtonClick={
+								onActivate={
 									slide.key === "hafez"
 										? onHafezClick
 										: slide.href
