@@ -100,3 +100,9 @@ export const HAFEZ_RESULT = {
 	path: `${APP_HOME.path}/hafez/result`,
 	icon: "",
 };
+
+export const SUDOKU = {
+	title: "سودوکو",
+	path: `${APP_HOME.path}/sudoku`,
+	icon: "",
+};

@@ -2,10 +2,20 @@
 
 import React from "react";
 
+import { useRouter } from "next/navigation";
+
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Typography from "@mui/material/Typography";
+
+import { SUDOKU } from "@/constants/routes";
+import GameIcon from "@/libs/components/icons/components/Game";
 import LuckyWheel from "@/libs/components/games/Roulette";
 import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 
 export default function GameNetPage() {
+	const { push } = useRouter();
+
 	const wheelItems = [
 		{ option: "۱۰ هزار تومان" },
 		{ option: "۲۰ هزار تومان" },
@@ -21,6 +31,36 @@ export default function GameNetPage() {
 
 	return (
 		<PwaAppPageLayout sx={{ mx: 0, p: 0 }}>
+			{/* ورودی بازی‌ها */}
+			<Box sx={{ px: 2 }}>
+				<ButtonBase
+					onClick={() => push(SUDOKU.path)}
+					sx={{
+						width: "100%",
+						justifyContent: "flex-start",
+						gap: 1.5,
+						p: 2,
+						borderRadius: 2,
+						bgcolor: "background.paper",
+						boxShadow: 2,
+						direction: "rtl",
+					}}
+				>
+					<Box
+						sx={{
+							display: "flex",
+							alignItems: "center",
+							"& svg": { width: 36, height: 36 },
+						}}
+					>
+						<GameIcon />
+					</Box>
+					<Typography variant="subtitle1" fontWeight={700}>
+						سودوکو
+					</Typography>
+				</ButtonBase>
+			</Box>
+
 			<LuckyWheel
 				items={wheelItems}
 				title="چرخونه شانسی"

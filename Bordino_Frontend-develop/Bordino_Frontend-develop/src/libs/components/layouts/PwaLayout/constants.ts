@@ -9,7 +9,7 @@ import {
 	WALLET,
 } from "@/constants/routes";
 
-export const PWA_BOTTOM_NAVIGATION = [MAIN_APP, WALLET, PROFILE];
+export const PWA_BOTTOM_NAVIGATION = [MAIN_APP, GAME_NET, WALLET, PROFILE];
 
 export const EXCLUDE_PATHS = [
 	APP_HOME.path,
@@ -17,6 +17,5 @@ export const EXCLUDE_PATHS = [
 	OTP.path,
 	ONBOARDING.path,
 	"/pwa/lottery/buy-ticket",
-	GAME_NET.path,
 	// BUY_TICKET.path,
 ];
