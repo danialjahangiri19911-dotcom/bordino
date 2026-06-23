@@ -8,12 +8,15 @@ class ScoreConfigurationQueryRepository:
         object_id,
         action_type: str,
     ) -> ScoreConfiguration | None:
-        return ScoreConfiguration.objects.get(
-            content_type_id=content_type_id,
-            object_id=object_id,
-            action_type=action_type.strip(),
-            is_active=True,
-        )
+        try:
+            return ScoreConfiguration.objects.get(
+                content_type_id=content_type_id,
+                object_id=object_id,
+                action_type=action_type.strip(),
+                is_active=True,
+            )
+        except ScoreConfiguration.DoesNotExist:
+            return None
 
     @staticmethod
     def get_active_config(
@@ -21,12 +24,15 @@ class ScoreConfigurationQueryRepository:
         action_type: str,
     ) -> ScoreConfiguration | None:
         section = section.lower() if section else section
-        return ScoreConfiguration.objects.get(
-            section=section,
-            action_type=action_type,
-            is_active=True,
-            content_type__isnull=True,
-        )
+        try:
+            return ScoreConfiguration.objects.get(
+                section=section,
+                action_type=action_type,
+                is_active=True,
+                content_type__isnull=True,
+            )
+        except ScoreConfiguration.DoesNotExist:
+            return None
 
     @staticmethod
     def get_configs_by_section(section: str) -> list[ScoreConfiguration]:
