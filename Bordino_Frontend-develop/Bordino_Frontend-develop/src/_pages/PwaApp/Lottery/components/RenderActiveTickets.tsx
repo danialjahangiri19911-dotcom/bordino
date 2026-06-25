@@ -37,7 +37,7 @@ export default function RenderActiveTickets({
 				<Fragment key={ticket.id}>
 					<TicketComponent
 						ticketNumber={array.length - index}
-						ballsNumber={ticket.numbers}
+						ballsNumber={ticket.numbers ?? []}
 						ballSx={ballSx}
 						onShowDetails={() => {
 							push(

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { GAME_NET } from "@/constants/routes";
+import { WHEEL } from "@/constants/routes";
 import Box from "@libs/components/atoms/Box";
 import "swiper/css";
 import { Autoplay } from "swiper/modules";
@@ -65,7 +65,7 @@ const SLIDES: SlideSpec[] = [
 		subtitle: "یه چرخش هیجان‌انگیز.",
 		buttonText: "جایزه بگیر",
 		buttonTextColor: "#235789",
-		href: GAME_NET.path,
+		href: WHEEL.path,
 		ellipses: [
 			{ left: 206, top: 65, w: 152, h: 79, color: "#204E7B" },
 			{ left: -90, top: 10, w: 152, h: 79, color: "#204E7B" },

@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.lottery.models import LotteryWheel
+from apps.wallet.models import Token
 
 
 class LotteryWheelPrize(models.Model):
@@ -14,6 +15,7 @@ class LotteryWheelPrize(models.Model):
     class PrizeType(models.TextChoices):
         CASH = "cash", _("Cash")
         RECHARGE = "recharge", _("Recharge")
+        EMPTY = "empty", _("Empty")
 
     lottery_wheel = models.ForeignKey(
         LotteryWheel,
@@ -38,6 +40,19 @@ class LotteryWheelPrize(models.Model):
         max_length=10,
         choices=PrizeType.choices,
         default=PrizeType.CASH,
+    )
+    # کیفِ مقصدِ جایزهٔ امتیازی (recharge). اگر خالی باشد، همان کیفِ امتیازی که
+    # هزینهٔ چرخش از آن کم می‌شود شارژ می‌شود. برای جایزهٔ نقدی بی‌اثر است.
+    target_token = models.ForeignKey(
+        Token,
+        verbose_name=_("Target points wallet"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_(
+            "فقط برای جایزهٔ امتیازی؛ خالی = همان کیفِ امتیازیِ پرداختِ چرخش"
+        ),
     )
 
     def __str__(self):

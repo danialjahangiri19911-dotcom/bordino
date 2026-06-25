@@ -31,6 +31,7 @@ class GameConfigurationAdmin(admin.ModelAdmin):
         "max_errors",
         "hint_count",
         "daily_score_limit",
+        "play_cost",
         "is_active",
         "create_time",
     )
@@ -47,7 +48,13 @@ class GameConfigurationAdmin(admin.ModelAdmin):
         (
             "Game Settings",
             {
-                "fields": ("timer", "max_errors", "hint_count", "daily_score_limit"),
+                "fields": (
+                    "timer",
+                    "max_errors",
+                    "hint_count",
+                    "daily_score_limit",
+                    "play_cost",
+                ),
             },
         ),
         (

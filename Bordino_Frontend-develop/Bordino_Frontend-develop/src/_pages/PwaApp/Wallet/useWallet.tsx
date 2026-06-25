@@ -211,27 +211,48 @@ export default function useWallet({
 
 	const { lotteryDetail } = useExtractLotteryDetail();
 
+	// فقط قرعه‌کشی‌هایی که با کیفِ امتیازِ فعلی (token) قابلِ انجام‌اند
+	const activeTokenId =
+		isPointsWallet && activeWallet
+			? (activeWallet as WalletSchema).token
+			: undefined;
+
+	const walletLotteries = useMemo(() => {
+		if (!activeTokenId) return [];
+		return lotteryData.filter((lottery) => lottery.token === activeTokenId);
+	}, [lotteryData, activeTokenId]);
+
 	const walletTabs = [
 		{
 			label: "قرعه کشی ها",
 			content: (
 				<Box display="flex" flexDirection="column" gap={2}>
-					{lotteryData.map((item, index, array) => (
-						<Fragment key={item.id}>
-							<LotteryCard
-								image={DEFAULT_IMAGE}
-								title={item.name}
-								date={isoStringToString(item.end_date)}
-								deprecated={item.status !== "active"}
-								onAction={() =>
-									push(addParamsToUrl(LOTTERY_DETAIL.path, { id: item.id }))
-								}
-								ticketCount={0}
-							/>
+					{walletLotteries.length > 0 ? (
+						walletLotteries.map((item, index, array) => (
+							<Fragment key={item.id}>
+								<LotteryCard
+									image={DEFAULT_IMAGE}
+									title={item.name}
+									date={isoStringToString(item.end_date)}
+									deprecated={item.status !== "active"}
+									onAction={() =>
+										push(addParamsToUrl(LOTTERY_DETAIL.path, { id: item.id }))
+									}
+									ticketCount={0}
+								/>
 
-							{index < array.length - 1 && <Divider />}
-						</Fragment>
-					))}
+								{index < array.length - 1 && <Divider />}
+							</Fragment>
+						))
+					) : (
+						<Typography
+							color="text.secondary"
+							textAlign="center"
+							sx={{ py: 4, fontSize: 14, fontWeight: 500 }}
+						>
+							قرعه‌کشی‌ای برای این کیف‌پول موجود نیست
+						</Typography>
+					)}
 				</Box>
 			),
 		},

@@ -8,13 +8,14 @@ export interface Lottery {
 }
 
 interface LotteryDetailResponse {
-	balance: string;
+	/** موجودیِ جایزه به تومان (balance × قیمتِ token) */
+	balance_in_money: string;
 	end_date: string;
 	id: string;
 	name: string;
 	owner: string;
 	start_date: string;
-	status: string;
+	status: "active" | "completed";
 	ticket_price: string;
 	token: string;
 }

@@ -325,7 +325,9 @@ API_LOGIN_ENDPOINT = get_env_value("API_LOGIN_ENDPOINT")
 TIME_ZONE_CELERY_BEAT = get_env_value("TIME_ZONE_CELERY_BEAT", default_value=TIME_ZONE)
 
 # Python profiler
-SILKY_PYTHON_PROFILER = True
+# توجه: profiler (cProfile روی هر درخواست) در dev باعث کندیِ شدید و خطای
+# «Another profiling tool is already active» می‌شود؛ برای سرعتِ توسعه خاموش است.
+SILKY_PYTHON_PROFILER = False
 SILKY_PYTHON_PROFILER_BINARY = False
 SILKY_PYTHON_PROFILER_RESULT_PATH: Path = BASE_DIR / "logs" / "silk"
 
@@ -337,7 +339,9 @@ SILKY_AUTHORISATION = True
 SILKY_META = True
 
 # Request interception
-SILKY_INTERCEPT_PERCENT = 100
+# 0 = هیچ درخواستی توسط silk ضبط نمی‌شود (سریع‌ترین برای dev). برای دیباگ با
+# داشبورد silk این مقدار را به 100 برگردانید.
+SILKY_INTERCEPT_PERCENT = 0
 
 # Request/Response body limits (in bytes)
 SILKY_MAX_REQUEST_BODY_SIZE = -1

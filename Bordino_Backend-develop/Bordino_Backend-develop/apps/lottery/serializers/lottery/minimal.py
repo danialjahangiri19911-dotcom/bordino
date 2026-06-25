@@ -5,4 +5,5 @@ from apps.lottery.models import Lottery
 class LotteryMinimalSerializer(BaseModelSerializer):
     class Meta:
         model = Lottery
-        fields = ("name", "status", "end_date")
+        # `token` تا فرانت بتواند قرعه‌کشی‌ها را بر اساسِ کیفِ امتیازِ کاربر فیلتر کند
+        fields = ("name", "status", "end_date", "token")

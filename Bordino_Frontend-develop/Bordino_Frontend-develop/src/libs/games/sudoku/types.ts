@@ -73,6 +73,7 @@ export type GameAction =
 	| { type: "REDO" }
 	| { type: "TICK" } // timer decrement
 	| { type: "EXIT_TO_MENU" }
+	| { type: "CONTINUE_AFTER_LOSS" } // ادامهٔ بازی پس از باخت (با کسرِ امتیاز)
 	| { type: "RESTORE_GAME"; payload: { savedState: GameState } }
 	| {
 			type: "UPDATE_CONFIG";

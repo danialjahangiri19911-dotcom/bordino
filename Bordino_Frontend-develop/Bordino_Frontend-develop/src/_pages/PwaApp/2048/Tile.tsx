@@ -11,6 +11,7 @@ import {
 import type { Tile as TileProps } from "@/libs/games/2048/types";
 import usePreviousProps from "@/libs/hooks/usePrevious";
 import { useMediaQuery } from "@/libs/uiHooks/device";
+import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
 
 import styles from "./tile.module.css";
 
@@ -58,7 +59,7 @@ export default function Tile({
 
 	return (
 		<div className={`${styles.tile} ${styles[`tile${value}`]}`} style={style}>
-			{value}
+			{toPersianDigits(value)}
 		</div>
 	);
 }

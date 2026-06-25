@@ -334,6 +334,18 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			break;
 		}
 
+		// ادامهٔ بازی پس از باخت: شمارندهٔ اشتباه صفر و وضعیت به «playing» بازمی‌گردد
+		// (همان پازل حفظ می‌شود؛ کسرِ امتیاز در لایهٔ UI انجام می‌شود)
+		case "CONTINUE_AFTER_LOSS": {
+			if (draft.status !== "lost") break;
+			draft.mistakes = 0;
+			draft.status = "playing";
+			if (draft.maxTime > 0 && draft.timeRemaining <= 0) {
+				draft.timeRemaining = draft.maxTime;
+			}
+			break;
+		}
+
 		case "RESTORE_GAME": {
 			const { savedState } = action.payload;
 			draft.solution = savedState.solution;

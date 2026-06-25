@@ -36,11 +36,17 @@ function LotteryCard({
 		if (ticketCount) {
 			return <TicketIconImage ticket={ticketCount} />;
 		}
-		return null;
+		// قرعه‌کشیِ فعال (قابلِ ورود)
+		return (
+			<Chip
+				label="فعال"
+				sx={{ bgcolor: "#E3F4E9", color: "#1F8A4C", fontWeight: 600 }}
+			/>
+		);
 	}, [deprecated, ticketCount]);
 
 	return (
-		<LotteryCardWrapper>
+		<LotteryCardWrapper onClick={onAction}>
 			<Box display="flex" gap={2} alignItems="center" flexGrow={1}>
 				<ImageBox
 					src={image}
@@ -52,17 +58,15 @@ function LotteryCard({
 				<Box display="flex" flexDirection="column" gap={1} flexGrow={1}>
 					<DetailWrapper>
 						<Box display="flex" alignItems="center" gap={1}>
-							{renderStatus() && renderStatus()}
+							{renderStatus()}
 							<Typography variant="14-regular" color="#2F2F2F">
 								{title}
 							</Typography>
 						</Box>
 
-						{deprecated && (
-							<IconButton onClick={onAction}>
-								<ArrowBackIo fontSize="small" />
-							</IconButton>
-						)}
+						<IconButton onClick={onAction} aria-label="ورود به قرعه‌کشی">
+							<ArrowBackIo fontSize="small" />
+						</IconButton>
 					</DetailWrapper>
 					<DetailWrapper>
 						<Typography variant="12-medium" color="#878686">
@@ -83,6 +87,7 @@ const LotteryCardWrapper = styled(Box)(({ theme }) => ({
 	gap: theme.spacing(2),
 	alignItems: "center",
 	position: "relative",
+	cursor: "pointer",
 }));
 const DetailWrapper = styled(Box)(() => ({
 	display: "flex",

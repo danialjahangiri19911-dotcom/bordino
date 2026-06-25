@@ -41,6 +41,12 @@ export const GAME_NET = {
 	icon: <GameIcon />,
 };
 
+export const WHEEL = {
+	title: "چرخونه شانسی",
+	path: `${APP_HOME.path}/wheel`,
+	icon: "",
+};
+
 export const SHOP = {
 	title: "فروشگاه",
 	path: `${APP_HOME.path}/shop`,
@@ -104,5 +110,11 @@ export const HAFEZ_RESULT = {
 export const SUDOKU = {
 	title: "سودوکو",
 	path: `${APP_HOME.path}/sudoku`,
+	icon: "",
+};
+
+export const GAME_2048 = {
+	title: "۲۰۴۸",
+	path: `${APP_HOME.path}/2048`,
 	icon: "",
 };

@@ -87,23 +87,38 @@ class LotteryWheelService:
                     CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
                         prize_amount=selected_prize.prize_amount,
                         customer=dto.customer,
-                        destination_wallet_account=dto.customer.user.wallet.currency_wallet_accounts.filter(
+                        destination_wallet_account=dto.token_wallet_account.wallet.currency_wallet_accounts.filter(
                             primary=True
                         ).first(),
                     )
                 )
             case LotteryWheelPrize.PrizeType.RECHARGE:
+                # جایزهٔ امتیازی: پیش‌فرض همان کیفِ امتیازیِ پرداختِ چرخش؛ اگر
+                # برای جایزه target_token مشخص شده باشد، کیفِ همان توکن شارژ می‌شود.
+                target_account = dto.token_wallet_account
+                if selected_prize.target_token_id:
+                    specified = dto.token_wallet_account.wallet.token_wallet_accounts.filter(
+                        token_id=selected_prize.target_token_id
+                    ).first()
+                    if specified:
+                        target_account = specified
+                target_account.amount += int(selected_prize.prize_amount)
+                target_account.save()
+            case LotteryWheelPrize.PrizeType.EMPTY:
+                # پوچ: جایزه‌ای واریز نمی‌شود
                 pass
             case _:
                 raise ValueError("Invalid prize type")
 
-        self.transaction_service.create_prize_wheel_payment(
-            self.transaction_service.CreatePrizeWheelPaymentDTO(
-                customer=dto.customer,
-                lottery_wheel=dto.lottery_wheel,
-                prize=selected_prize,
+        # برای پوچ تراکنشِ جایزه ثبت نمی‌کنیم
+        if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
+            self.transaction_service.create_prize_wheel_payment(
+                self.transaction_service.CreatePrizeWheelPaymentDTO(
+                    customer=dto.customer,
+                    lottery_wheel=dto.lottery_wheel,
+                    prize=selected_prize,
+                )
             )
-        )
 
         spin, created = LotteryWheelSpin.objects.get_or_create(
             lottery_wheel=dto.lottery_wheel,

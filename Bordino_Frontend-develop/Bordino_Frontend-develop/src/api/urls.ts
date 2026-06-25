@@ -26,6 +26,8 @@ export const WALLET = {
 	GET_BANK_ACCOUNTS: "wallet/bank-accounts/",
 	CREATE_BANK_ACCOUNT: "wallet/bank-accounts/",
 	WITHDRAW_CURRENCY: "wallet/currency/withdraw/",
+	GAME_PLAY_COST: "wallet/games/charge/",
+	GAME_PLAY_CHARGE: "wallet/games/charge/",
 };
 
 export const LOTTERY = {
@@ -36,6 +38,11 @@ export const LOTTERY = {
 	GET_TICKET_DETAIL: "lotteries/ticket/:id/",
 	GET_LOTTERY_FULL_DETAIL: "lotteries/:id/results/",
 	BUY_TICKET_NUMBERS: "lotteries/ticket/numbers/",
+};
+
+export const LOTTERY_WHEEL = {
+	GET_WHEEL: "lotteries/lottery-wheel/:id/",
+	SPIN: "lotteries/lottery-wheel/spin/",
 };
 
 export const GAME_URLS = {

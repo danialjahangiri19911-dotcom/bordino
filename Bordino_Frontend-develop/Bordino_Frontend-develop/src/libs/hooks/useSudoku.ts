@@ -298,6 +298,10 @@ export function useSudoku() {
 		clearGame();
 	}, [dispatch, clearGame]);
 
+	const continueAfterLoss = useCallback(() => {
+		dispatch({ type: "CONTINUE_AFTER_LOSS" });
+	}, [dispatch]);
+
 	return {
 		solution: state.solution,
 		board: state.board,
@@ -324,5 +328,6 @@ export function useSudoku() {
 		undo,
 		redo,
 		exitToMenu,
+		continueAfterLoss,
 	};
 }

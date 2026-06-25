@@ -52,8 +52,13 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         user = self.context["request"].user
         token_wallet_account = validated_data["token_wallet_account"]
 
-        # Check total spins for the wheel
-        total_spins = LotteryWheelSpin.objects.all().aggregate(Sum("count")).get("count__sum") or 0
+        # Check total spins for the wheel (only this wheel)
+        total_spins = (
+            LotteryWheelSpin.objects.filter(lottery_wheel=lottery_wheel)
+            .aggregate(Sum("count"))
+            .get("count__sum")
+            or 0
+        )
 
         if total_spins >= lottery_wheel.max_spins:
             raise serializers.ValidationError(_("Maximum spins for this wheel has been reached"))

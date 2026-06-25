@@ -23,6 +23,15 @@ class GameConfiguration(AbstractBaseModel):
     max_errors = models.PositiveIntegerField(validators=[MinValueValidator(0)], default=3)
     hint_count = models.PositiveIntegerField(validators=[MinValueValidator(0)], default=1)
     daily_score_limit = models.PositiveIntegerField(validators=[MinValueValidator(0)], default=0)
+    play_cost = models.PositiveIntegerField(
+        validators=[MinValueValidator(0)],
+        default=0,
+        verbose_name=_("Play cost"),
+        help_text=_(
+            "امتیازی که با هر بار بازی (شروع/ادامه) از کیفِ امتیازِ کاربر کم می‌شود. "
+            "۰ = رایگان."
+        ),
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta(AbstractBaseModel.Meta):

@@ -70,8 +70,8 @@ export default function Board() {
 	return (
 		<MobileSwiper onSwipe={handleSwipe}>
 			<div className={styles.board}>
-				{status === "won" && <Splash heading="You won!" type="won" />}
-				{status === "lost" && <Splash heading="You lost!" />}
+				{status === "won" && <Splash type="won" />}
+				{/* حالتِ باخت در GameView با دیالوگِ «باختی!» مدیریت می‌شود */}
 				<div className={styles.tiles}>{renderTiles()}</div>
 				<div className={styles.grid}>{renderGrid()}</div>
 			</div>

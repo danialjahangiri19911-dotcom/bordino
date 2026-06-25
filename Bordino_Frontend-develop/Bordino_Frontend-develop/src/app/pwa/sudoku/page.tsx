@@ -4,20 +4,20 @@ import React, { useEffect, useState } from "react";
 
 import Container from "@mui/material/Container";
 
+import useChargeGamePlay from "@/api/games/useChargeGamePlay";
+import useGetPlayCost from "@/api/games/useGetPlayCost";
 import { ActionButtons } from "@/_pages/PwaApp/sudoku/ActionButtons";
-import {
-	ExitConfirmDialog,
-	GameOverDialog,
-	VictoryMessage,
-} from "@/_pages/PwaApp/sudoku/Dialogs";
+import { ExitConfirmDialog, VictoryMessage } from "@/_pages/PwaApp/sudoku/Dialogs";
 import { GameBoard } from "@/_pages/PwaApp/sudoku/GameBoard";
 import { GameHeader } from "@/_pages/PwaApp/sudoku/GameHeader";
 import { MenuScreen } from "@/_pages/PwaApp/sudoku/MenuScreen";
 import { NumberPad } from "@/_pages/PwaApp/sudoku/NumberPad";
+import LostDialog from "@/libs/components/games/LostDialog";
 import PageLoading from "@/libs/components/loading/PageLoading";
 import { useSudokuStore } from "@/libs/games/sudoku/storage";
-import type { Index } from "@/libs/games/sudoku/types";
+import type { Difficulty, Index } from "@/libs/games/sudoku/types";
 import { useSudoku } from "@/libs/hooks/useSudoku";
+import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
 
 export default function SudokuPage() {
 	const {
@@ -41,10 +41,18 @@ export default function SudokuPage() {
 		hint,
 		undo,
 		exitToMenu,
+		continueAfterLoss,
 	} = useSudoku();
 
 	const { isHardUnlocked, isMediumUnlocked, getCompletionCounts } =
 		useSudokuStore();
+
+	const { data: costData, refetch: refetchCost } = useGetPlayCost({
+		gameName: "sudoku",
+	});
+	const { chargeAsync, isCharging } = useChargeGamePlay();
+	const playCost = costData?.result?.play_cost ?? 0;
+	const currentPoints = costData?.result?.current_amount ?? 0;
 
 	const [exitDialogOpen, setExitDialogOpen] = useState(false);
 	const [gameOverDialogOpen, setGameOverDialogOpen] = useState(false);
@@ -62,6 +70,17 @@ export default function SudokuPage() {
 		}
 	}, [status]);
 
+	// شروعِ بازیِ جدید با کسرِ امتیاز (هر بار بازی کردنِ سودوکو)
+	const handleSelectDifficulty = async (difficulty: Difficulty) => {
+		try {
+			await chargeAsync({ game_name: "sudoku" });
+			void refetchCost();
+			generateGame(difficulty);
+		} catch {
+			// خطا (امتیازِ ناکافی) با toastِ سراسری نمایش داده می‌شود
+		}
+	};
+
 	// ---------- Loading state (including menu config fetch) ----------
 	if (isLoadingConfig) {
 		return <PageLoading />;
@@ -74,7 +93,7 @@ export default function SudokuPage() {
 				completions={completions}
 				mediumUnlocked={mediumUnlocked}
 				hardUnlocked={hardUnlocked}
-				onSelectDifficulty={generateGame}
+				onSelectDifficulty={handleSelectDifficulty}
 			/>
 		);
 	}
@@ -105,13 +124,20 @@ export default function SudokuPage() {
 	};
 	const handleExitCancel = () => setExitDialogOpen(false);
 
-	const handleGameOverNewGame = () => {
-		setGameOverDialogOpen(false);
-		exitToMenu();
-	};
 	const handleGameOverExit = () => {
 		setGameOverDialogOpen(false);
 		exitToMenu();
+	};
+	// ادامهٔ بازی با کسرِ امتیاز: اشتباه‌ها صفر و همان پازل ادامه می‌یابد
+	const handleGameOverContinue = async () => {
+		try {
+			await chargeAsync({ game_name: "sudoku" });
+			void refetchCost();
+			continueAfterLoss();
+			setGameOverDialogOpen(false);
+		} catch {
+			// خطا (امتیازِ ناکافی) با toastِ سراسری نمایش داده می‌شود
+		}
 	};
 
 	return (
@@ -162,12 +188,18 @@ export default function SudokuPage() {
 				onHint={hint}
 			/>
 
-			<GameOverDialog
+			<LostDialog
 				open={gameOverDialogOpen}
-				mistakes={mistakes}
-				maxMistakes={maxMistakes}
-				onNewGame={handleGameOverNewGame}
-				onExit={handleGameOverExit}
+				description={
+					mistakes >= maxMistakes
+						? `تو ${toPersianDigits(mistakes)} تا اشتباه داشتی و بازی رو باختی.`
+						: "زمان تمام شد و بازی رو باختی."
+				}
+				points={currentPoints}
+				cost={playCost}
+				loading={isCharging}
+				onContinue={handleGameOverContinue}
+				onCancel={handleGameOverExit}
 			/>
 
 			<ExitConfirmDialog

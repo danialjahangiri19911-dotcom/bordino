@@ -1,43 +1,62 @@
 .splash {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
 	display: flex;
-	justify-content: center;
 	align-items: center;
-	position: absolute;
+	justify-content: center;
 	text-align: center;
-	z-index: 3;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	border-radius: calc(var(--pixel-size) * 0.75);
-	background: rgba(181, 157, 135, 0.6);
+	direction: rtl;
+	padding: 24px;
 }
 
 .win {
-	background: rgba(237, 194, 46, 0.6);
-	color: white;
+	background: #a4bc1e;
 }
 
-.splash > div {
-	margin: 0 auto;
+.lose {
+	background: rgba(61, 58, 51, 0.94);
 }
 
-.splash > div > button {
-	margin: calc(var(--pixel-size) * 3) auto;
+.content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	max-width: 360px;
+	width: 100%;
 }
 
-.splash > div > h1 {
-	color: rgba(240, 240, 240, 1);
+.heading {
+	color: #ffffff;
+	font-size: 28px;
+	font-weight: 800;
+	margin: 0;
+}
+
+.desc {
+	color: #ffffff;
+	font-size: 18px;
+	font-weight: 600;
+	margin: 0;
+}
+
+.sub {
+	color: rgba(255, 255, 255, 0.85);
+	font-size: 14px;
+	margin: 0;
 }
 
 .button {
-	background: var(--button-background);
-	border: calc(var(--pixel-size) * 0.125) solid var(--primary-background);
-	border-radius: calc(var(--pixel-size) * 0.5);
-	font-size: calc(var(--pixel-size) * 2);
-	line-height: calc(var(--pixel-size) * 4);
-	padding: calc(var(--pixel-size) * 0.5) calc(var(--pixel-size) * 2);
-	font-weight: bold;
-	color: white;
+	margin-top: 28px;
+	width: 100%;
+	background: #a49381;
+	color: #ffffff;
+	border: none;
+	border-radius: 12px;
+	padding: 14px 28px;
+	font-size: 16px;
+	font-weight: 700;
 	cursor: pointer;
+	font-family: inherit;
 }

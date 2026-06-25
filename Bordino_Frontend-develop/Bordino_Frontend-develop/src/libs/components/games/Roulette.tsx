@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { WheelDataType } from "react-custom-roulette";
 
 import dynamic from "next/dynamic";
@@ -9,6 +9,8 @@ import Box from "@libs/components/atoms/Box";
 import Button from "@libs/components/atoms/Button";
 import Typography from "@libs/components/atoms/Typography";
 
+import WinDialog from "./WinDialog";
+import PointsChip from "@/libs/components/common/PointsChip";
 import styled from "@/libs/styles/styled";
 
 const Wheel = dynamic(
@@ -38,71 +40,204 @@ interface Props {
 	title?: string;
 	buttonLabel?: string;
 	showTicketBadge?: boolean;
-	ticketBadgeLabel?: string;
-	ticketBadgeCount?: number;
 	config?: RouletteConfig;
 	emptyPrizeLabel?: string;
-	emptyPrizeMessage?: string;
-	winMessage?: string;
+	onBack?: () => void;
+	/** بازگشت به خانه از مودالِ برد */
+	onHome?: () => void;
+	/** ضریب انتخابی به‌والد گزارش می‌شود (مثلاً "5x") */
+	onMultiplierChange?: (multiplier: string) => void;
+	defaultMultiplier?: string;
+	/**
+	 * چرخشِ سرور-محور: با کلیک «بگردون!» صدا زده می‌شود و باید اندیسِ اسلایسِ
+	 * برنده را برگرداند (Promise). در نبودش، انتخابِ تصادفیِ کلاینت (حالتِ دمو).
+	 */
+	onSpinRequest?: () => Promise<number>;
 }
 
 const defaultConfig: RouletteConfig = {
-	outerBorderWidth: 5,
-	outerBorderColor: "#FFD700",
-	innerRadius: 20,
+	outerBorderWidth: 10,
+	outerBorderColor: "#F0AC46",
+	innerRadius: 15,
 	innerBorderWidth: 0,
 	radiusLineWidth: 2,
-	radiusLineColor: "#FFD700",
-	textDistance: 95,
-	fontSize: 12,
+	radiusLineColor: "#D69136",
+	textDistance: 75,
+	fontSize: 18,
 	fontWeight: 700,
 	perpendicularText: false,
 	spinDuration: 0.8,
 };
+
+/**
+ * مرکز هر سلولِ ضریب به‌صورت درصدِ تصویرِ بنر (از مختصات Figma استخراج شده).
+ * badgeW = عرضِ badge طلایی برای آن سلول، به‌صورت درصد عرض بنر.
+ * badgeImg = تصویرِ بیک‌شدهٔ Figma برای حالتِ انتخاب‌شده؛ نبود → fallback (badge خالی + عدد).
+ */
+interface MultiplierCell {
+	value: string;
+	cx: number;
+	cy: number;
+	badgeW: number;
+	/** تصویرِ بیک‌شدهٔ Figma برای حالتِ انتخاب‌شده */
+	badgeImg?: string;
+	/** آیا عدد داخل تصویر بیک شده؟ اگر نه، عدد را با کد روی badge می‌گذاریم */
+	bakedNumber?: boolean;
+}
+
+const MULTIPLIERS: MultiplierCell[] = [
+	{ value: "5x", cx: 14.7, cy: 25.6, badgeW: 33.0 },
+	{
+		value: "4x",
+		cx: 36.3,
+		cy: 28.8,
+		badgeW: 28.4,
+		badgeImg: "/media/App/wheel/badge-4x.png",
+		bakedNumber: true,
+	},
+	{
+		value: "3x",
+		cx: 55.3,
+		cy: 38.7,
+		badgeW: 35.3,
+		badgeImg: "/media/App/wheel/badge-3x.png",
+		bakedNumber: true,
+	},
+	{
+		value: "2x",
+		cx: 70.7,
+		cy: 54.4,
+		badgeW: 37.6,
+		badgeImg: "/media/App/wheel/badge-2x.png",
+	},
+	{
+		value: "1x",
+		cx: 84.7,
+		cy: 80.3,
+		badgeW: 30.3,
+		badgeImg: "/media/App/wheel/badge-1x.png",
+	},
+];
+
+/* موقعیت overlayها نسبت به قطر گردونه (از Figma) */
+const RIBBON = { left: 44.4, top: -21.5, width: 58.6 };
+const POINTER = { left: 50, top: -1, width: 7 };
+
+const LED_COUNT = 16;
+const LED_RADIUS_PCT = 46;
+
+function LedRing({ isSpinning }: Readonly<{ isSpinning: boolean }>) {
+	const [activeIdx, setActiveIdx] = useState(0);
+
+	useEffect(() => {
+		const ms = isSpinning ? 70 : 280;
+		const id = setInterval(
+			() => setActiveIdx((p) => (p + 1) % LED_COUNT),
+			ms,
+		);
+		return () => clearInterval(id);
+	}, [isSpinning]);
+
+	return (
+		<>
+			{Array.from({ length: LED_COUNT }).map((_, i) => {
+				const rad = (i * 2 * Math.PI) / LED_COUNT - Math.PI / 2;
+				const left = 50 + LED_RADIUS_PCT * Math.cos(rad);
+				const top = 50 + LED_RADIUS_PCT * Math.sin(rad);
+				const isOn =
+					i === activeIdx ||
+					i === (activeIdx + LED_COUNT / 2) % LED_COUNT;
+				return (
+					<Led
+						key={i}
+						style={{
+							left: `${left}%`,
+							top: `${top}%`,
+							transform: "translate(-50%, -50%)",
+							background: isOn ? "#F9D55F" : "#8D5808",
+							boxShadow: isOn
+								? "0 0 6px #F9D55F, 0 0 12px #F0AC46"
+								: "none",
+						}}
+					/>
+				);
+			})}
+		</>
+	);
+}
 
 export default function LuckyWheel({
 	items,
 	onStopSpinning,
 	handleWin,
 	wheelBackgroundColors = [
-		"#FF4444",
-		"#3366FF",
-		"#FF1493",
-		"#00FF66",
-		"#FFD700",
-		"#FF0066",
+		"#4459D8",
+		"#E64056",
+		"#4459D8",
+		"#7B3FC0",
+		"#4459D8",
+		"#E64056",
+		"#4459D8",
+		"#7B3FC0",
 	],
-	title = "چرخونه شانسی",
+	title = "💫 چرخونه شانسی 💫",
 	buttonLabel = "بگردون!",
 	showTicketBadge = true,
-	ticketBadgeLabel = "اعتبار",
-	ticketBadgeCount,
 	config = {},
 	emptyPrizeLabel = "پوچ",
-	emptyPrizeMessage = "متاسفانه این دفعه شانس با شما یار نبود",
-	winMessage = "تبریک! شما برنده شدید",
+	onBack,
+	onHome,
+	onMultiplierChange,
+	defaultMultiplier = "5x",
+	onSpinRequest,
 }: Readonly<Props>) {
 	const [mustSpin, setMustSpin] = useState(false);
 	const [prizeNumber, setPrizeNumber] = useState(0);
 	const [winner, setWinner] = useState<string | null>(null);
 	const [isSpinning, setIsSpinning] = useState(false);
+	const [winOpen, setWinOpen] = useState(false);
+	const [selectedMultiplier, setSelectedMultiplier] =
+		useState(defaultMultiplier);
 
 	const finalConfig = { ...defaultConfig, ...config };
 
-	const handleSpinClick = () => {
-		if (!isSpinning && items.length > 0) {
-			const newPrizeNumber = Math.floor(Math.random() * items.length);
-			setPrizeNumber(newPrizeNumber);
-			setMustSpin(true);
-			setWinner(null);
+	const handleSelectMultiplier = (value: string) => {
+		if (isSpinning) return;
+		setSelectedMultiplier(value);
+		onMultiplierChange?.(value);
+	};
+
+	const handleSpinClick = async () => {
+		if (isSpinning || items.length === 0) return;
+		setWinner(null);
+
+		if (onSpinRequest) {
+			// چرخشِ سرور-محور: اول جایزه را از سرور بگیر، بعد روی همان بایست
 			setIsSpinning(true);
+			try {
+				const idx = await onSpinRequest();
+				const safeIdx = idx >= 0 && idx < items.length ? idx : 0;
+				setPrizeNumber(safeIdx);
+				setMustSpin(true);
+			} catch {
+				// خطا (امتیاز ناکافی/سقف چرخش) را interceptor سراسری toast می‌کند
+				setIsSpinning(false);
+			}
+			return;
 		}
+
+		// حالتِ دمو: انتخابِ تصادفیِ کلاینت
+		const newPrizeNumber = Math.floor(Math.random() * items.length);
+		setPrizeNumber(newPrizeNumber);
+		setMustSpin(true);
+		setIsSpinning(true);
 	};
 
 	const handleWinner = useCallback(
 		async (prize: string) => {
 			setWinner(prize);
 			setIsSpinning(false);
+			setWinOpen(true); // مودال برای برد و پوچ باز می‌شود
 
 			if (prize !== emptyPrizeLabel) {
 				if (typeof window !== "undefined") {
@@ -111,7 +246,7 @@ export default function LuckyWheel({
 						particleCount: 150,
 						spread: 80,
 						origin: { y: 0.6 },
-						colors: ["#FFD700", "#FF1493", "#00FF66", "#3366FF"],
+						colors: ["#F0AC46", "#F9D55F", "#D69136", "#DB9E2C"],
 					});
 				}
 				handleWin?.(prize);
@@ -120,210 +255,388 @@ export default function LuckyWheel({
 		[handleWin, emptyPrizeLabel],
 	);
 
+	const handleSpinAgain = () => {
+		setWinOpen(false);
+		setWinner(null);
+		// چرخش مجدد از همان مسیرِ handleSpinClick (سرور-محور یا دمو)
+		void handleSpinClick();
+	};
+
+	const activeCell = MULTIPLIERS.find((m) => m.value === selectedMultiplier);
+
 	return (
-		<RouletteContainer>
-			<HeaderSection>
+		<PageContainer>
+			{/* ─── Header ─── */}
+			<HeaderRow>
+				{/* امتیاز کیف‌پول — سمت چپ در RTL */}
+				<Box>{showTicketBadge && <PointsChip />}</Box>
+
+				{/* عنوان — وسط */}
 				<TitleWrapper>
-					<Typography variant="20-bold" color="common.white">
+					<Typography
+						variant="16-medium"
+						sx={{ color: "#F9F9F9", textAlign: "center" }}
+					>
 						{title}
 					</Typography>
 				</TitleWrapper>
-				{showTicketBadge && (
-					<TicketBadge>
-						<Typography variant="12-medium">
-							{ticketBadgeLabel}
-							{ticketBadgeCount !== undefined && `: ${ticketBadgeCount}`}
-						</Typography>
-					</TicketBadge>
-				)}
-			</HeaderSection>
 
+				{/* بازگشت — سمت راست در RTL */}
+				{onBack ? (
+					<BackButton onClick={onBack}>
+						<Typography variant="16-medium" sx={{ color: "#F9F9F9" }}>
+							بازگشت
+						</Typography>
+						<ChevronLeft viewBox="0 0 16 16">
+							<path
+								fillRule="evenodd"
+								clipRule="evenodd"
+								d="M10.6013 3.14624C10.7969 3.34187 10.7969 3.65905 10.6013 3.85468L6.45451 8.00144L10.6013 12.1482C10.7969 12.3438 10.7969 12.661 10.6013 12.8566C10.4056 13.0523 10.0884 13.0523 9.89282 12.8566L5.39179 8.35566C5.19616 8.16003 5.19616 7.84285 5.39179 7.64721L9.89282 3.14624C10.0884 2.9506 10.4056 2.9506 10.6013 3.14624Z"
+								fill="#F9F9F9"
+							/>
+						</ChevronLeft>
+					</BackButton>
+				) : (
+					<PlaceholderBox />
+				)}
+			</HeaderRow>
+
+			{/* ─── Wheel ─── */}
 			<WheelSection>
-				<WheelWrapper>
-					<Wheel
-						mustStartSpinning={mustSpin}
-						prizeNumber={prizeNumber}
-						outerBorderWidth={finalConfig.outerBorderWidth}
-						outerBorderColor={finalConfig.outerBorderColor}
-						innerRadius={finalConfig.innerRadius}
-						innerBorderWidth={finalConfig.innerBorderWidth}
-						radiusLineWidth={finalConfig.radiusLineWidth}
-						radiusLineColor={finalConfig.radiusLineColor}
-						textDistance={finalConfig.textDistance}
-						perpendicularText={finalConfig.perpendicularText}
-						spinDuration={finalConfig.spinDuration}
-						data={items}
-						backgroundColors={wheelBackgroundColors}
-						textColors={["#ffffff"]}
-						fontSize={finalConfig.fontSize}
-						fontWeight={finalConfig.fontWeight}
-						onStopSpinning={() => {
-							setMustSpin(false);
-							const prize = items[prizeNumber]?.option ?? "";
-							handleWinner(prize);
-							onStopSpinning?.();
-						}}
+				{/* بنر قوسی ضریب‌ها (تعاملی): انتخاب هر سلول → طلایی شدن */}
+				<RibbonStage
+					style={{
+						left: `${RIBBON.left}%`,
+						top: `${RIBBON.top}%`,
+						width: `${RIBBON.width}%`,
+					}}
+				>
+					<RibbonImg
+						src="/media/App/wheel/multiplier-ribbon.png"
+						alt=""
+						draggable={false}
 					/>
-				</WheelWrapper>
+
+					{/* badge طلاییِ سلولِ انتخاب‌شده */}
+					{activeCell && (
+						<BadgeWrap
+							style={{
+								left: `${activeCell.cx}%`,
+								top: `${activeCell.cy}%`,
+								width: `${activeCell.badgeW}%`,
+								transform: "translate(-50%, -58%)",
+							}}
+						>
+							<img
+								src={
+									activeCell.badgeImg ??
+									"/media/App/wheel/multiplier-badge-blank.png"
+								}
+								alt={selectedMultiplier}
+								draggable={false}
+								style={{ width: "100%", display: "block" }}
+							/>
+							{!activeCell.bakedNumber && (
+								<BadgeNumber>{selectedMultiplier}</BadgeNumber>
+							)}
+						</BadgeWrap>
+					)}
+
+					{/* نواحی کلیکِ هر سلول */}
+					{MULTIPLIERS.map((m) => (
+						<CellHit
+							key={m.value}
+							aria-label={m.value}
+							onClick={() => handleSelectMultiplier(m.value)}
+							style={{
+								left: `${m.cx}%`,
+								top: `${m.cy}%`,
+								transform: "translate(-50%, -50%)",
+							}}
+						/>
+					))}
+				</RibbonStage>
+
+				<WheelGlow />
+
+				{/* دکورِ گردونه: حلقهٔ طلایی → tire قهوه‌ای → حلقهٔ داخلی → پره‌ها → هاب */}
+				<GoldRing>
+					<Tire />
+					<InnerGold />
+
+					{/*
+					 * react-custom-roulette پرهٔ برنده را در ۳۱۷° (۴۷° راستِ بالا، محلِ
+					 * سوزنِ پیش‌فرضِ خودش) متوقف می‌کند. دیسک را ۴۷° پادساعتگرد می‌چرخانیم
+					 * تا برنده دقیقاً زیرِ سوزنِ بالا-وسطِ ما بایستد. inline تا RTL-plugin فلیپ نکند.
+					 */}
+					<SliceArea style={{ transform: "rotate(-47deg)" }}>
+						{items.length > 0 && (
+							<Wheel
+								mustStartSpinning={mustSpin}
+								prizeNumber={prizeNumber}
+								outerBorderWidth={0}
+								innerRadius={0}
+								innerBorderWidth={0}
+								radiusLineWidth={finalConfig.radiusLineWidth}
+								radiusLineColor={finalConfig.radiusLineColor}
+								textDistance={finalConfig.textDistance}
+								perpendicularText={finalConfig.perpendicularText}
+								spinDuration={finalConfig.spinDuration}
+								data={items}
+								backgroundColors={wheelBackgroundColors}
+								textColors={["#ffffff"]}
+								fontSize={finalConfig.fontSize}
+								fontWeight={finalConfig.fontWeight}
+								pointerProps={{ style: { display: "none" } }}
+								onStopSpinning={() => {
+									setMustSpin(false);
+									const prize = items[prizeNumber]?.option ?? "";
+									handleWinner(prize);
+									onStopSpinning?.();
+								}}
+							/>
+						)}
+					</SliceArea>
+
+					<LedRing isSpinning={isSpinning} />
+
+					{/* هابِ طلاییِ مرکز با آیکون چرخش */}
+					<Hub>
+						<svg viewBox="0 0 24 24" width="58%" height="58%" aria-hidden>
+							<path
+								d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"
+								fill="#6E3A12"
+							/>
+						</svg>
+					</Hub>
+				</GoldRing>
+
+				{/* سوزن قرمزِ بالای گردونه (روی حلقهٔ بیرونی، رو به پایین) */}
+				<Pointer
+					viewBox="0 0 24 44"
+					aria-hidden
+					style={{
+						left: `${POINTER.left}%`,
+						top: `${POINTER.top}%`,
+						width: `${POINTER.width}%`,
+						transform: "translateX(-50%)",
+					}}
+				>
+					<path d="M5.5 15 L18.5 15 L12 41 Z" fill="#D9962F" />
+					<circle cx="12" cy="12.5" r="11.5" fill="#E8C25E" />
+					<circle cx="12" cy="12.5" r="9.3" fill="#C98A2A" />
+					<circle cx="12" cy="12.5" r="6.8" fill="#E12D45" />
+				</Pointer>
 			</WheelSection>
 
+			{/* ─── Action ─── */}
 			<ActionSection>
-				{winner && (
-					<WinnerMessage
-						className={winner !== emptyPrizeLabel ? "win" : "lose"}
-					>
-						<Typography variant="14-medium" color="common.white">
-							{winner === emptyPrizeLabel
-								? emptyPrizeMessage
-								: `${winMessage}: ${winner}`}
-						</Typography>
-					</WinnerMessage>
-				)}
-
 				<SpinButton
-					onClick={handleSpinClick}
+					onClick={() => void handleSpinClick()}
 					disabled={isSpinning || items.length === 0}
 					variant="contained"
 				>
 					{isSpinning ? "در حال چرخش..." : buttonLabel}
 				</SpinButton>
 			</ActionSection>
-		</RouletteContainer>
+
+			{/* مودالِ نتیجه (برد یا پوچ) */}
+			<WinDialog
+				open={winOpen}
+				prize={winner ?? ""}
+				isEmpty={winner === emptyPrizeLabel}
+				onClose={() => setWinOpen(false)}
+				onSpinAgain={handleSpinAgain}
+				onHome={onHome ?? onBack}
+			/>
+		</PageContainer>
 	);
 }
 
-const RouletteContainer = styled(Box)(({ theme }) => ({
+/* ─── Styled ─── */
+
+const PageContainer = styled(Box)({
 	display: "flex",
 	flexDirection: "column",
 	alignItems: "center",
-	justifyContent: "space-between",
-	gap: theme.spacing(1.5),
-	padding: theme.spacing(1.5, 1.5),
-	background: "linear-gradient(135deg, #3D1F5C 0%, #1A0B2E 50%, #2D1B4E 100%)",
-	borderRadius: "28px",
+	gap: 12,
+	padding: "12px 16px 40px",
+	background: "#240620",
 	position: "relative",
-	overflow: "hidden",
-	height: "100vh",
-	maxHeight: "100dvh",
+	overflowX: "hidden",
+	minHeight: "100vh",
 	boxSizing: "border-box",
+	direction: "rtl",
+});
 
-	[theme.breakpoints.up("sm")]: {
-		padding: theme.spacing(2, 2.5),
-		gap: theme.spacing(2),
-		borderRadius: "32px",
-		height: "auto",
-		minHeight: "600px",
-		maxHeight: "none",
-	},
-
-	"&::before": {
-		content: '""',
-		position: "absolute",
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		background:
-			"radial-gradient(circle at 20% 30%, rgba(255, 50, 150, 0.08) 0%, transparent 40%), radial-gradient(circle at 80% 70%, rgba(100, 50, 200, 0.06) 0%, transparent 40%)",
-		pointerEvents: "none",
-		zIndex: 1,
-	},
-}));
-
-const HeaderSection = styled(Box)(({ theme }) => ({
+const HeaderRow = styled(Box)({
 	display: "flex",
 	alignItems: "center",
 	justifyContent: "space-between",
 	width: "100%",
-	gap: theme.spacing(1.5),
-	position: "relative",
-	zIndex: 3,
-	flexWrap: "nowrap",
-	flexShrink: 0,
+	paddingTop: 4,
+});
 
-	[theme.breakpoints.up("sm")]: {
-		gap: theme.spacing(2),
-	},
-}));
-
-const TitleWrapper = styled(Box)(() => ({
+const TitleWrapper = styled(Box)({
 	flex: 1,
-	textAlign: "left",
-
-	"& .MuiTypography-root": {
-		fontSize: "16px",
-		lineHeight: "24px",
-	},
-}));
-
-const TicketBadge = styled(Box)(({ theme }) => ({
-	display: "flex",
-	alignItems: "center",
-	justifyContent: "center",
-	backgroundColor: "#FF4081",
-	borderRadius: "12px",
-	padding: theme.spacing(0.4, 1.2),
-	minWidth: "50px",
 	textAlign: "center",
-	boxShadow: "0 2px 8px rgba(255, 64, 129, 0.35)",
-	transition: "transform 0.2s ease",
+	padding: "0 8px",
+});
 
-	[theme.breakpoints.up("sm")]: {
-		borderRadius: "16px",
-		padding: theme.spacing(0.5, 1.5),
-		minWidth: "60px",
-	},
+const BackButton = styled(Box)({
+	display: "flex",
+	alignItems: "center",
+	gap: 2,
+	cursor: "pointer",
+	minWidth: 79,
+	justifyContent: "flex-end",
+	userSelect: "none",
+});
 
-	"&:hover": {
-		transform: "scale(1.05)",
-	},
+const ChevronLeft = styled("svg")({
+	width: 18,
+	height: 18,
+	flexShrink: 0,
+});
 
-	"& .MuiTypography-root": {
-		color: "#ffffff",
-		fontSize: "11px",
-		lineHeight: "16.5px",
+const PlaceholderBox = styled(Box)({
+	minWidth: 79,
+});
 
-		[theme.breakpoints.up("sm")]: {
-			fontSize: "12px",
-			lineHeight: "18px",
-		},
-	},
-}));
-
-const WheelSection = styled(Box)(({ theme }) => ({
+const WheelSection = styled(Box)({
 	position: "relative",
-	display: "flex",
-	alignItems: "center",
-	justifyContent: "center",
 	width: "100%",
-	maxWidth: "min(85vw, 450px)",
+	maxWidth: 340,
 	aspectRatio: "1",
-	margin: "0 auto",
-	zIndex: 2,
-	flex: "1 1 auto",
-	minHeight: 0,
-
-	[theme.breakpoints.up("sm")]: {
-		maxWidth: "500px",
-	},
-
-	[theme.breakpoints.down("sm")]: {
-		maxWidth: "min(85vw, 340px)",
-	},
-}));
-
-const WheelWrapper = styled(Box)(({ theme: _theme }) => ({
-	width: "100%",
-	height: "100%",
+	margin: "84px auto 0",
 	display: "flex",
 	alignItems: "center",
 	justifyContent: "center",
-	filter: "drop-shadow(0 0 40px rgba(255, 215, 0, 0.4))",
-	transition: "filter 0.3s ease",
+});
 
-	"&:hover": {
-		filter: "drop-shadow(0 0 50px rgba(255, 215, 0, 0.5))",
-	},
+/** ظرفِ بنر — دقیقاً روی تصویرِ بنر می‌نشیند تا overlayها نسبت به همان قاب درصدی شوند */
+const RibbonStage = styled(Box)({
+	position: "absolute",
+	zIndex: 8,
+	pointerEvents: "none",
+	filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.35))",
+});
+
+const RibbonImg = styled("img")({
+	width: "100%",
+	display: "block",
+	pointerEvents: "none",
+});
+
+const BadgeWrap = styled(Box)({
+	position: "absolute",
+	containerType: "inline-size",
+	pointerEvents: "none",
+	zIndex: 2,
+	filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.45))",
+});
+
+const BadgeNumber = styled("span")({
+	position: "absolute",
+	inset: 0,
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "center",
+	paddingBottom: "12%",
+	color: "#F6C453",
+	fontFamily: "'Lobster', 'Georgia', serif",
+	fontStyle: "italic",
+	fontWeight: 700,
+	fontSize: "46cqw",
+	lineHeight: 1,
+	textShadow: "0 2px 3px rgba(0,0,0,0.45)",
+	pointerEvents: "none",
+});
+
+const CellHit = styled("button")({
+	position: "absolute",
+	width: "18%",
+	height: "30%",
+	padding: 0,
+	margin: 0,
+	border: "none",
+	background: "transparent",
+	cursor: "pointer",
+	pointerEvents: "auto",
+	zIndex: 3,
+	borderRadius: "50%",
+	WebkitTapHighlightColor: "transparent",
+});
+
+const Pointer = styled("svg")({
+	position: "absolute",
+	zIndex: 9,
+	height: "auto",
+	pointerEvents: "none",
+	filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.45))",
+});
+
+const Led = styled(Box)({
+	position: "absolute",
+	width: "2.6%",
+	height: "2.6%",
+	borderRadius: "50%",
+	transition: "background 0.08s, box-shadow 0.08s",
+	zIndex: 5,
+	pointerEvents: "none",
+});
+
+const WheelGlow = styled(Box)({
+	position: "absolute",
+	inset: "-6%",
+	borderRadius: "50%",
+	background:
+		"radial-gradient(circle at 50% 50%, rgba(203,48,224,0.30) 0%, rgba(230,64,86,0.18) 45%, transparent 70%)",
+	pointerEvents: "none",
+	zIndex: 0,
+});
+
+/** حلقهٔ طلاییِ بیرونی (کلِ قطرِ گردونه) */
+const GoldRing = styled(Box)({
+	position: "absolute",
+	inset: 0,
+	borderRadius: "50%",
+	background:
+		"radial-gradient(circle at 35% 28%, #FBE48F 0%, #F0AC46 48%, #C8881F 100%)",
+	boxShadow:
+		"inset 0 0 0 2px #F9D55F, inset 0 -8px 14px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.45)",
+	zIndex: 1,
+});
+
+/** حلقهٔ قهوه‌ایِ tire */
+const Tire = styled(Box)({
+	position: "absolute",
+	inset: "7.5%",
+	borderRadius: "50%",
+	background: "radial-gradient(circle at 35% 28%, #A9701F 0%, #7A4A07 100%)",
+	boxShadow: "inset 0 2px 5px rgba(0,0,0,0.5)",
+	zIndex: 2,
+});
+
+/** حلقهٔ طلاییِ نازکِ داخلی */
+const InnerGold = styled(Box)({
+	position: "absolute",
+	inset: "10%",
+	borderRadius: "50%",
+	background: "linear-gradient(180deg, #F9D55F 0%, #D69136 100%)",
+	zIndex: 3,
+});
+
+/** ناحیهٔ پره‌های چرخان (react-custom-roulette) */
+const SliceArea = styled(Box)({
+	position: "absolute",
+	inset: "11.5%",
+	borderRadius: "50%",
+	overflow: "hidden",
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "center",
+	zIndex: 4,
 
 	"& > div": {
 		width: "100% !important",
@@ -336,125 +649,62 @@ const WheelWrapper = styled(Box)(({ theme: _theme }) => ({
 		width: "100% !important",
 		height: "auto !important",
 	},
-}));
+});
 
-const ActionSection = styled(Box)(({ theme }) => ({
+/** هابِ طلاییِ مرکز */
+const Hub = styled(Box)({
+	position: "absolute",
+	left: "50%",
+	top: "50%",
+	width: "17%",
+	height: "17%",
+	transform: "translate(-50%, -50%)",
+	borderRadius: "50%",
+	background:
+		"radial-gradient(circle at 35% 30%, #FBE48F 0%, #F0AC46 55%, #C8881F 100%)",
+	border: "2px solid #F9D55F",
+	boxShadow: "0 2px 6px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.3)",
+	display: "flex",
+	alignItems: "center",
+	justifyContent: "center",
+	zIndex: 6,
+});
+
+const ActionSection = styled(Box)({
 	display: "flex",
 	flexDirection: "column",
 	alignItems: "center",
-	gap: theme.spacing(1.5),
+	gap: 16,
 	width: "100%",
-	maxWidth: "350px",
+	marginTop: 24,
 	position: "relative",
 	zIndex: 3,
-	padding: theme.spacing(0, 1),
-	flexShrink: 0,
+});
 
-	[theme.breakpoints.up("sm")]: {
-		maxWidth: "400px",
-		gap: theme.spacing(2),
-	},
-}));
-
-const WinnerMessage = styled(Box)(({ theme }) => ({
-	backgroundColor: "rgba(255, 255, 255, 0.1)",
-	borderRadius: "14px",
-	padding: theme.spacing(1.2, 1.5),
-	backdropFilter: "blur(10px)",
-	border: "1px solid rgba(255, 255, 255, 0.2)",
-	textAlign: "center",
-	width: "100%",
-	animation: "slideUp 0.4s ease-out",
-
-	"&.win": {
-		backgroundColor: "rgba(76, 175, 80, 0.15)",
-		border: "1px solid rgba(76, 175, 80, 0.4)",
-		boxShadow: "0 4px 12px rgba(76, 175, 80, 0.2)",
-	},
-
-	"@keyframes slideUp": {
-		from: {
-			opacity: 0,
-			transform: "translateY(15px)",
-		},
-		to: {
-			opacity: 1,
-			transform: "translateY(0)",
-		},
-	},
-
-	"& .MuiTypography-root": {
-		lineHeight: 1.5,
-		fontSize: "13px",
-	},
-
-	[theme.breakpoints.up("sm")]: {
-		padding: theme.spacing(1.5, 2),
-		borderRadius: "16px",
-
-		"& .MuiTypography-root": {
-			fontSize: "14px",
-			lineHeight: 1.6,
-		},
-	},
-}));
-
-const SpinButton = styled(Button)(({ theme }) => ({
-	borderRadius: "20px",
-	padding: "10px 32px",
-	fontSize: "14px",
-	fontWeight: 700,
+const SpinButton = styled(Button)({
+	borderRadius: 16,
+	padding: "6px 42px",
+	fontSize: 16,
+	fontWeight: 500,
 	textTransform: "none",
-	minWidth: "130px",
-	minHeight: "44px",
-	backgroundColor: "#FF4081",
-	color: "#ffffff",
-	transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-	boxShadow: "0 4px 14px rgba(255, 64, 129, 0.4)",
-	position: "relative",
-	overflow: "hidden",
-
-	"&::before": {
-		content: '""',
-		position: "absolute",
-		top: "50%",
-		left: "50%",
-		width: "0",
-		height: "0",
-		borderRadius: "50%",
-		background: "rgba(255, 255, 255, 0.3)",
-		transform: "translate(-50%, -50%)",
-		transition: "width 0.6s, height 0.6s",
-	},
+	minWidth: 135,
+	height: 34,
+	backgroundColor: "#F9F9F9",
+	color: "#240620",
+	boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
 
 	"&:hover:not(:disabled)": {
-		backgroundColor: "#FF1493",
-		boxShadow: "0 6px 20px rgba(255, 64, 129, 0.6)",
-		transform: "translateY(-3px) scale(1.02)",
-
-		"&::before": {
-			width: "300px",
-			height: "300px",
-		},
+		backgroundColor: "#FFFFFF",
+		boxShadow: "0 6px 18px rgba(255,255,255,0.2)",
+		transform: "translateY(-1px)",
 	},
 
 	"&:active:not(:disabled)": {
-		transform: "translateY(-1px) scale(0.98)",
-		boxShadow: "0 4px 12px rgba(255, 64, 129, 0.5)",
+		transform: "translateY(0)",
 	},
 
 	"&:disabled": {
-		backgroundColor: "#999",
-		opacity: 0.6,
-		cursor: "not-allowed",
-		boxShadow: "none",
+		backgroundColor: "rgba(249,249,249,0.4)",
+		color: "rgba(36,6,32,0.5)",
 	},
-
-	[theme.breakpoints.up("sm")]: {
-		padding: "12px 40px",
-		fontSize: "15px",
-		minWidth: "150px",
-		minHeight: "48px",
-		borderRadius: "22px",
-	},
-}));
+});

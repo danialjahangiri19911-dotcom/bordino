@@ -87,6 +87,17 @@ requester.interceptors.response.use(
 			return Promise.reject(error);
 		}
 
+		// خطای واکشیِ گردونه (۴۰۴ وقتی هنوز گردونه‌ای ساخته نشده) و خلاصهٔ امتیاز
+		// را toast نکن؛ فرانت به‌صورت دمو/۰ ادامه می‌دهد. خطای spin (POST) همچنان نمایش داده می‌شود.
+		const reqUrl = error.config?.url ?? "";
+		const reqMethod = (error.config?.method ?? "").toLowerCase();
+		if (
+			reqMethod === "get" &&
+			(reqUrl.includes("lottery-wheel/") || reqUrl.includes("points/summary"))
+		) {
+			return Promise.reject(error);
+		}
+
 		if (!shouldDisableError) {
 			emitError(errorMessage);
 		}

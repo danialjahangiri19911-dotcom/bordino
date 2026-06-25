@@ -5,6 +5,7 @@ from apps.wallet.views.activity import RecordActionCRUDView, ScoreHistoryView, S
 from apps.wallet.views.bank.list import BankListView
 from apps.wallet.views.bank_account.views import BankAccountViewSet
 from apps.wallet.views.currency_transaction.list import CurrencyTransactionListView
+from apps.wallet.views.game_play.charge import GamePlayChargeView
 from apps.wallet.views.wallet.currency_summary import CurrencyWalletSummaryView
 from apps.wallet.views.wallet.summary import PointsWalletSummaryView
 from apps.wallet.views.wallet.transactions import PointsWalletTransactionsView
@@ -30,6 +31,11 @@ router.register(
 )
 
 urlpatterns = [
+    path(
+        "api/v1/wallet/games/charge/",
+        GamePlayChargeView.as_view(),
+        name="game_play_charge",
+    ),
     path(
         "api/v1/wallet/points/summary/",
         PointsWalletSummaryView.as_view(),

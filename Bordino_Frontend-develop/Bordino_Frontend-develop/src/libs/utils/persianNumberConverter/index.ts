@@ -17,3 +17,10 @@ export function persianNumberConverter(text: string) {
 		.map((char) => persianToEnglish[char] || char)
 		.join("");
 }
+
+const PERSIAN_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
+
+/** تبدیلِ ارقامِ انگلیسی به فارسی برای نمایش (مثلِ ۲۰۴۸). */
+export function toPersianDigits(value: string | number) {
+	return String(value).replace(/\d/g, (d) => PERSIAN_DIGITS[Number(d)]);
+}
