@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { WHEEL } from "@/constants/routes";
+import { TAROT, WHEEL } from "@/constants/routes";
 import Box from "@libs/components/atoms/Box";
 import "swiper/css";
 import { Autoplay } from "swiper/modules";
@@ -30,6 +30,8 @@ interface SlideSpec {
 	key: string;
 	bg: string;
 	image: string;
+	/** اگر تصویری نباشد، این اموجی در جای تصویر نمایش داده می‌شود */
+	emoji?: string;
 	img: { left: number; top: number; width: number; height: number };
 	title: string;
 	subtitle: string;
@@ -71,6 +73,22 @@ const SLIDES: SlideSpec[] = [
 			{ left: -90, top: 10, w: 152, h: 79, color: "#204E7B" },
 		],
 	},
+	{
+		key: "tarot",
+		bg: "#3A1D5E",
+		image: "",
+		emoji: "🔮",
+		img: { left: 30, top: 16, width: 78, height: 78 },
+		title: "فال تاروت",
+		subtitle: "کارت‌هاتو رو کن و آینده‌تو ببین",
+		buttonText: "بریم",
+		buttonTextColor: "#3A1D5E",
+		href: TAROT.path,
+		ellipses: [
+			{ left: -10, top: -6, w: 150, h: 100, color: "#7B3FC0", opacity: 0.5, blur: 26 },
+			{ left: 250, top: 40, w: 80, h: 70, color: "#C9A24B", opacity: 0.18, blur: 14 },
+		],
+	},
 ];
 
 function PromoCard({ slide, onActivate }: Readonly<{ slide: SlideSpec; onActivate?: () => void }>) {
@@ -104,18 +122,37 @@ function PromoCard({ slide, onActivate }: Readonly<{ slide: SlideSpec; onActivat
 				/>
 			))}
 
-			<img
-				src={slide.image}
-				alt=""
-				style={{
-					position: "absolute",
-					left: slide.img.left,
-					top: slide.img.top,
-					width: slide.img.width,
-					height: slide.img.height,
-					objectFit: "contain",
-				}}
-			/>
+			{slide.image ? (
+				<img
+					src={slide.image}
+					alt=""
+					style={{
+						position: "absolute",
+						left: slide.img.left,
+						top: slide.img.top,
+						width: slide.img.width,
+						height: slide.img.height,
+						objectFit: "contain",
+					}}
+				/>
+			) : slide.emoji ? (
+				<div
+					style={{
+						position: "absolute",
+						left: slide.img.left,
+						top: slide.img.top,
+						width: slide.img.width,
+						height: slide.img.height,
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						fontSize: slide.img.height * 0.7,
+						lineHeight: 1,
+					}}
+				>
+					{slide.emoji}
+				</div>
+			) : null}
 
 			{/* بلوک متن، لنگرشده به لبه‌ی راست؛ بدون width ثابت تا متن‌ها یک‌خطی بمانند */}
 			<div style={{ position: "absolute", right: 24, top: 18, textAlign: "right" }}>

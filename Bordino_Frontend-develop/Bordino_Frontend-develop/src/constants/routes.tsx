@@ -107,6 +107,12 @@ export const HAFEZ_RESULT = {
 	icon: "",
 };
 
+export const TAROT = {
+	title: "فال تاروت",
+	path: `${APP_HOME.path}/tarot`,
+	icon: "",
+};
+
 export const SUDOKU = {
 	title: "سودوکو",
 	path: `${APP_HOME.path}/sudoku`,

@@ -56,4 +56,5 @@ export const ACTIVITY_URLS = {
 
 export const ENTERTAINMENT_URLS = {
 	RANDOM_FORTUNE: "entertainment/fortune-reading/",
+	TAROT: "entertainment/tarot/",
 };
