@@ -20,13 +20,10 @@ class LotteryWinnerService:
         self.prize_transfer_service = CurrencyWalletAccountTransferService()
 
     def _calculate_matches(self, ticket_numbers):
-        """Calculate how many numbers match with lottery numbers in the same position"""
-        lottery_numbers = self.lottery.numbers
-        matches = 0
-        for i, lottery_number in enumerate(lottery_numbers):
-            if lottery_number == ticket_numbers[i]:
-                matches += 1
-        return matches
+        """تعدادِ توپ‌های منطبق = شماره‌هایی از بلیط که در شماره‌های برنده هستند
+        (مقداری، هم‌سان با نمایشِ UI — نه بر اساسِ موقعیت)."""
+        winning_numbers = set(self.lottery.numbers or [])
+        return len([n for n in (ticket_numbers or []) if n in winning_numbers])
 
     def _validate_lottery_state(self):
         """Validate lottery is ready for winner calculation"""
@@ -39,117 +36,110 @@ class LotteryWinnerService:
         if not self.prize_rules.exists():
             raise ValidationError(_("Lottery must have prize rules defined"))
 
-    def _calculate_maximum_possible_prize(self):
-        """Calculate maximum possible prize if all tickets win maximum prize"""
-        total_tickets = self.lottery.total_tickets
-        max_prize_rule = self.prize_rules.order_by("-prize_amount").first()
-        return max_prize_rule.prize_amount * total_tickets if max_prize_rule else 0
+    def _floor(self, amount):
+        """به‌سمتِ پایین گرد می‌کند (۰ رقمِ اعشار)."""
+        return Decimal(amount).quantize(Decimal("1"), rounding=ROUND_DOWN)
 
-    def _get_winners_by_match_count(self):
-        """Group tickets by number of matching numbers"""
-        winners = {}
-        tickets = self.lottery.tickets.filter(status=Ticket.Status.ACTIVE)
+    def _compute_allocations(self):
+        """جایزهٔ هر بلیط را طبقِ قوانینِ توزیع محاسبه می‌کند (بدونِ هیچ side-effect).
 
-        for ticket in tickets:
-            matches = self._calculate_matches(ticket.numbers)
-            # Only include tickets that match a prize rule
-            if self.prize_rules.filter(lottery=self.lottery, match_count=matches).exists():
-                if matches not in winners:
-                    winners[matches] = []
-                winners[matches].append(ticket)
+        - استخر P = lottery.prize_amount_in_money (۲ × امتیازِ خرج‌شده × قیمت توکن)
+        - سطوحِ غیرِجک‌پات: مبلغِ ثابتِ جدول (PrizeRule)
+        - جک‌پات (۶ توپ) = باقیمانده‌ی استخر، با کفِ «مجموعِ جوایزِ سایر سطوح»،
+          مساوی بین بلیط‌های جک‌پات
+        - اگر مجموعِ جوایز از استخر بیشتر شد، همه با ضریبِ P/مجموع کم می‌شوند
+
+        خروجی: (allocations, expired) که allocations لیستِ (ticket, match_count, prize) است.
+        """
+        pool = Decimal(self.lottery.prize_amount_in_money or 0)
+        jackpot_match = len(self.lottery.numbers or [])
+        rule_amount = {rule.match_count: Decimal(rule.prize_amount) for rule in self.prize_rules}
+
+        non_jackpot = []  # (ticket, match, base_amount)
+        jackpot_tickets = []
+        expired = []
+
+        for ticket in self.lottery.tickets.filter(status=Ticket.Status.ACTIVE):
+            matches = self._calculate_matches(ticket.numbers or [])
+            if jackpot_match and matches == jackpot_match:
+                jackpot_tickets.append(ticket)
+            elif matches in rule_amount:
+                non_jackpot.append((ticket, matches, rule_amount[matches]))
             else:
-                ticket.status = Ticket.Status.EXPIRED
-                ticket.save()
-        return winners
+                expired.append(ticket)
 
-    def _calculate_total_potential_prizes(self, winners_by_matches):
-        """Calculate total potential prizes based on winners and prize rules"""
-        total_potential = Decimal("0")
+        non_jackpot_total = sum((base for _, _, base in non_jackpot), Decimal("0"))
 
-        for prize_rule in self.prize_rules:
-            match_count = prize_rule.match_count
-            if match_count in winners_by_matches:
-                winners_count = len(winners_by_matches[match_count])
-                total_potential += prize_rule.prize_amount * winners_count
+        # جک‌پات = باقیمانده‌ی استخر، ولی نه کمتر از مجموعِ سایر سطوح
+        if jackpot_tickets:
+            jackpot_pot = max(pool - non_jackpot_total, non_jackpot_total)
+        else:
+            jackpot_pot = Decimal("0")
 
-        return total_potential
+        raw_total = non_jackpot_total + jackpot_pot
+        # اگر مجموع از استخر بیشتر شد، همه با ضریب کم می‌شوند تا مجموع = استخر
+        coefficient = (
+            pool / raw_total if raw_total > pool and raw_total > 0 else Decimal("1")
+        )
 
-    def _calculate_prize_coefficient(self, total_potential_prizes):
-        """Calculate coefficient to adjust prizes if total exceeds balance"""
-        if total_potential_prizes > self.lottery.balance:
-            return Decimal(self.lottery.balance) / Decimal(total_potential_prizes)
-        return Decimal("1")
+        allocations = [
+            (ticket, match, self._floor(base * coefficient))
+            for ticket, match, base in non_jackpot
+        ]
 
-    def _adjust_prize_amount(self, original_amount, coefficient):
-        """Adjust prize amount using coefficient"""
-        adjusted = original_amount * coefficient
-        # Round to 0 decimal places
-        return Decimal(adjusted).quantize(Decimal("1"), rounding=ROUND_DOWN)
+        if jackpot_tickets:
+            per_ticket = (jackpot_pot / len(jackpot_tickets)) * coefficient
+            for ticket in jackpot_tickets:
+                allocations.append((ticket, jackpot_match, self._floor(per_ticket)))
+
+        return allocations, expired
 
     @transaction.atomic
     def process_winners(self):
         """Process all winners for the lottery"""
         self._validate_lottery_state()
 
-        # Get winners grouped by match count
-        winners_by_matches = self._get_winners_by_match_count()
+        allocations, expired = self._compute_allocations()
 
-        # Calculate total potential prizes and coefficient
-        total_potential_prizes = self._calculate_total_potential_prizes(winners_by_matches)
-        coefficient = self._calculate_prize_coefficient(total_potential_prizes)
+        # بلیط‌های بدونِ جایزه منقضی می‌شوند
+        for ticket in expired:
+            ticket.status = Ticket.Status.EXPIRED
+            ticket.save()
 
         results = {
             "total_winners": 0,
             "winners_by_category": {},
             "total_prize_amount": Decimal("0"),
-            "prize_coefficient": coefficient,
-            "original_total_potential": total_potential_prizes,
-            "adjusted_total": total_potential_prizes * coefficient,
         }
 
-        # Process each prize rule with adjusted amounts
-        for prize_rule in self.prize_rules:
-            match_count = prize_rule.match_count
-            if match_count in winners_by_matches:
-                winning_tickets = winners_by_matches[match_count]
-                adjusted_prize = self._adjust_prize_amount(prize_rule.prize_amount, coefficient)
+        for ticket, match_count, prize in allocations:
+            ticket.matched_numbers = match_count
+            ticket.prize_amount = prize
+            ticket.status = Ticket.Status.WINNER
+            ticket.save()
 
-                # Update each winning ticket
-                for ticket in winning_tickets:
-                    ticket.matched_numbers = match_count
-                    ticket.prize_amount = adjusted_prize
-                    ticket.status = Ticket.Status.WINNER
-                    ticket.save()
+            # واریزِ جایزه به کیفِ نقدیِ اصلیِ برنده + ثبتِ تراکنش
+            self.prize_transfer_service.send_prize_to_customer(
+                dto=CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
+                    prize_amount=prize,
+                    customer=ticket.customer,
+                    destination_wallet_account=ticket.customer.user.wallet.currency_wallet_accounts.filter(
+                        primary=True
+                    ).first(),
+                )
+            )
+            self.transaction_service.create_prize_payment(
+                self.transaction_service.CreatePrizePaymentDTO(ticket=ticket, amount=prize)
+            )
 
-                    # Send prize to customer
-                    self.prize_transfer_service.send_prize_to_customer(
-                        dto=CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
-                            prize_amount=adjusted_prize,
-                            customer=ticket.customer,
-                            destination_wallet_account=ticket.customer.user.wallet.currency_wallet_accounts.filter(
-                                primary=True
-                            ).first(),
-                        )
-                    )
+            category = results["winners_by_category"].setdefault(
+                match_count, {"count": 0, "total_prize": Decimal("0")}
+            )
+            category["count"] += 1
+            category["total_prize"] += prize
+            results["total_winners"] += 1
+            results["total_prize_amount"] += prize
 
-                    self.transaction_service.create_prize_payment(
-                        self.transaction_service.CreatePrizePaymentDTO(
-                            ticket=ticket, amount=adjusted_prize
-                        )
-                    )
-
-                # Update results
-                results["winners_by_category"][match_count] = {
-                    "count": len(winning_tickets),
-                    "original_prize": prize_rule.prize_amount,
-                    "adjusted_prize": adjusted_prize,
-                    "total_prize": adjusted_prize * len(winning_tickets),
-                }
-                results["total_winners"] += len(winning_tickets)
-                results["total_prize_amount"] += adjusted_prize * len(winning_tickets)
-
-        # Update lottery balance and status
-        self.lottery.balance -= results["total_prize_amount"]
         self.lottery.status = Lottery.Status.COMPLETED
         self.lottery.save()
 
