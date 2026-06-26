@@ -147,7 +147,9 @@ class TicketPurchaseService:
 
                 lottery_tokens = amount - total_referral_tokens
                 Lottery.objects.filter(id=lottery.id).update(
-                    balance=F("balance") + lottery_tokens * token.price
+                    balance=F("balance") + lottery_tokens * token.price,
+                    # امتیازِ کاملِ پرداختیِ خریدار (مبنای «مبلغ جایزه»)
+                    tickets_points_spent=F("tickets_points_spent") + amount,
                 )
         except IntegrityError as e:
             raise ValidationError(_("You already have a ticket with these numbers.")) from e

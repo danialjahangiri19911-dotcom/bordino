@@ -4,7 +4,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from apps.django_helper.drf.serializers import BaseModelSerializer
-from apps.lottery.models import Ticket
+from apps.lottery.models import Lottery, Ticket
 from apps.lottery.services.ticket.purchase import TicketPurchaseService
 
 
@@ -15,6 +15,12 @@ class TicketCRUDSerializer(BaseModelSerializer):
     name = serializers.CharField(read_only=True)
     reference = serializers.SerializerMethodField()
     ticket_count = serializers.SerializerMethodField()
+    update_time = serializers.DateTimeField(read_only=True)
+    # وضعیتِ قرعه‌کشیِ این بلیط + شماره‌های برنده و تعداد توپِ منطبق
+    # (برای صفحهٔ جزئیاتِ بلیط: سبزکردنِ توپ‌ها و نمایشِ ردیفِ «وضعیت»)
+    lottery_status = serializers.CharField(source="lottery.status", read_only=True)
+    winning_numbers = serializers.SerializerMethodField()
+    matched_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
@@ -24,10 +30,25 @@ class TicketCRUDSerializer(BaseModelSerializer):
             "reference",
             "ticket_count",
             "numbers",
+            "update_time",
+            "lottery_status",
+            "winning_numbers",
+            "matched_count",
         )
 
     def get_reference(self, obj):
         return str(obj.id).replace("-", "")[-8:]
+
+    def get_winning_numbers(self, obj):
+        if obj.lottery.status == Lottery.Status.COMPLETED:
+            return obj.lottery.numbers or []
+        return []
+
+    def get_matched_count(self, obj):
+        if obj.lottery.status != Lottery.Status.COMPLETED:
+            return None
+        winning = set(obj.lottery.numbers or [])
+        return len([n for n in (obj.numbers or []) if n in winning])
 
     def get_ticket_count(self, obj):
         if hasattr(obj, "ticket_count"):

@@ -94,7 +94,7 @@ class LotteryMatchResultSerializer(BaseModelSerializer):
         return self.lottery_query_repository.get_total_winners(lottery)
 
     def get_total_prize_pool(self, lottery):
-        return self.lottery_query_repository.get_total_prize_pool(lottery)
+        return lottery.prize_amount_in_money
 
     def get_summary(self, lottery):
         return self.lottery_query_repository.get_summary(lottery)

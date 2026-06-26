@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -62,6 +63,14 @@ class Lottery(AbstractBaseModel):
         null=True,
         blank=True,
     )
+    # مجموعِ امتیازی که همه‌ی کاربران برای خریدِ بلیطِ توپ خرج کرده‌اند (نه گردونه).
+    # با هر خرید در TicketPurchaseService افزایش می‌یابد؛ مبنای محاسبهٔ «مبلغ جایزه».
+    tickets_points_spent = models.DecimalField(
+        verbose_name=_("Tickets points spent"),
+        max_digits=20,
+        decimal_places=0,
+        default=0,
+    )
 
     def __str__(self):
         return self.name
@@ -97,3 +106,11 @@ class Lottery(AbstractBaseModel):
     def total_prize_pool(self):
         """Calculate total prize pool"""
         return self.ticket_price * self.total_tickets
+
+    @property
+    def prize_amount_in_money(self):
+        """«مبلغ جایزه» = ضریب × امتیازِ خرج‌شده برای بلیطِ توپ × قیمتِ توکن."""
+        if not self.token:
+            return 0
+        coefficient = getattr(settings, "LOTTERY_PRIZE_COEFFICIENT", 2)
+        return self.tickets_points_spent * self.token.price * coefficient

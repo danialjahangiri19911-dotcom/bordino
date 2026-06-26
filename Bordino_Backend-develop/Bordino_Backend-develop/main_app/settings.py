@@ -324,6 +324,10 @@ API_LOGIN_ENDPOINT = get_env_value("API_LOGIN_ENDPOINT")
 
 TIME_ZONE_CELERY_BEAT = get_env_value("TIME_ZONE_CELERY_BEAT", default_value=TIME_ZONE)
 
+# Lottery
+# ضریبِ «مبلغ جایزه» نسبت به امتیازهای خرج‌شده برای خرید بلیطِ توپ.
+LOTTERY_PRIZE_COEFFICIENT = 2
+
 # Python profiler
 # توجه: profiler (cProfile روی هر درخواست) در dev باعث کندیِ شدید و خطای
 # «Another profiling tool is already active» می‌شود؛ برای سرعتِ توسعه خاموش است.

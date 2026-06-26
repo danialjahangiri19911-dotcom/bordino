@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import LinearProgress from "@libs/components/atoms/LinearProgress";
 
 import Ball from "@/_pages/PwaApp/Lottery/components/Ball";
+import BilliardBall from "@/_pages/PwaApp/Lottery/components/BilliardBall";
 import { SelectedBallsRow } from "@/_pages/PwaApp/Lottery/components/BallWithContainer";
 import useGetTicketDetail from "@/api/lottery/hooks/useGetTIcketDetail";
 import { TICKET_DETAIL as TicketDetailImage } from "@/constants/imagePaths";
@@ -27,11 +28,33 @@ const transformName = {
 	date: "تاریخ و ساعت",
 };
 
+const NUM_WORDS = ["صفر", "یک", "دو", "سه", "چهار", "پنج", "شش"];
+
+/** متنِ ردیفِ «وضعیت» مطابق فیگما، بر اساس وضعیتِ قرعه‌کشی و تعداد توپِ منطبق */
+function buildStatusText(
+	lotteryStatus?: string,
+	matchedCount?: number | null,
+): string {
+	if (lotteryStatus === "completed") {
+		const c = matchedCount ?? 0;
+		if (c <= 0) return "برگزار شده - بدون توپ مشابه";
+		const word = NUM_WORDS[c] ?? String(c);
+		return `برگزار شده - ${word} توپ شما مشابه`;
+	}
+	if (lotteryStatus === "cancelled") return "لغو شده";
+	return "در حال برگزاری";
+}
+
 export default function TicketDetail() {
 	const { id } = useParams<{ id: string }>();
-	const { push } = useRouter();
+	const { push, back } = useRouter();
 	const searchParams = useSearchParams();
 	const { data, isLoading } = useGetTicketDetail({ id });
+
+	// این صفحه دو حالت دارد:
+	//  - جریانِ خرید (وقتی پارامترِ count در URL هست): نوار پیشرفت و دکمهٔ «ثبت بلیط بعدی»
+	//  - مشاهدهٔ بلیطِ خریداری‌شده (از «بلیط‌های من»): طراحیِ فیگما (node 881-19957)
+	const isBuyFlow = searchParams.has("count");
 
 	// Progress within the current purchase session, carried via the URL:
 	// "count" = total tickets chosen, "done" = how many are already completed.
@@ -59,31 +82,122 @@ export default function TicketDetail() {
 		return `ثبت بلیط بعدی ${assignCount + 1}/${ticketCount}`;
 	}, [isFinished, assignCount, ticketCount]);
 
-	const detailRowData = useMemo(() => {
-		if (!data?.result) return [];
-
-		return [
-			{
-				key: "title",
-				value: data.result.name,
-			},
-			{
-				key: "id",
-				value: data.result.reference,
-			},
-			{
-				key: "date",
-				value: isoStringToString(data.result.update_time, true, true),
-			},
-		];
-	}, [data]);
-
 	const ballNumbers = data?.result?.numbers || [];
 
 	if (isLoading || !data) {
 		return null;
 	}
 
+	// ───────────────────────── حالتِ مشاهده (فیگما) ─────────────────────────
+	if (!isBuyFlow) {
+		const result = data.result;
+		const winningNumbers = result?.winning_numbers ?? [];
+		const ticketNo = searchParams.get("n");
+
+		const detailRows = [
+			{ key: "title", label: "عنوان بلیط", value: result?.name },
+			{
+				key: "date",
+				label: "تاریخ و ساعت",
+				value: isoStringToString(result?.update_time, true, true),
+			},
+			{ key: "id", label: "شناسه بلیط", value: result?.reference },
+			{
+				key: "status",
+				label: "وضعیت:",
+				value: buildStatusText(result?.lottery_status, result?.matched_count),
+			},
+		];
+
+		return (
+			<PwaAppPageLayout
+				contentWrapperProps={{
+					sx: {
+						display: "flex",
+						flexDirection: "column",
+						justifyContent: "space-between",
+						height: "95dvh",
+					},
+				}}
+				hasHeader={false}
+			>
+				<Wrapper>
+					<Typography variant="14-medium" color="#151414">
+						{ticketNo ? `اطلاعات بلیط شماره ${ticketNo}` : "اطلاعات بلیط"}
+					</Typography>
+
+					<Box display="flex" flexDirection="column" gap={1}>
+						<Typography variant="12-regular" color="#3F3F3F">
+							توپ‌های انتخاب‌شده
+						</Typography>
+						<BallsCard>
+							{ballNumbers.length ? (
+								ballNumbers.map((number, idx) => (
+									<Fragment key={`${number}-${idx}`}>
+										<BilliardBall
+											num={number}
+											matched={winningNumbers.includes(number)}
+										/>
+										{idx < ballNumbers.length - 1 && <BallDivider />}
+									</Fragment>
+								))
+							) : (
+								<Typography variant="12-regular" color="#3F3F3F">
+									توپی انتخاب نشده است.
+								</Typography>
+							)}
+						</BallsCard>
+					</Box>
+
+					<Box display="flex" flexDirection="column" gap={1.5}>
+						{detailRows.map((row, idx) => (
+							<Fragment key={row.key}>
+								<DetailRow>
+									<Typography color="#3F3F3F" variant="12-regular">
+										{row.label}
+									</Typography>
+									<Typography color="#3F3F3F" variant="12-regular">
+										{row.value}
+									</Typography>
+								</DetailRow>
+								{idx < detailRows.length - 1 && <DottedDivider />}
+							</Fragment>
+						))}
+					</Box>
+				</Wrapper>
+
+				<Box display="flex" flexDirection="column" gap={3}>
+					<ImageBox
+						src={TicketDetailImage}
+						alt="ticket-detail"
+						sx={{
+							width: "60%",
+							maxWidth: 250,
+							aspectRatio: "250 / 210",
+							mx: "auto",
+						}}
+					/>
+					<Button
+						onClick={() => back()}
+						fullWidth
+						variant="outlined"
+						sx={{
+							borderWidth: 1.5,
+							borderColor: "#313E72",
+							color: "#313E72",
+							"&:hover": { borderColor: "#313E72", borderWidth: 1.5 },
+						}}
+					>
+						<Typography variant="16-medium" color="#313E72">
+							خروج
+						</Typography>
+					</Button>
+				</Box>
+			</PwaAppPageLayout>
+		);
+	}
+
+	// ───────────────────────── حالتِ خرید (بدون تغییر) ─────────────────────────
 	return (
 		<PwaAppPageLayout
 			contentWrapperProps={{
@@ -110,16 +224,9 @@ export default function TicketDetail() {
 				<Typography variant="20-medium" mt={2} color="common.black">
 					{` اطلاعات بلیط شماره ${assignCount || ""}`}
 				</Typography>
-				<Box
-					display="flex"
-					flexDirection="column"
-					gap={1}
-					justifyContent="center"
-				>
+				<Box display="flex" flexDirection="column" gap={1} justifyContent="center">
 					<Typography>توپ‌های انتخاب‌شده</Typography>
-					<SelectedBallsRow
-						sx={{ mx: "auto", flexDirection: "row", width: "95%" }}
-					>
+					<SelectedBallsRow sx={{ mx: "auto", flexDirection: "row", width: "95%" }}>
 						{ballNumbers.length
 							? ballNumbers.map((number) => (
 									<Ball
@@ -133,7 +240,14 @@ export default function TicketDetail() {
 					</SelectedBallsRow>
 				</Box>
 				<Box display="flex" flexDirection="column" gap={1}>
-					{detailRowData.map((row, idx) => (
+					{[
+						{ key: "title", value: data.result.name },
+						{ key: "id", value: data.result.reference },
+						{
+							key: "date",
+							value: isoStringToString(data.result.update_time, true, true),
+						},
+					].map((row, idx, arr) => (
 						<Fragment key={row.key}>
 							<DetailRow>
 								<Typography color="#3F3F3F" variant="12-regular">
@@ -143,7 +257,7 @@ export default function TicketDetail() {
 									{row.value}
 								</Typography>
 							</DetailRow>
-							{idx < detailRowData.length - 1 && (
+							{idx < arr.length - 1 && (
 								<Divider
 									sx={{
 										borderStyle: "dotted",
@@ -158,23 +272,12 @@ export default function TicketDetail() {
 					))}
 				</Box>
 			</Wrapper>
-			<Box
-				display="flex"
-				flexDirection="column"
-				justifyContent="center"
-				gap="75px"
-			>
+			<Box display="flex" flexDirection="column" justifyContent="center" gap="75px">
 				<ImageBox
 					src={TicketDetailImage}
 					alt="ticket-detail"
-					sx={{
-						width: "60%",
-						maxWidth: 250,
-						aspectRatio: "250 / 210",
-						mx: "auto",
-					}}
+					sx={{ width: "60%", maxWidth: 250, aspectRatio: "250 / 210", mx: "auto" }}
 				/>
-
 				<Box display="flex" gap={2}>
 					<Button
 						onClick={actionButtonOnClick}
@@ -185,7 +288,6 @@ export default function TicketDetail() {
 					>
 						<Typography variant="14-medium"> {actionButtonText}</Typography>
 					</Button>
-
 					{!isFinished && (
 						<Button
 							onClick={() => push(LOTTERY.path)}
@@ -215,6 +317,29 @@ const DetailRow = styled(Box)(() => ({
 	alignItems: "center",
 	justifyContent: "space-between",
 }));
+
+const BallsCard = styled(Box)({
+	display: "flex",
+	flexDirection: "row",
+	alignItems: "center",
+	justifyContent: "space-between",
+	backgroundColor: "#fff",
+	border: "1px solid #898989",
+	borderRadius: 8,
+	padding: 12,
+});
+
+const BallDivider = styled(Box)({
+	width: "1px",
+	height: 19,
+	backgroundColor: "#CACACA",
+	flexShrink: 0,
+});
+
+const DottedDivider = styled(Box)({
+	borderTop: "1px dotted #CACACA",
+	width: "100%",
+});
 
 const ProgressBar = styled(LinearProgress)(({ theme }) => ({
 	height: 16,

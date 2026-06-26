@@ -20,7 +20,7 @@ import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 import useUserStore from "@/libs/stores/userStore";
 
 export default function Main() {
-	const { remainingTime } = useExtractLotteries();
+	const { remainingTime, activeLotteries } = useExtractLotteries();
 	const { user } = useUserStore();
 	const { push } = useRouter();
 	const [hafezOpen, setHafezOpen] = useState(false);
@@ -43,7 +43,7 @@ export default function Main() {
 		>
 			<Stack rowGap="32px" mx="16px">
 				<HomeBigLotteryCountdown
-					giftPrice={120000000}
+					giftPrice={Number(activeLotteries?.balance_in_money ?? 0)}
 					onShowDetails={() => push(LOTTERY_GUIDE.path)}
 					remainingTime={remainingTime}
 				/>

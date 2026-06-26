@@ -10,7 +10,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CUSTOMER_URLS } from "@/api/urls";
 import { FEMALE, MALE } from "@/constants/imagePaths";
 import Button from "@/libs/components/atoms/Button";
+import type { ResponseApiData } from "@/libs/http/interfaces";
 import useMutate from "@/libs/http/useMutate";
+import useUserStore from "@/libs/stores/userStore";
+
+type ProfileImageResponse = ResponseApiData<{ image_url: string | null }>;
 
 interface Props {
 	profileImage: string;
@@ -28,10 +32,21 @@ function HeaderProfile({
 	const [image, setImage] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 	const queryClient = useQueryClient();
+	const setUser = useUserStore((state) => state.setUser);
 
-	const requestOnSuccess = useCallback(() => {
-		queryClient.invalidateQueries();
-	}, [queryClient]);
+	const requestOnSuccess = useCallback(
+		(data: ProfileImageResponse) => {
+			// عکسِ جدید را در استور بنشان تا آواتار بلافاصله جایگزین شود
+			const newImageUrl = data?.result?.image_url;
+			if (newImageUrl) {
+				setUser({ image_url: newImageUrl });
+			}
+			setImage(null);
+			setPreviewUrl(null);
+			queryClient.invalidateQueries();
+		},
+		[queryClient, setUser],
+	);
 
 	const handleImageChange = useCallback(
 		(event: ChangeEvent<HTMLInputElement>) => {
@@ -48,7 +63,7 @@ function HeaderProfile({
 		[],
 	);
 
-	const { isSending, submitHandler } = useMutate({
+	const { isSending, submitHandler } = useMutate<ProfileImageResponse, FormData>({
 		url: CUSTOMER_URLS.PROFILE_IMAGE,
 		method: "PATCH",
 		onSuccess: requestOnSuccess,
@@ -58,9 +73,8 @@ function HeaderProfile({
 		if (image) {
 			const formData = new FormData();
 			formData.append("image", image);
+			// preview تا زمانِ موفقیت می‌ماند؛ پاک‌سازی در onSuccess انجام می‌شود
 			submitHandler(formData);
-			setImage(null);
-			setPreviewUrl(null);
 		}
 	}, [image, submitHandler]);
 

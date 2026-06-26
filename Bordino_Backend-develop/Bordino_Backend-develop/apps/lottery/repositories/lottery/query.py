@@ -95,40 +95,49 @@ class LotteryQueryRepository:
         return customers_data
 
     def get_results_by_match(self, lottery):
-        """Group results by match count."""
-        customers_data = self.get_customer_data(lottery)
+        """Group winning *tickets* by match count.
+
+        هر بلیطِ برنده یک ردیفِ مجزاست (یک شخص می‌تواند در چند ردیف ظاهر شود)،
+        ذیلِ ردیفِ تطبیقِ همان بلیط.
+        """
+        winning_tickets = lottery.tickets.filter(
+            matched_numbers__gt=0, prize_amount__gt=0, status=Ticket.Status.WINNER
+        ).order_by("-matched_numbers", "-prize_amount")
+
         results = {}
+        for ticket in winning_tickets:
+            matched = ticket.matched_numbers
 
-        # Group by highest match
-        for customer_data in customers_data.values():
-            highest_match = customer_data["highest_match"]
-
-            if highest_match not in results:
-                results[highest_match] = {
-                    "matched_numbers": highest_match,
+            if matched not in results:
+                results[matched] = {
+                    "matched_numbers": matched,
                     "winners": [],
                     "total_prize": 0,
                     "winners_count": 0,
                 }
 
-            match_group = results[highest_match]
-            match_group["winners"].append(customer_data)
-            match_group["total_prize"] += customer_data["total_prize_amount"]
-            match_group["winners_count"] += 1
+            group = results[matched]
+            group["winners"].append(
+                {
+                    "customer_id": ticket.customer_id,
+                    "total_prize_amount": ticket.prize_amount,
+                    "tickets_count": 1,
+                    "winning_tickets": [ticket.id],
+                    "highest_match": matched,
+                }
+            )
+            group["total_prize"] += ticket.prize_amount
+            group["winners_count"] += 1
 
-        # Process each match group and remove empty groups
         processed_results = []
-        for match_group in results.values():
-            # Only include groups that have actual winners
-            if match_group["winners"]:
-                match_group["average_prize_per_winner"] = (
-                    match_group["total_prize"] / match_group["winners_count"]
-                    if match_group["winners_count"] > 0
-                    else 0
-                )
-                # Sort winners by total prize amount
-                match_group["winners"].sort(key=lambda x: x["total_prize_amount"], reverse=True)
-                processed_results.append(match_group)
+        for group in results.values():
+            group["average_prize_per_winner"] = (
+                group["total_prize"] / group["winners_count"]
+                if group["winners_count"] > 0
+                else 0
+            )
+            group["winners"].sort(key=lambda x: x["total_prize_amount"], reverse=True)
+            processed_results.append(group)
 
         # Sort by matched numbers descending
         return sorted(processed_results, key=lambda x: x["matched_numbers"], reverse=True)

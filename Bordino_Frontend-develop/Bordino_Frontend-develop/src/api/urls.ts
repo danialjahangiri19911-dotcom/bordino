@@ -37,6 +37,7 @@ export const LOTTERY = {
 	BUY_TICKET: "lotteries/ticket/",
 	GET_TICKET_DETAIL: "lotteries/ticket/:id/",
 	GET_LOTTERY_FULL_DETAIL: "lotteries/:id/results/",
+	GET_LOTTERY_WINNER: "lotteries/:id/results/winners/:winnerId/",
 	BUY_TICKET_NUMBERS: "lotteries/ticket/numbers/",
 };
 

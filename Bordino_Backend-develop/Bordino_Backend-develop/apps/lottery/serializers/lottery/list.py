@@ -8,7 +8,7 @@ class LotterySerializer(BaseModelSerializer):
     balance_in_money = serializers.SerializerMethodField()
 
     def get_balance_in_money(self, obj):
-        return str(obj.balance * obj.token.price)
+        return str(obj.prize_amount_in_money)
 
     class Meta:
         model = Lottery

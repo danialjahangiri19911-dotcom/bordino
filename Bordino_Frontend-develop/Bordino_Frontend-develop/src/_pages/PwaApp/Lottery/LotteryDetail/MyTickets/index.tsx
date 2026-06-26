@@ -12,7 +12,7 @@ import Typography from "@/libs/components/atoms/Typography";
 import ArrowBackIo from "@/libs/components/icons/components/ArrowBackIo";
 import styled from "@/libs/styles/styled";
 import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
-import { addParamsToUrl } from "@/libs/utils/urls";
+import { addParamsToUrl, addSearchParamsToUrl } from "@/libs/utils/urls";
 
 interface Props {
 	lotteryId: string;
@@ -56,7 +56,12 @@ export default function MyTickets({ lotteryId, winningNumbers = [] }: Props) {
 							<Box
 								role="button"
 								onClick={() =>
-									push(addParamsToUrl(TICKET_DETAIL.path, { id: ticket.id }))
+									push(
+										addSearchParamsToUrl(
+											addParamsToUrl(TICKET_DETAIL.path, { id: ticket.id }),
+											{ n: String(index + 1) },
+										),
+									)
 								}
 								sx={{
 									display: "flex",

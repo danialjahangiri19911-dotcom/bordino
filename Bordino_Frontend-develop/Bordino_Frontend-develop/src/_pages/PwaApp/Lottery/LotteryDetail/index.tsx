@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import Information from "./Information";
 import LotteryDetailBanner from "./LotteryDetailBanner";
 import MyTickets from "./MyTickets";
+import WinnersList from "./Winners";
 
 import useGetLotteryDetail from "@/api/lottery/hooks/useGetLotteryDetail";
 import useGetLotteryFullDetail from "@/api/lottery/hooks/useGetLotteryFullDetail";
@@ -55,7 +56,12 @@ export default function LotteryDetail() {
 		},
 		{
 			label: "لیست برندگان",
-			content: <>لیست برندگان</>,
+			content: (
+				<WinnersList
+					groups={results?.results_by_match ?? []}
+					lotteryId={id}
+				/>
+			),
 		},
 	];
 

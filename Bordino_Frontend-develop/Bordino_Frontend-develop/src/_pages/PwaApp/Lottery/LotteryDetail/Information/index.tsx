@@ -1,8 +1,8 @@
-import React from "react";
+import React, { Fragment } from "react";
 
 import Divider from "@libs/components/atoms/Divider";
 
-import BallWithContainer from "@/_pages/PwaApp/Lottery/components/BallWithContainer";
+import BilliardBall from "@/_pages/PwaApp/Lottery/components/BilliardBall";
 import Box from "@/libs/components/atoms/Box";
 import Typography from "@/libs/components/atoms/Typography";
 import styled from "@/libs/styles/styled";
@@ -58,10 +58,25 @@ export default function Information({
 					))}
 				</DetailCard>
 			</Box>
-			<BallWithContainer
-				ballBackgroundColor="primary.main"
-				ballNumbers={winnerBall || []}
-			/>
+			<Box display="flex" flexDirection="column" gap={1}>
+				<Typography variant="12-regular" color="#3F3F3F">
+					توپ‌های برنده
+				</Typography>
+				{winnerBall?.length ? (
+					<BallsCard>
+						{winnerBall.map((number, idx) => (
+							<Fragment key={`${number}-${idx}`}>
+								<BilliardBall num={number} matched />
+								{idx < winnerBall.length - 1 && <BallDivider />}
+							</Fragment>
+						))}
+					</BallsCard>
+				) : (
+					<Typography variant="12-regular" color="#3F3F3F">
+						هنوز قرعه‌کشی برگزار نشده است.
+					</Typography>
+				)}
+			</Box>
 		</Box>
 	);
 }
@@ -82,3 +97,21 @@ const DetailRow = styled(Box)(({ theme }) => ({
 	alignItems: "center",
 	gap: theme.spacing(2),
 }));
+
+const BallsCard = styled(Box)({
+	display: "flex",
+	flexDirection: "row",
+	alignItems: "center",
+	justifyContent: "space-between",
+	backgroundColor: "#fff",
+	border: "1px solid #E5E5E5",
+	borderRadius: 8,
+	padding: 12,
+});
+
+const BallDivider = styled(Box)({
+	width: "1px",
+	height: 19,
+	backgroundColor: "#D4D4D4",
+	flexShrink: 0,
+});
