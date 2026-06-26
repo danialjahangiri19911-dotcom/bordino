@@ -4,6 +4,8 @@ import type { ResponseApiData } from "@/libs/http/interfaces";
 export interface SpinWheelRequest {
 	lottery_wheel: string;
 	token_wallet_account: string;
+	/** ضریبِ انتخابی (۱ تا ۵) */
+	multiplier?: number;
 }
 
 export interface SpinWheelResult {

@@ -5,7 +5,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
-from apps.lottery.models import LotteryWheel, LotteryWheelPrize, LotteryWheelSpin
+from apps.lottery.models import (
+    LotteryWheel,
+    LotteryWheelPrize,
+    LotteryWheelSpin,
+    LotteryWheelSpinLog,
+)
 from apps.users.models import Customer
 from apps.wallet.models import TokenWalletAccount
 from apps.wallet.services.currency_wallet_account.transfer import (
@@ -25,6 +30,7 @@ class LotteryWheelService:
         customer: Customer
         lottery_wheel: LotteryWheel
         token_wallet_account: TokenWalletAccount
+        multiplier: int = 1
 
     def _validate_prizes(self, prizes):
         """Validate that prizes have valid probabilities"""
@@ -35,26 +41,45 @@ class LotteryWheelService:
         if total_probability != 100:
             raise ValidationError(_("Total probability of all prizes must equal 100"))
 
-    def select_prize(self, prizes):
+    def select_prize(self, prizes, multiplier: int = 1):
         """
-        Select a prize randomly based on their probabilities.
-        Returns the selected prize or None if no prizes are available.
+        انتخابِ تصادفیِ جایزه با درنظرگرفتنِ ضریبِ M:
+        احتمالِ هر جایزه‌ی غیرپوچ = probability/M و سهمِ آزادشده به پوچ(ها) اضافه می‌شود.
         """
-        if not prizes.exists():
+        prize_list = list(prizes)
+        if not prize_list:
             return None
 
-        # Generate a random number between 0 and 100
-        random_number = random.randint(0, 99)
+        multiplier = max(1, int(multiplier))
+        empties = [p for p in prize_list if p.prize_type == LotteryWheelPrize.PrizeType.EMPTY]
+        non_empties = [p for p in prize_list if p.prize_type != LotteryWheelPrize.PrizeType.EMPTY]
 
-        # Calculate cumulative probability and select the prize
-        cumulative_probability = 0
-        for prize in prizes:
-            cumulative_probability += prize.probability
-            if random_number < cumulative_probability:
+        weights = {}
+        freed = 0.0
+        for prize in non_empties:
+            adjusted = prize.probability / multiplier
+            weights[prize.id] = adjusted
+            freed += prize.probability - adjusted
+
+        if empties:
+            base = sum(p.probability for p in empties)
+            for prize in empties:
+                share = (prize.probability / base * freed) if base > 0 else (freed / len(empties))
+                weights[prize.id] = prize.probability + share
+        # اگر پوچی نباشد، سهمِ آزادشده توزیع نمی‌شود و وزن‌ها همان نسبتِ کاهش‌یافته می‌مانند.
+
+        total = sum(weights.values())
+        if total <= 0:
+            return prize_list[0]
+
+        random_number = random.uniform(0, total)
+        cumulative = 0.0
+        for prize in prize_list:
+            cumulative += weights.get(prize.id, 0)
+            if random_number < cumulative:
                 return prize
 
-        # This should never happen if probabilities sum to 100
-        return None
+        return prize_list[-1]
 
     @transaction.atomic
     def spin_wheel(self, dto: SpinWheelDTO):
@@ -77,9 +102,14 @@ class LotteryWheelService:
         dto.token_wallet_account.amount -= int(dto.lottery_wheel.cost_per_spin)
         dto.token_wallet_account.save()
 
-        selected_prize = self.select_prize(prizes)
+        multiplier = max(1, int(dto.multiplier or 1))
+        selected_prize = self.select_prize(prizes, multiplier)
         if not selected_prize:
             return None
+
+        # مبلغِ جایزه ×M (فقط در حافظه برای پرداخت و پاسخ؛ ردیفِ مدل save نمی‌شود)
+        if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
+            selected_prize.prize_amount = selected_prize.prize_amount * multiplier
 
         match selected_prize.prize_type:
             case LotteryWheelPrize.PrizeType.CASH:
@@ -127,5 +157,13 @@ class LotteryWheelService:
         if not created:
             spin.count += 1
             spin.save()
+
+        # لاگِ هر چرخش: ضریبِ انتخابی + چرخ + جایزه + زمانِ چرخش (create_time)
+        LotteryWheelSpinLog.objects.create(
+            lottery_wheel=dto.lottery_wheel,
+            customer=dto.customer,
+            multiplier=multiplier,
+            prize=selected_prize if selected_prize.pk else None,
+        )
 
         return selected_prize, spin

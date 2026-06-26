@@ -16,6 +16,9 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
     token_wallet_account = serializers.PrimaryKeyRelatedField(
         queryset=TokenWalletAccount.objects.all(), write_only=True
     )
+    multiplier = serializers.IntegerField(
+        min_value=1, max_value=5, default=1, write_only=True, required=False
+    )
     prize = LotteryWheelPrizeMinimalSerializer(read_only=True)
 
     class Meta:
@@ -23,6 +26,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         fields = (
             "lottery_wheel",
             "token_wallet_account",
+            "multiplier",
             "prize",
             "count",
         )
@@ -38,6 +42,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
                     customer=self.context["request"].user.customer,
                     lottery_wheel=validated_data["lottery_wheel"],
                     token_wallet_account=validated_data["token_wallet_account"],
+                    multiplier=validated_data.get("multiplier", 1),
                 )
             )
             # Add the prize to the spin instance for serialization

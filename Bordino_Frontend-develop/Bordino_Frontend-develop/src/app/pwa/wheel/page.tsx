@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useMemo } from "react";
+import React, { Suspense, useMemo, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -42,15 +42,46 @@ function WheelContent() {
 
 	const { spinAsync } = useSpinWheel();
 
-	// اسلایس‌ها = جوایزِ گردونه؛ اندازه‌ی هر اسلایس به‌نسبتِ احتمالِ همان جایزه (optionSize)
-	const items = useMemo(
-		() =>
-			prizes.map((p) => ({
-				option: p.name,
-				optionSize: p.probability && p.probability > 0 ? p.probability : 1,
-			})),
-		[prizes],
-	);
+	// ضریبِ انتخابیِ کاربر (۱..۵)؛ پیش‌فرض ۱ (پایه)
+	const [multiplier, setMultiplier] = useState(1);
+
+	// اسلایس‌ها با احتمالِ تعدیل‌شده‌ی ضریب M:
+	//  - جوایزِ غیرپوچ: اندازه = probability/M و مبلغِ نمایش = prize_amount×M
+	//  - پوچ: سهمِ آزادشده را جذب می‌کند (بزرگ‌تر می‌شود)
+	const items = useMemo(() => {
+		const M = Math.max(1, multiplier);
+		const nonEmpties = prizes.filter((p) => p.prize_type !== "empty");
+		const empties = prizes.filter((p) => p.prize_type === "empty");
+		const nonEmptySize = (prob: number) => Math.max(1, Math.round((prob || 0) / M));
+		const sumNonEmpty = nonEmpties.reduce(
+			(s, p) => s + nonEmptySize(p.probability),
+			0,
+		);
+		const emptyTotal = Math.max(0, 100 - sumNonEmpty);
+		const emptyBase = empties.reduce((s, p) => s + (p.probability || 0), 0);
+
+		return prizes.map((p) => {
+			const isEmpty = p.prize_type === "empty";
+			let size: number;
+			if (isEmpty) {
+				size =
+					empties.length === 1
+						? emptyTotal
+						: emptyBase > 0
+							? Math.round((p.probability / emptyBase) * emptyTotal)
+							: Math.round(emptyTotal / empties.length);
+			} else {
+				size = nonEmptySize(p.probability);
+			}
+			let label = p.name;
+			if (!isEmpty) {
+				const amount = Number(p.prize_amount || 0) * M;
+				const unit = p.prize_type === "cash" ? "تومان" : "امتیاز";
+				label = `${amount.toLocaleString("fa-IR")} ${unit}`;
+			}
+			return { option: label, optionSize: Math.max(1, size) };
+		});
+	}, [prizes, multiplier]);
 
 	// گردونهٔ سرور موجود است؟ وگرنه دمو
 	const hasServerWheel = items.length > 0;
@@ -63,6 +94,7 @@ function WheelContent() {
 		const res = await spinAsync({
 			lottery_wheel: wheelId,
 			token_wallet_account: tokenAccountId,
+			multiplier,
 		});
 		// به‌روزرسانی امتیازِ کیف‌پول (هزینهٔ چرخش کم و جایزه واریز شده)
 		void refetchPoints();
@@ -90,7 +122,10 @@ function WheelContent() {
 				}}
 				emptyPrizeLabel="پوچ"
 				onSpinRequest={hasServerWheel ? handleSpinRequest : undefined}
-				defaultMultiplier="5x"
+				defaultMultiplier="1x"
+				onMultiplierChange={(m) =>
+					setMultiplier(Number(m.replace(/[^0-9]/g, "")) || 1)
+				}
 				onBack={back}
 				onHome={() => push(MAIN_APP.path)}
 			/>
