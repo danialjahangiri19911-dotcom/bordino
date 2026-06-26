@@ -10,4 +10,5 @@ class LotteryWheelPrizeMinimalSerializer(BaseModelSerializer):
             "name",
             "prize_amount",
             "prize_type",
+            "probability",
         )

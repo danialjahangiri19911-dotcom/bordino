@@ -42,7 +42,7 @@ export default function GameNetPage() {
 		<PwaAppPageLayout
 			rightAction={<PointsChip />}
 		>
-			<Box sx={{ px: 2, direction: "rtl" }}>
+			<Box sx={{ px: 2 }}>
 				<Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
 					بازی‌ها
 				</Typography>

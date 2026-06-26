@@ -42,8 +42,15 @@ function WheelContent() {
 
 	const { spinAsync } = useSpinWheel();
 
-	// اسلایس‌ها = جوایزِ گردونه (به‌تعدادِ سطرها)
-	const items = useMemo(() => prizes.map((p) => ({ option: p.name })), [prizes]);
+	// اسلایس‌ها = جوایزِ گردونه؛ اندازه‌ی هر اسلایس به‌نسبتِ احتمالِ همان جایزه (optionSize)
+	const items = useMemo(
+		() =>
+			prizes.map((p) => ({
+				option: p.name,
+				optionSize: p.probability && p.probability > 0 ? p.probability : 1,
+			})),
+		[prizes],
+	);
 
 	// گردونهٔ سرور موجود است؟ وگرنه دمو
 	const hasServerWheel = items.length > 0;

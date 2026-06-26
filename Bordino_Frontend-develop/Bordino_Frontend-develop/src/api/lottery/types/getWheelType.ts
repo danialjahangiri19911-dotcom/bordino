@@ -6,6 +6,8 @@ export interface WheelPrize {
 	/** DecimalField → به‌صورت رشته */
 	prize_amount: string;
 	prize_type: "cash" | "recharge" | "empty";
+	/** احتمالِ این جایزه؛ مبنای اندازه‌ی نسبیِ اسلایسِ گردونه */
+	probability: number;
 }
 
 export interface Wheel {
