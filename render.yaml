@@ -1,0 +1,57 @@
+# Render Blueprint — بک‌اندِ Django (Bordino)
+# این فایل را Render هنگامِ «New > Blueprint» از روی ریپو می‌خواند.
+# دیتابیس (Neon) و Redis (Upstash) به‌صورتِ سرویسِ خارجی‌اند؛ مقدارهاشان را
+# در داشبوردِ Render به‌صورتِ Environment Variable وارد کن (sync: false).
+services:
+  - type: web
+    name: bordino-backend
+    runtime: docker
+    plan: free
+    # ریشه‌ی نسخه‌ی نهاییِ بک‌اند در ریپو (تو در تو)
+    rootDir: Bordino_Backend-develop/Bordino_Backend-develop
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /swagger/
+    # مهاجرت + جمع‌آوریِ استاتیک + اجرای gunicorn روی پورتِ تخصیص‌دادهٔ Render ($PORT)
+    dockerCommand: >-
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn main_app.asgi:application
+      -k uvicorn.workers.UvicornWorker
+      -b 0.0.0.0:$PORT --workers 2 --timeout 120"
+    envVars:
+      - key: DJANGO_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      # دامنه‌ها — بعد از اولین deploy، دامنهٔ Render و دامنهٔ Vercel را اینجا بگذار
+      - key: ALLOWED_HOSTS
+        sync: false # مثال: bordino-backend.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false # مثال: https://bordino-backend.onrender.com,https://<frontend>.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false # مثال: https://<frontend>.vercel.app
+      - key: APP_DOMAIN
+        sync: false # مثال: https://bordino-backend.onrender.com
+      # ── دیتابیسِ Postgres (از Neon) ──
+      - key: DB_TYPE
+        value: postgres
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      # ── Redis (از Upstash) — کش/OTP و نتیجهٔ سلری ──
+      - key: REDIS_LOCATION
+        sync: false # مثال: rediss://default:<password>@<host>.upstash.io:6379
+      # بقیهٔ متغیرها (LANGUAGE_CODE, OTP_*, WALLET_*, EMAIL_*, KAVENEGAR_API_KEY,
+      # SPECTACULAR_*, TIME_ZONE, SENTRY_DSN, ...) را از روی
+      # Bordino_Backend-develop/Bordino_Backend-develop/main_app/.env.example
+      # در داشبوردِ Render اضافه کن (Add from .env).
