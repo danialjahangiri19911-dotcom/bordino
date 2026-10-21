@@ -28,7 +28,7 @@ class SMSService:
             api = KavenegarAPI(self.kavenegar_api_key)
             params = {
                 "receptor": phone_number,
-                "template": "otp",
+                "template": settings.KAVENEGAR_OTP_TEMPLATE,
                 "token": message,
                 "type": "sms",
             }

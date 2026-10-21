@@ -249,7 +249,11 @@ LOGGING = {
             "level": "DEBUG",
         }
     },
-    "loggers": {"": {"handlers": ["console"], "propagate": True, "level": "DEBUG"}},
+    "loggers": {
+        "": {"handlers": ["console"], "propagate": True, "level": "DEBUG"},
+        # urllib3 logs full request URLs at DEBUG, and Kavenegar puts the API key in the URL.
+        "urllib3": {"level": "WARNING"},
+    },
 }
 
 
@@ -313,6 +317,19 @@ if ENVIRONMENT == "prod":
 
 
 KAVENEGAR_API_KEY = get_env_value("KAVENEGAR_API_KEY")
+KAVENEGAR_OTP_TEMPLATE = get_env_value("KAVENEGAR_OTP_TEMPLATE", default_value="otp")
+
+# Admin login = SMS code to these numbers only (apps/user_management/admin_otp.py).
+# Empty list → nobody can log in to /admin/. ADMIN_PASSWORD_LOGIN=true restores the
+# stock password form (break-glass).
+ADMIN_OTP_WHITELIST = [
+    p.strip() for p in get_env_value("ADMIN_OTP_WHITELIST", default_value="").split(",") if p.strip()
+]
+ADMIN_PASSWORD_LOGIN = get_env_value("ADMIN_PASSWORD_LOGIN", default_value="false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 CACHE_KEY_PREFIX = get_env_value("CACHE_KEY_PREFIX")
 OTP_TTL = int(get_env_value("OTP_TTL"))

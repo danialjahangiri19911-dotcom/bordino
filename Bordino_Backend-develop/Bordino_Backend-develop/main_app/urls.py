@@ -3,6 +3,13 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.user_management.admin_otp import admin_otp_login
+
+# Must run before admin.site.urls is evaluated: AdminSite.get_urls() routes
+# admin/login/ to whatever self.login is at that moment.
+if not settings.ADMIN_PASSWORD_LOGIN:
+    admin.site.login = admin_otp_login
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 ]
