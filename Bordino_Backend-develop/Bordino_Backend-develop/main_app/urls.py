@@ -22,6 +22,7 @@ urlpatterns += [
     path("", include("apps.lottery.urls")),
     path("", include("apps.entertainment.urls")),
     path("", include("apps.configuration.urls")),
+    path("", include("apps.crash.urls")),
 ]
 
 if settings.DEBUG:

@@ -41,6 +41,21 @@ export const LOTTERY = {
 	BUY_TICKET_NUMBERS: "lotteries/ticket/numbers/",
 };
 
+export const CRASH = {
+	CONFIG: "games/crash/config/",
+	ROUNDS: "games/crash/rounds/",
+	CASHOUT: "games/crash/rounds/:id/cashout/",
+	WAIT: "games/crash/rounds/:id/wait/",
+	SEED: "games/crash/seed/",
+};
+
+export const CHICKEN = {
+	CONFIG: "games/chicken/config/",
+	ROUNDS: "games/chicken/rounds/",
+	STEP: "games/chicken/rounds/:id/step/",
+	CASHOUT: "games/chicken/rounds/:id/cashout/",
+};
+
 export const LOTTERY_WHEEL = {
 	GET_WHEEL: "lotteries/lottery-wheel/:id/",
 	SPIN: "lotteries/lottery-wheel/spin/",

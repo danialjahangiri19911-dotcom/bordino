@@ -100,7 +100,7 @@ async function fetchWithAuth(url: string, headers?: Record<string, string>) {
 	}
 }
 
-export { fetchWithAuth };
+export { fetchWithAuth, refreshAccessToken };
 
 function createDefaultFetcher(url: string, headers?: Record<string, string>) {
 	async function fetcher() {

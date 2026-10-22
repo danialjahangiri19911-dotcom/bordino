@@ -24,6 +24,9 @@ const DISABLE_SHOW_ERROR_CLIENT_PATHS = [
 	"/pwa/otp",
 	"/pwa/main",
 	"/pwa/wallet",
+	// The points games show their own errors next to the bet button.
+	"/pwa/crash",
+	"/pwa/chicken",
 ];
 
 const DISABLE_401_ERRORS = ["/pwa/register"];

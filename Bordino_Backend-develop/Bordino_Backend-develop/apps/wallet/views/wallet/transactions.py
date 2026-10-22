@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
+from apps.crash.models import ChickenRound, CrashRound
 from apps.django_helper.drf.pagination.custom_page_number import CustomPageNumberPagination
 from apps.wallet.models import TokenWalletAccount
 from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransaction
@@ -176,6 +177,71 @@ class PointsWalletTransactionsView(APIView):
                     "reference": str(txn.id).replace("-", "")[-8:],
                 }
             )
+
+        crash_rounds = CrashRound.objects.filter(customer=customer)
+        if token_account:
+            crash_rounds = crash_rounds.filter(token_account=token_account)
+        # Crash bets and wins are raw points (the unit the game is played in).
+        for crash_round in crash_rounds:
+            reference = str(crash_round.id).replace("-", "")[-8:]
+            transactions.append(
+                {
+                    "id": crash_round.id,
+                    "type": "crash_bet",
+                    "title": _("بازی انفجار"),
+                    "amount": crash_round.bet,
+                    "is_positive": False,
+                    "date": crash_round.create_time.date(),
+                    "icon": None,
+                    "reference": reference,
+                }
+            )
+            if crash_round.payout:
+                transactions.append(
+                    {
+                        "id": crash_round.id,
+                        "type": "crash_win",
+                        "title": _("برد انفجار ×%(multiplier)s")
+                        % {"multiplier": crash_round.cashout_multiplier},
+                        "amount": crash_round.payout,
+                        "is_positive": True,
+                        "date": crash_round.create_time.date(),
+                        "icon": None,
+                        "reference": reference,
+                    }
+                )
+
+        chicken_rounds = ChickenRound.objects.filter(customer=customer)
+        if token_account:
+            chicken_rounds = chicken_rounds.filter(token_account=token_account)
+        for chicken_round in chicken_rounds:
+            reference = str(chicken_round.id).replace("-", "")[-8:]
+            transactions.append(
+                {
+                    "id": chicken_round.id,
+                    "type": "chicken_bet",
+                    "title": _("بازی مرغ فراری"),
+                    "amount": chicken_round.bet,
+                    "is_positive": False,
+                    "date": chicken_round.create_time.date(),
+                    "icon": None,
+                    "reference": reference,
+                }
+            )
+            if chicken_round.payout:
+                transactions.append(
+                    {
+                        "id": chicken_round.id,
+                        "type": "chicken_win",
+                        "title": _("برد مرغ فراری ×%(multiplier)s")
+                        % {"multiplier": chicken_round.cashout_multiplier},
+                        "amount": chicken_round.payout,
+                        "is_positive": True,
+                        "date": chicken_round.create_time.date(),
+                        "icon": None,
+                        "reference": reference,
+                    }
+                )
 
         transactions.sort(key=lambda x: x["date"], reverse=True)
 

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5b301" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#f5b301" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="24" fill="#0f212e"/>
+  <g stroke="#2f4553" stroke-width="2" stroke-dasharray="3 5">
+    <line x1="16" y1="40" x2="104" y2="40"/>
+    <line x1="16" y1="70" x2="104" y2="70"/>
+  </g>
+  <path d="M16 100 C 50 98, 76 84, 98 30 L 98 100 Z" fill="url(#fill)"/>
+  <path d="M16 100 C 50 98, 76 84, 98 30" fill="none" stroke="#f5b301" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="98" cy="30" r="9" fill="#ed4163"/>
+  <g stroke="#ed4163" stroke-width="4" stroke-linecap="round">
+    <line x1="98" y1="12" x2="98" y2="4"/>
+    <line x1="112" y1="22" x2="118" y2="17"/>
+    <line x1="84" y1="22" x2="78" y2="17"/>
+    <line x1="113" y1="36" x2="119" y2="38"/>
+  </g>
+  <text x="22" y="34" font-family="Arial, sans-serif" font-size="24" font-weight="800" fill="#ffffff">2.4×</text>
+</svg>

@@ -119,6 +119,18 @@ export const SUDOKU = {
 	icon: "",
 };
 
+export const CRASH = {
+	title: "انفجار",
+	path: `${APP_HOME.path}/crash`,
+	icon: "",
+};
+
+export const CHICKEN = {
+	title: "مرغ فراری",
+	path: `${APP_HOME.path}/chicken`,
+	icon: "",
+};
+
 export const GAME_2048 = {
 	title: "۲۰۴۸",
 	path: `${APP_HOME.path}/2048`,

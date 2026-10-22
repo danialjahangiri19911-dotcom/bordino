@@ -47,6 +47,7 @@ LOCAL_APPS = [
     "apps.lottery.apps.LotteryConfig",
     "apps.entertainment.apps.EntertainmentConfig",
     "apps.configuration.apps.ConfigurationConfig",
+    "apps.crash.apps.CrashConfig",
 ]
 
 THIRD_PARTY_APPS = [

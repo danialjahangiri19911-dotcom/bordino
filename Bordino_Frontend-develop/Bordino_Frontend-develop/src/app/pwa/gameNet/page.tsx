@@ -9,7 +9,7 @@ import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
 
-import { GAME_2048, SUDOKU } from "@/constants/routes";
+import { CHICKEN, CRASH, GAME_2048, SUDOKU } from "@/constants/routes";
 import PointsChip from "@/libs/components/common/PointsChip";
 import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 
@@ -32,6 +32,18 @@ const GAMES: GameItem[] = [
 		title: "۲۰۴۸",
 		icon: "/media/App/games/game2048-icon.png",
 		path: GAME_2048.path,
+	},
+	{
+		key: "crash",
+		title: CRASH.title,
+		icon: "/media/App/games/crash-icon.svg",
+		path: CRASH.path,
+	},
+	{
+		key: "chicken",
+		title: CHICKEN.title,
+		icon: "/media/App/games/chicken-icon.svg",
+		path: CHICKEN.path,
 	},
 ];
 
