@@ -79,6 +79,9 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # API messages in the language the client asks for (the PWA asks for Persian); the admin
+    # keeps LANGUAGE_CODE.
+    "main_app.middleware.ApiLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -219,7 +222,7 @@ DEFAULT_FROM_EMAIL = get_env_value("DEFAULT_FROM_EMAIL")
 REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.user_management.authentication.RevocableJWTAuthentication",
     ),
     "DEFAULT_RENDERER_CLASSES": (
         "apps.django_helper.drf.responses.custom_json.CustomJSONRenderer",

@@ -1,8 +1,8 @@
 import type { FieldValues, SubmitHandler } from "react-hook-form";
 
+import { withAuth } from "./query";
 import type { RequestError } from "./requester";
 import requester from "./requester";
-import useAuthStore from "@libs/stores/authStore";
 import type { MutationFunction } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 
@@ -26,8 +26,6 @@ export default function useMutate<Data, Variables>({
 	onError,
 	hasHeader = true,
 }: UseMutateProps<Data, Variables>) {
-	const { accessToken } = useAuthStore();
-
 	const {
 		mutate,
 		isPending: isSending,
@@ -36,31 +34,35 @@ export default function useMutate<Data, Variables>({
 		mutationFn:
 			mutationFn ??
 			(async (payload: Variables | undefined) => {
-				const config = hasHeader
-					? {
-							headers: {
-								Authorization: `Bearer ${accessToken}`,
-							},
-						}
-					: {};
+				const send = async (accessToken: string | null) => {
+					const config = hasHeader
+						? {
+								headers: {
+									Authorization: `Bearer ${accessToken}`,
+								},
+							}
+						: {};
 
-				switch (method) {
-					case "POST":
-						return (await requester.post<Data>(url, payload, config)).data;
-					case "PUT":
-						return (await requester.put<Data>(url, payload, config)).data;
-					case "PATCH":
-						return (await requester.patch<Data>(url, payload, config)).data;
-					case "DELETE":
-						return (
-							await requester.delete<Data>(url, {
-								...config,
-								data: payload,
-							})
-						).data;
-					default:
-						throw new Error(`Unsupported HTTP method: ${method}`);
-				}
+					switch (method) {
+						case "POST":
+							return (await requester.post<Data>(url, payload, config)).data;
+						case "PUT":
+							return (await requester.put<Data>(url, payload, config)).data;
+						case "PATCH":
+							return (await requester.patch<Data>(url, payload, config)).data;
+						case "DELETE":
+							return (
+								await requester.delete<Data>(url, {
+									...config,
+									data: payload,
+								})
+							).data;
+						default:
+							throw new Error(`Unsupported HTTP method: ${method}`);
+					}
+				};
+				// Authenticated mutations refresh an expired access token like queries do.
+				return hasHeader ? withAuth(send) : send(null);
 			}),
 
 		onSuccess: (data, variables) => {

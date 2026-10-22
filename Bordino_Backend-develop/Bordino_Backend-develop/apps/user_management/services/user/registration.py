@@ -57,10 +57,8 @@ class UserRegistrationService:
         try:
             user = self._get_user(dto)
             with transaction.atomic():
-                self.otp_command_repository.mark_otp_as_used(dto.phone_number)
-                if not user.is_active:
-                    UserRegistrationService.activate(user)
-
+                # The code was already claimed (deleted) by the serializer, and a disabled
+                # account was refused there: login never re-activates one.
                 if dto.referral_code:
                     # کد معرف نباید ورود را مسدود کند. اگر نامعتبر بود فقط همین بخش
                     # (savepoint داخلی) لغو می‌شود و کاربر همچنان با موفقیت وارد می‌شود.
@@ -91,9 +89,13 @@ class UserRegistrationService:
 
     def _validate_and_store_referral_code(self, referral_code: str, user: User):
         try:
-            customer = self.customer_query_repository.all().get(user=user)
+            # Locked: two logins at once must not both set (or overwrite) the inviter.
+            customer = self.customer_query_repository.all().select_for_update().get(user=user)
             if customer.invited_by:
                 raise ValueError("User already has a referral")
+            # Only a new account (profile not set up yet) can name who invited it.
+            if customer.registration_step != Customer.Step.PROFILE_SETUP:
+                raise ValueError("Referral codes are for new accounts only")
 
             referrer_customer = self.customer_query_repository.filter_by_referral_code(
                 referral_code
@@ -105,7 +107,10 @@ class UserRegistrationService:
             if not referrer_customer.user.is_active:
                 raise ValueError("Referrer is not active")
 
-            self.referral_code_command_repository.save(user.phone_number, referral_code)
+            # The customer already exists (made at registration), so attach the inviter now; the
+            # cached code was only ever read when creating a customer, i.e. never on this path.
+            customer.invited_by = referrer_customer.user
+            customer.save(update_fields=["invited_by"])
         except Customer.DoesNotExist:
             raise ValueError("Invalid referral code")
         except ValueError:
@@ -145,7 +150,9 @@ class UserRegistrationService:
         return self.otp_service.create_otp(user.phone_number)
 
     def _send_sms(self, phone_number, code):
-        self.otp_service.send_otp(phone_number, code)
+        if not self.otp_service.send_otp(phone_number, code):
+            # Not sent: drop the code so «ارسال مجدد» works right away instead of after its TTL.
+            self.otp_command_repository.delete_otp(phone_number)
 
     def _create_wallet_for_user(self, user: User):
         wallet = self.wallet_service.create_wallet(self.wallet_service.CreateWalletDTO(user))

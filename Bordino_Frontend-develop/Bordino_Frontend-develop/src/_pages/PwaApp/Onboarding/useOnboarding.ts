@@ -30,15 +30,21 @@ export default function useOnboarding() {
 
 	const [step, setStep] = useState(extractCurrentStep);
 	const isManualStepRef = useRef(false);
+	const syncedRef = useRef(false);
 
+	// Start where the server says, once, when the profile arrives. Later refetches (step 1's save
+	// invalidates every query) must not move the player: the server then says "DailyUsageTime",
+	// a step this flow skips, and the jump would close step 1's welcome dialog.
 	useEffect(() => {
+		if (syncedRef.current || !data) return;
+		syncedRef.current = true;
 		if (isManualStepRef.current || step >= 5) {
 			return;
 		}
 		if (extractCurrentStep !== step) {
 			setStep(extractCurrentStep);
 		}
-	}, [extractCurrentStep, step]);
+	}, [data, extractCurrentStep, step]);
 	useEffect(() => {
 		// if (step >= 2 && step <= 4) {
 		// 	isManualStepRef.current = true;
@@ -49,7 +55,7 @@ export default function useOnboarding() {
 		}
 	}, [push, step]);
 
-	const mustRegisterUser = useMemo(() => {
+	const computedMustRegister = useMemo(() => {
 		if (error && error.status === 404) {
 			return true;
 		}
@@ -59,6 +65,15 @@ export default function useOnboarding() {
 		if (!(data?.result.birthdate && data.result.username)) return true;
 		return false;
 	}, [data, error]);
+
+	// Decided once, from the first answer about the profile. Saving step 1 fills the profile and
+	// refetches it; switching to the "update" form then would unmount step 1 and its welcome
+	// dialog in the middle of the flow.
+	const mustRegisterRef = useRef<boolean | null>(null);
+	if (mustRegisterRef.current === null && (data || error)) {
+		mustRegisterRef.current = computedMustRegister;
+	}
+	const mustRegisterUser = mustRegisterRef.current ?? computedMustRegister;
 
 	const handleNext = useCallback(() => {
 		isManualStepRef.current = true;

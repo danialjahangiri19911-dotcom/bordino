@@ -28,19 +28,19 @@ class CustomerProfileService:
         if image_file.size > 5 * 1024 * 1024:  # 5MB in bytes
             raise ValidationError("Image size must be less than 5MB")
 
-    def _delete_old_image(self, customer: Customer):
+    def _delete_old_image(self, old_image):
         """
         Delete the old image file and its database record
 
         Args:
-            customer: Customer instance
+            old_image: the customer's previous File, or None
         """
-        if customer.image:
+        if old_image:
             # Delete the file from storage
-            if customer.image.file and os.path.isfile(customer.image.file.path):
-                os.remove(customer.image.file.path)
+            if old_image.file and os.path.isfile(old_image.file.path):
+                os.remove(old_image.file.path)
             # Delete the database record
-            customer.image.delete()
+            old_image.delete()
 
     def update_profile_image(self, customer: Customer, image_file) -> Customer:
         """
@@ -59,8 +59,9 @@ class CustomerProfileService:
         # Validate the image
         self.validate_image(image_file)
 
-        # Delete old image if exists
-        self._delete_old_image(customer)
+        # The old image goes only after the new one is saved: a failed conversion or write must
+        # leave the player's current picture in place.
+        old_image = customer.image
 
         # Convert to WebP
         webp_io = self.image_processor.convert_to_webp(image_file)
@@ -75,6 +76,10 @@ class CustomerProfileService:
 
         # Update the customer's image
         customer.image = file_instance
-        customer.save()
+        # Only the image: a full save would write back whatever else this instance read earlier
+        # (e.g. an onboarding step another request has moved on since).
+        customer.save(update_fields=["image", "update_time"])
+
+        self._delete_old_image(old_image)
 
         return customer

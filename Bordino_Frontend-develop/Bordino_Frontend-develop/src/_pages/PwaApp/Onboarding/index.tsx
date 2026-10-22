@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 import Step2 from "./Step2";
 import Step3 from "./Step3";
@@ -21,8 +21,14 @@ export default function Onboarding() {
 
 	const { user } = useUserStore();
 
+	// Onboarding is for a profile that is not set up yet, decided when the player arrives. Saving
+	// step 1 moves the stored step on, and that must not throw the player out halfway (the
+	// welcome dialog and the intro slides come after it).
+	const entered = useRef(false);
+	if (user?.registrationStep === "ProfileSetup") entered.current = true;
+
 	useEffect(() => {
-		if (user?.registrationStep !== "ProfileSetup") {
+		if (!entered.current) {
 			push(MAIN_APP.path);
 		}
 	}, [push, user?.registrationStep]);
@@ -57,7 +63,7 @@ export default function Onboarding() {
 		}
 	}, [mustRegisterUser, rest, step]);
 
-	if (user?.registrationStep !== "ProfileSetup") {
+	if (!entered.current) {
 		return null;
 	}
 

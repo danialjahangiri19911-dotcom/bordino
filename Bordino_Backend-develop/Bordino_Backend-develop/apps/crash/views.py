@@ -11,7 +11,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 
 from drf_spectacular.utils import extend_schema
@@ -25,6 +24,7 @@ from apps.crash.models import (
 )
 from apps.crash.services import chicken, fair, rounds
 from apps.django_helper.drf.responses.standard import StandardResponse
+from apps.user_management.authentication import RevocableJWTAuthentication
 
 HISTORY_SIZE = 20
 # The long-poll answers at the crash or after this many seconds, whichever comes first.
@@ -192,7 +192,7 @@ def _json(status_code, data):
 
 def _authenticate(request):
     try:
-        result = JWTAuthentication().authenticate(request)
+        result = RevocableJWTAuthentication().authenticate(request)
     except (AuthenticationFailed, InvalidToken):
         return None
     return result[0] if result else None

@@ -374,7 +374,7 @@ msgstr ""
 
 #: apps/user_management/serializers/otp/utils/otp_validate.py:48
 msgid "OTP not found or expired."
-msgstr "رمز یک‌بارمصرف یافت نشد یا منقضی شده است."
+msgstr "کد منقضی شده است؛ کد جدید بگیرید."
 
 #: apps/user_management/serializers/otp/utils/otp_validate.py:52
 msgid "OTP has already been used."
@@ -382,7 +382,7 @@ msgstr "رمز یک‌بارمصرف قبلا استفاده شده است."
 
 #: apps/user_management/serializers/otp/utils/otp_validate.py:56
 msgid "Invalid OTP code."
-msgstr "کد OTP نامعتبر است."
+msgstr "کد واردشده درست نیست."
 
 #: apps/user_management/serializers/user/login.py:33
 msgid "The account has been activated successfully"
@@ -929,3 +929,27 @@ msgstr ""
 
 #~ msgid "Reason 6"
 #~ msgstr "دلایل دیگر"
+
+msgid "Too many wrong codes for this number today. Please try again tomorrow."
+msgstr "امروز برای این شماره کد اشتباه زیادی وارد شده است. لطفاً فردا دوباره تلاش کنید."
+
+msgid "Too many wrong codes. Wait for this code to expire and request a new one."
+msgstr "کد اشتباه زیاد وارد شد. صبر کنید این کد منقضی شود و کد جدید بگیرید."
+
+msgid "This account has been disabled."
+msgstr "این حساب غیرفعال شده است."
+
+msgid "Too many codes requested for this number. Please try again in an hour."
+msgstr "برای این شماره کد زیادی درخواست شده است. لطفاً یک ساعت دیگر تلاش کنید."
+
+msgid "The SMS could not be sent. Please try again in a moment."
+msgstr "ارسال پیامک ناموفق بود. لطفاً چند لحظه دیگر دوباره تلاش کنید."
+
+msgid "Token has been revoked."
+msgstr "این نشست پایان یافته است."
+
+msgid "Complete the previous steps first."
+msgstr "اول مرحله‌های قبلی را کامل کنید."
+
+msgid "Registration already completed."
+msgstr "ثبت‌نام قبلاً کامل شده است."

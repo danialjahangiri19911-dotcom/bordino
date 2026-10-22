@@ -13,6 +13,7 @@ import Button from "@libs/components/atoms/Button";
 import Typography from "@libs/components/atoms/Typography";
 
 import useGetCustomerProfile from "@/api/customer/hooks/useGetCustomerProfile";
+import { authErrorMessage } from "@/api/login/errorMessage";
 import useResendOtp from "@/api/login/hooks/useResendOtp";
 import type { LoginApiDataResponse } from "@/api/login/types/loginType";
 import { AUTH_URLS } from "@/api/urls";
@@ -93,11 +94,8 @@ export default function SendOtp() {
 	>({
 		url: AUTH_URLS.LOGIN,
 		hasHeader: false,
-		onError(err: any) {
-			const error = err.response.data.errors.non_field_errors;
-			if (error && error.length > 0) {
-				toast.error(error[0]);
-			}
+		onError(err) {
+			toast.error(authErrorMessage(err));
 		},
 	});
 
@@ -115,6 +113,21 @@ export default function SendOtp() {
 		},
 		[setValue],
 	);
+
+	// The code input accepts only Latin digits; a Persian keyboard types ۱۲۳۴. Convert them in
+	// the input before it looks, and handle a pasted code (either kind of digit) here.
+	const latinize = (event: React.FormEvent<HTMLInputElement>) => {
+		const input = event.currentTarget;
+		const converted = persianNumberConverter(input.value);
+		if (converted !== input.value) input.value = converted;
+	};
+	const handlePasteOtp = (event: React.ClipboardEvent<HTMLInputElement>) => {
+		event.preventDefault();
+		const digits = persianNumberConverter(event.clipboardData.getData("text/plain"))
+			.replace(/\D/g, "")
+			.slice(0, 4);
+		if (digits) handleChangeOtp(digits);
+	};
 
 	return (
 		<Box
@@ -195,7 +208,23 @@ export default function SendOtp() {
 							inputType="tel"
 							onChange={handleChangeOtp}
 							numInputs={4}
-							renderInput={(props) => <input {...props} />}
+							renderInput={(props, index) => (
+								<input
+									{...props}
+									// Lets the phone offer the code from the SMS (all 4 digits at once).
+									autoComplete={index === 0 ? "one-time-code" : "off"}
+									aria-label={`رقم ${index + 1} از ۴ کد تأیید`}
+									onInput={(event) => {
+										latinize(event);
+										props.onInput(event);
+									}}
+									onChange={(event) => {
+										latinize(event);
+										props.onChange(event);
+									}}
+									onPaste={handlePasteOtp}
+								/>
+							)}
 							containerStyle={{
 								gap: 12,
 								flexDirection: "row-reverse",
@@ -228,6 +257,7 @@ export default function SendOtp() {
 											resetCounter();
 											setOtp("");
 										},
+										onError: (error) => toast.error(authErrorMessage(error)),
 									})
 								}
 							>

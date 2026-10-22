@@ -1,6 +1,7 @@
 import type { ResponseApiData } from "./interfaces";
 import { emitError } from "./useErrorListeners";
 import settings from "@libs/settings";
+import useAuthStore from "@libs/stores/authStore";
 import axios, { type AxiosError, type AxiosResponse } from "axios";
 
 import { ACTIVITY_URLS, AUTH_URLS, CUSTOMER_URLS } from "@/api/urls";
@@ -9,6 +10,8 @@ const requester = axios.create({
 	baseURL: settings.apiBaseUrl,
 	timeout: 2 * 60 * 1000,
 	withCredentials: false,
+	// The API answers in Persian when asked (Django's messages, e.g. a wrong OTP code).
+	headers: { "Accept-Language": "fa" },
 });
 
 export type ApiError<T> = {
@@ -71,6 +74,17 @@ requester.interceptors.response.use(
 
 		if (has401Err && error.status === 401) {
 			return;
+		}
+
+		// An expired access token is renewed and the request resent (libs/http/query withAuth);
+		// only a failed renewal ends the session, so this 401 is not the user's problem.
+		if (error.status === 401 && useAuthStore.getState().refreshToken) {
+			return Promise.reject(error);
+		}
+
+		// Logout is best effort: it clears the device whatever the server says.
+		if (error.config?.url === AUTH_URLS.LOGOUT) {
+			return Promise.reject(error);
 		}
 
 		if (error.config?.url === CUSTOMER_URLS.PROFILE && error.status === 404) {

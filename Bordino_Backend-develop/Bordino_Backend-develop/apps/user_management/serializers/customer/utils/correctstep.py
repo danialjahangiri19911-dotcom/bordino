@@ -13,7 +13,7 @@ class BaseStepSerializerMixin(metaclass=SerializerMetaclass):
 
         current_step = user.customer.registration_step
 
-        if current_step == Customer.Step.INTEREST_SELECTION:
+        if current_step == Customer.Step.COMPLETED:
             raise serializers.ValidationError(
                 _("Registration already completed. Current step: {registration_step}").format(
                     registration_step=current_step

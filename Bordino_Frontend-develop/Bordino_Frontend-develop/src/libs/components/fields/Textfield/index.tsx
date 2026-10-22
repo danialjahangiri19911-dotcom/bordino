@@ -150,7 +150,8 @@ export default function TextField<V extends FieldValues>(
 						slotProps={{
 							inputLabel: {
 								...labelProps,
-								shrink: hasValue,
+								// A start icon sits where an empty field's label would be: keep it raised.
+								shrink: hasValue || Boolean(InputProps?.startAdornment),
 							},
 							input: {
 								readOnly: disable,

@@ -8,6 +8,12 @@ interface ImageProps {
 	height?: BoxProps["height"];
 	maxWidth?: BoxProps["maxWidth"];
 	onClick?: BoxProps["onClick"];
+	// For an image used as a control (e.g. a choice in a form).
+	role?: string;
+	tabIndex?: number;
+	"aria-label"?: string;
+	"aria-checked"?: boolean;
+	onKeyDown?: BoxProps["onKeyDown"];
 }
 
 export default function ImageBox({
@@ -18,11 +24,13 @@ export default function ImageBox({
 	height = "auto",
 	maxWidth,
 	onClick,
+	...control
 }: Readonly<ImageProps>) {
 	return (
 		<Box
 			component="img"
 			{...{ height, maxWidth, width, sx, alt, src, onClick }}
+			{...control}
 		/>
 	);
 }

@@ -1,5 +1,4 @@
 import type { SubmitHandler, UseFormReturn } from "react-hook-form";
-import { useSwipeable } from "react-swipeable";
 
 import type { Step1FormValue } from "./form/validations";
 import type { GENDER } from "./interfaces";
@@ -43,7 +42,6 @@ export default function BaseStep1({
 	isSubmitting,
 	onWelcomeDialogClose,
 	showWelcomeDialog = false,
-	handleNext,
 }: Readonly<Props>) {
 	const username = form.watch("username");
 	const gender = form.watch("gender");
@@ -57,16 +55,24 @@ export default function BaseStep1({
 
 	const showGenderError = !gender && submitCount > 0;
 
-	const handlers = useSwipeable({
-		onSwipedLeft: () => {
-			handleNext();
+	// The two pictures are the gender choice: reachable with Tab, chosen with Enter or Space.
+	const choiceProps = (value: "F" | "M", label: string, choose: () => void) => ({
+		role: "radio",
+		tabIndex: 0,
+		"aria-label": label,
+		"aria-checked": selectedGender === value,
+		onKeyDown: (event: React.KeyboardEvent) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				choose();
+			}
 		},
-		trackMouse: true,
-		delta: 50,
 	});
 
+	// No swipe to the next step here (the later slides have one): this step is a form, and the
+	// only way forward is saving it, so a profile cannot be skipped or its typing lost.
 	return (
-		<Box {...handlers}>
+		<Box>
 			<LinearStepper
 				form={form}
 				activeStep={activeStep}
@@ -98,6 +104,8 @@ export default function BaseStep1({
 
 				<Box display="flex" flexDirection="column" gap={1}>
 					<Box
+						role="radiogroup"
+						aria-label="جنسیت"
 						display="flex"
 						gap={{ xs: 1.5, sm: 3 }}
 						sx={{
@@ -154,6 +162,7 @@ export default function BaseStep1({
 										},
 									}}
 									onClick={onFemaleClick}
+									{...choiceProps("F", "زن", onFemaleClick)}
 								/>
 							</Box>
 							<Typography
@@ -207,6 +216,7 @@ export default function BaseStep1({
 										},
 									}}
 									onClick={onMaleClick}
+									{...choiceProps("M", "مرد", onMaleClick)}
 								/>
 							</Box>
 							<Typography

@@ -38,4 +38,11 @@ const useUserStore = create<UserState>()(
 	),
 );
 
+// Kept in step with the other tabs, like the session (authStore).
+if (typeof window !== "undefined") {
+	window.addEventListener("storage", (event) => {
+		if (event.key === "user-storage") useUserStore.persist.rehydrate();
+	});
+}
+
 export default useUserStore;

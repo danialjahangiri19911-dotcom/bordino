@@ -43,11 +43,10 @@ export default function Register() {
 	const { resendOtp } = useResendOtp();
 
 	const registerOnSuccess = useCallback(
-		(data: RegisterApiDataResponse) => {
-			const phoneNumber = form.getValues("phone_number");
-			const normalizedPhoneNumber = phoneNumber.startsWith("0")
-				? phoneNumber.substring(1)
-				: phoneNumber;
+		(data: RegisterApiDataResponse, variables: registerFormValue | undefined) => {
+			// The number this answer is about is the one that was sent (already without its
+			// leading 0), not what the field holds now: it may have been edited meanwhile.
+			const normalizedPhoneNumber = variables?.phone_number ?? "";
 			if (data.result.status === RegistrationType.isRegisteredBefore) {
 				setPhoneNumber(normalizedPhoneNumber);
 				setAlreadyExist(true);
@@ -65,7 +64,7 @@ export default function Register() {
 				push(OTP.path);
 			}
 		},
-		[form, push, resendOtp, setPhoneNumber, setAlreadyExist, markOtpSent],
+		[push, resendOtp, setPhoneNumber, setAlreadyExist, markOtpSent],
 	);
 
 	const { submitHandler: baseSubmitHandler, isSending } = useMutate<

@@ -37,6 +37,9 @@ class Customer(AbstractBaseModel):
         DAILY_USAGE_TIME = "DailyUsageTime", _("Daily Usage Time")
         USAGE_GOAL = "UsageGoal", "Usage Goal"
         INTEREST_SELECTION = "InterestSelection", _("Interest Selection")
+        # After interest selection. Each step value means "the next step to do", so the last
+        # step needs its own "done" value, or it could never be submitted (or be submitted twice).
+        COMPLETED = "Completed", _("Completed")
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="customer")
     gender = models.CharField(

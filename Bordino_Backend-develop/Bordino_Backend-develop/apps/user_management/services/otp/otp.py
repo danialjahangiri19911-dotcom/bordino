@@ -5,10 +5,19 @@ from django.contrib.auth import get_user_model
 
 from apps.user_management.repositories.otp.command import OTPCommandRepository
 from apps.user_management.repositories.user.query import UserQueryRepository
+from apps.user_management.services.otp.attempts import OtpAttempts
 from apps.user_management.services.otp.utils import generate_random_code
 from apps.user_management.services.sms.sms import SMSService
 
 User = get_user_model()
+
+
+class OtpNotSent(Exception):
+    """The SMS could not be sent (provider error) or the number asked for too many codes."""
+
+    def __init__(self, too_many=False):
+        super().__init__("too many codes" if too_many else "sms failed")
+        self.too_many = too_many
 
 
 class OTPService:
@@ -33,13 +42,13 @@ class OTPService:
         Args:
             phone_number (str): The phone number to resend the OTP for.
         """
+        if not OtpAttempts(dto.phone_number).allow_send():
+            raise OtpNotSent(too_many=True)
         try:
             user = self.otp_query_repository.filter_by_phone_number(dto.phone_number).first()
 
             otp = self.create_otp(dto.phone_number)
-            self.send_otp(dto.phone_number, otp)
-
-            return user
+            sent = self.send_otp(dto.phone_number, otp)
         except User.DoesNotExist as e:
             logging.error("No user found with phone number %s : %s", dto.phone_number, e)
             return None
@@ -49,21 +58,28 @@ class OTPService:
         except Exception as e:  # pylint: disable=broad-except
             logging.error("Error resending OTP: %s", e)
             return None
-        # TODO: Handle and raise an appropriate exception here when needed.
+        if not sent:
+            # Never report a code as sent when it was not; and let the player retry at once.
+            self.otp_command_repository.delete_otp(dto.phone_number)
+            raise OtpNotSent()
+        return user
 
-    def send_otp(self, phone_number: str, otp: str):
+    def send_otp(self, phone_number: str, otp: str) -> bool:
         """
         Send the OTP via SMS.
         Args:
             phone_number (str): The phone number to send the OTP to.
             otp (str): The OTP to send.
+        Returns:
+            bool: whether the SMS provider accepted it.
         """
         try:
             # Send the OTP (or log it in dev mode)
-            self.sms_service.send_sms(phone_number, otp)
+            return self.sms_service.send_sms(phone_number, otp) is not None
 
         except Exception as e:  # pylint: disable=broad-except
             logging.error("Error sending OTP: %s", e)
+            return False
         # TODO: Handle and raise an appropriate exception here when needed.
 
     def create_otp(self, phone_number: str):

@@ -1,4 +1,6 @@
 # yourapp/serializers.py
+import logging
+
 from rest_framework import serializers
 
 from apps.user_management.services.user.logout import LogoutService
@@ -17,17 +19,17 @@ class LogoutSerializer(serializers.Serializer):
         After validation, optionally revoke the access token.
         We'll pop 'revoke_access' from validated_data to decide.
         """
+        revoke = validated_data.pop("revoke_access", True)
+        refresh = validated_data.pop("refresh")
         try:
-            revoke = validated_data.pop("revoke_access", True)
-            refresh = validated_data.pop("refresh", True)
-            request = self.context.get("request")
-            if revoke and request:
-                auth = request.META.get("HTTP_AUTHORIZATION", "")
-                if auth:
-                    self.logout_service.blacklist_refresh(refresh)
-                    self.logout_service.revoke_access_jti(
-                        self.logout_service.RevokeAccessJtiDTO(auth_header=auth)
-                    )
-        except Exception as e:
-            raise serializers.ValidationError(f"Invalid refresh token: {e}")
+            self.logout_service.blacklist_refresh(refresh)
+        except Exception as e:  # pylint: disable=broad-except
+            # Already blacklisted or expired: the session is over either way.
+            logging.info("Logout with an unusable refresh token: %s", e)
+        request = self.context.get("request")
+        auth = request.META.get("HTTP_AUTHORIZATION", "") if request else ""
+        if revoke and auth:
+            self.logout_service.revoke_access_jti(
+                self.logout_service.RevokeAccessJtiDTO(auth_header=auth)
+            )
         return {}

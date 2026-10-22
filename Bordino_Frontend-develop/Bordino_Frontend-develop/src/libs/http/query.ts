@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 
 import requester, { type RequestError } from "./requester";
-import useAuthStore from "@libs/stores/authStore";
+import useAuthStore, { tokenUser } from "@libs/stores/authStore";
 import {
 	type UseQueryOptions,
 	useQuery as useTanStackQuery,
 } from "@tanstack/react-query";
 import axios from "axios";
 
+import { AUTH_URLS } from "@/api/urls";
 import useUserStore from "@/libs/stores/userStore";
 
 export interface Res<TData> {
@@ -15,17 +16,36 @@ export interface Res<TData> {
 	statusCode: number;
 }
 export type Modify<T, R> = Omit<T, keyof R> & R;
-let refreshPromise: Promise<{
-	newAccessToken: string;
-	newRefreshToken: string;
-} | null> | null = null;
+type Tokens = { newAccessToken: string; newRefreshToken: string };
+let refreshPromise: Promise<Tokens | null> | null = null;
+
+/**
+ * Run `task` while holding the one session lock shared by every tab of this site (Web Locks), so
+ * two tabs never refresh, or refresh and log out, at the same time: refresh tokens rotate, and
+ * the second one to use the old token would be refused. Without Web Locks it just runs.
+ */
+function withSessionLock<T>(task: () => Promise<T>): Promise<T> {
+	const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+	// request() resolves to what the task resolves to (lib.dom types it one Promise too deep).
+	return locks ? (locks.request("bordino-session", task) as unknown as Promise<T>) : task();
+}
 
 async function refreshAccessToken(refreshToken: string) {
 	if (refreshPromise) {
 		return refreshPromise;
 	}
 
-	refreshPromise = (async () => {
+	refreshPromise = withSessionLock(async (): Promise<Tokens | null> => {
+		// While this waited for the lock another tab may have refreshed (its tokens are in
+		// storage), logged out, or logged in as someone else.
+		await useAuthStore.persist.rehydrate();
+		const stored = useAuthStore.getState();
+		if (!stored.refreshToken || tokenUser(stored.refreshToken) !== tokenUser(refreshToken)) {
+			throw new Error("Session changed before refresh");
+		}
+		if (stored.refreshToken !== refreshToken && stored.accessToken) {
+			return { newAccessToken: stored.accessToken, newRefreshToken: stored.refreshToken };
+		}
 		try {
 			const response = await axios.post<{
 				result: {
@@ -33,74 +53,76 @@ async function refreshAccessToken(refreshToken: string) {
 					refresh: string;
 				};
 			}>(`${process.env.NEXT_PUBLIC_REFRESH_URL}token/refresh/`, {
-				refresh: refreshToken,
+				refresh: stored.refreshToken,
 			});
 
 			const {
 				result: { access, refresh },
 			} = response.data;
 
+			// Logged out elsewhere while this was on its way: the new pair is valid on the
+			// server, so end it there too instead of leaving it alive.
+			if (useAuthStore.getState().refreshToken !== stored.refreshToken) {
+				requester
+					.post(AUTH_URLS.LOGOUT, { refresh }, { headers: { Authorization: `Bearer ${access}` } })
+					.catch(() => undefined);
+				throw new Error("Session changed during refresh");
+			}
 			useAuthStore.getState().login(access, refresh);
 
 			return { newAccessToken: access, newRefreshToken: refresh };
 		} catch (error: any) {
-			const status = error.response?.status;
-			console.log(status);
-			if (status === 401) {
+			if (error.response?.status === 401) {
 				useAuthStore.getState().logout();
 				useUserStore.getState().clearUser();
 			}
 			throw error;
-		} finally {
-			refreshPromise = null;
 		}
-	})();
+	}).finally(() => {
+		refreshPromise = null;
+	});
 
 	return refreshPromise;
 }
 
-async function fetchWithAuth(url: string, headers?: Record<string, string>) {
-	const { refreshToken: currentRefreshToken } = useAuthStore.getState();
-
+/**
+ * Send an authenticated request with the session's current access token. On a 401: when the
+ * token changed while the request was out (another request refreshed it) just resend with the
+ * new one; otherwise refresh once and resend. The refresh token is read when the 401 arrives,
+ * never captured before the request, because each refresh replaces it (rotation). A retry only
+ * ever goes out for the user who sent the request: a session that changed hands meanwhile (logout
+ * and login as someone else, maybe in another tab) gets the original error instead.
+ */
+async function withAuth<T>(send: (accessToken: string | null) => Promise<T>): Promise<T> {
+	const used = useAuthStore.getState().accessToken;
+	const owner = tokenUser(used);
 	try {
-		const { status, data } = await requester.get(url, { headers });
-		return { statusCode: status, data };
+		return await send(used);
 	} catch (error: any) {
-		const { accessToken: currentAccessToken } = useAuthStore.getState();
-
-		if (
-			!!headers &&
-			(error.response?.status === 401 || !currentAccessToken) &&
-			currentRefreshToken
-		) {
-			try {
-				const refreshResult = await refreshAccessToken(currentRefreshToken);
-
-				if (!refreshResult) {
-					throw new Error("Refresh failed");
-				}
-
-				const { newAccessToken } = refreshResult;
-
-				const { status, data } = await requester.get(url, {
-					headers: { ...headers, Authorization: `Bearer ${newAccessToken}` },
-				});
-				return { statusCode: status, data };
-			} catch (refreshError: any) {
-				// eslint-disable-next-line no-console
-				console.log(refreshError);
-				throw refreshError;
-			}
+		if (error?.response?.status !== 401) throw error;
+		const { accessToken, refreshToken } = useAuthStore.getState();
+		if (accessToken && accessToken !== used) {
+			if (tokenUser(accessToken) !== owner) throw error;
+			return send(accessToken);
 		}
-		if (error.response.status === 401) {
-			useUserStore.getState().clearUser();
-		}
-		console.log(error);
-		throw error;
+		if (!refreshToken) throw error;
+		const refreshed = await refreshAccessToken(refreshToken);
+		if (!refreshed || tokenUser(refreshed.newAccessToken) !== owner) throw error;
+		return send(refreshed.newAccessToken);
 	}
 }
 
-export { fetchWithAuth, refreshAccessToken };
+async function fetchWithAuth(url: string, headers?: Record<string, string>) {
+	// No headers = a public request: no token, no refresh.
+	const send = (token: string | null) =>
+		requester.get(url, {
+			headers: headers && token ? { ...headers, Authorization: `Bearer ${token}` } : headers,
+		});
+	const { status, data } = headers ? await withAuth(send) : await send(null);
+	return { statusCode: status, data };
+}
+
+export { fetchWithAuth, refreshAccessToken, withAuth, withSessionLock };
 
 function createDefaultFetcher(url: string, headers?: Record<string, string>) {
 	async function fetcher() {

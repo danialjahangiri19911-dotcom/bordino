@@ -1,7 +1,6 @@
 import type { ResponseApiData } from "@libs/http/interfaces";
-import { refreshAccessToken } from "@libs/http/query";
+import { withAuth } from "@libs/http/query";
 import requester from "@libs/http/requester";
-import useAuthStore from "@libs/stores/authStore";
 import axios from "axios";
 
 /**
@@ -21,20 +20,7 @@ export async function call<T>(
 			headers: token ? { Authorization: `Bearer ${token}` } : undefined,
 		});
 
-	try {
-		return (await send(useAuthStore.getState().accessToken)).data.result;
-	} catch (error) {
-		const { refreshToken } = useAuthStore.getState();
-		if (
-			axios.isAxiosError(error) &&
-			error.response?.status === 401 &&
-			refreshToken
-		) {
-			const refreshed = await refreshAccessToken(refreshToken);
-			return (await send(refreshed?.newAccessToken ?? null)).data.result;
-		}
-		throw error;
-	}
+	return (await withAuth(send)).data.result;
 }
 
 /** The server's message for a failed game call, in Persian. */

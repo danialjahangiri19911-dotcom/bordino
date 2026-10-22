@@ -2,6 +2,7 @@ export const AUTH_URLS = {
 	LOGIN: "login/",
 	REGISTER: "registration/",
 	RESEND_OTP: "resend_otp/",
+	LOGOUT: "logout/",
 	REFRESH_TOKEN: "/token/refresh/",
 };
 

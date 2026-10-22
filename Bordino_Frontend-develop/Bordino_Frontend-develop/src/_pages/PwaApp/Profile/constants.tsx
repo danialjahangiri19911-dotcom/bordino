@@ -2,12 +2,7 @@ import MoonIcon from "@/libs/components/icons/components/Moon";
 import NotificationIcon from "@/libs/components/icons/components/Notification";
 import ProfileIcon from "@/libs/components/icons/components/Profile";
 import ShieldIcon from "@/libs/components/icons/components/Shield";
-import useAuthStore from "@/libs/stores/authStore";
-import useUserStore from "@/libs/stores/userStore";
-
-const { getState } = useAuthStore;
-
-const { getState: userGetState } = useUserStore;
+import signOut from "@/libs/http/signOut";
 
 export const ACCOUNT_SETTINGS_ITEMS = [
 	{ icon: <ProfileIcon />, title: "اطلاعات شخصی" },
@@ -15,10 +10,7 @@ export const ACCOUNT_SETTINGS_ITEMS = [
 	{
 		icon: "x",
 		title: "خروج",
-		handleGoTask: () => {
-			getState().logout();
-			userGetState().clearUser();
-		},
+		handleGoTask: signOut,
 	},
 ];
 

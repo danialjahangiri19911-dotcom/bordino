@@ -122,23 +122,22 @@ export default function useCrashGame() {
 			if (!mountedRef.current) return;
 			const finished = recent.results.filter((r) => r.revealed);
 			setHistory(finished.slice(0, HISTORY_SIZE));
+			// Show the newest finished round when it is the one on screen or a newer one (a bet
+			// whose answer was lost); the pills above are already in the server's order.
 			const shown = roundRef.current;
-			const same = shown && finished.find((r) => r.id === shown.id);
-			if (same) {
-				apply(same);
-				return;
-			}
 			const latest = finished[0];
 			if (
 				latest &&
-				(!shown || Date.parse(latest.started_at) > Date.parse(shown.started_at))
+				(!shown ||
+					latest.id === shown.id ||
+					Date.parse(latest.started_at) > Date.parse(shown.started_at))
 			) {
 				setRound(latest);
 			}
 		} catch {
 			// Still offline; the error message stays and the next action retries.
 		}
-	}, [apply, setRound, updateBalance, waitForCrash]);
+	}, [setRound, updateBalance, waitForCrash]);
 
 	useEffect(() => {
 		mountedRef.current = true;
