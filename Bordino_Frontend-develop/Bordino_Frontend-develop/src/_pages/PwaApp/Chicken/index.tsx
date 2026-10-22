@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -145,7 +145,14 @@ export default function ChickenGame() {
 		return () => window.removeEventListener("keydown", onKey);
 	});
 
-	const lastFinished = settled ? round : history[0] ?? null;
+	// The result belongs to the end of the hop animation: until the chicken gets there, keep the
+	// finished round out of the history pills, the balance and the fairness dialog.
+	const hiding = !!round && round.revealed && !settled;
+	const shownHistory = hiding ? history.filter((r) => r.id !== round!.id) : history;
+	const stableBalance = useRef(balance);
+	if (!hiding) stableBalance.current = balance;
+	const shownBalance = hiding ? stableBalance.current : balance;
+	const lastFinished = settled ? round : shownHistory[0] ?? null;
 
 	return (
 		// Bottom margin clears the app's fixed bottom navigation bar.
@@ -172,7 +179,7 @@ export default function ChickenGame() {
 						scrollbarWidth: "none",
 					}}
 				>
-					{history.map((r) => (
+					{shownHistory.map((r) => (
 						<Box
 							key={r.id}
 							sx={{
@@ -312,7 +319,7 @@ export default function ChickenGame() {
 								: null}
 					</Typography>
 					<Typography component="span" sx={{ fontSize: 12, color: CRASH_COLORS.muted }}>
-						موجودی: <Box component="b" sx={{ color: CRASH_COLORS.text }}>{formatPoints(balance)}</Box> امتیاز
+						موجودی: <Box component="b" sx={{ color: CRASH_COLORS.text }}>{formatPoints(shownBalance)}</Box> امتیاز
 					</Typography>
 				</Box>
 			</Box>

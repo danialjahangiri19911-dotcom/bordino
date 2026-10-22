@@ -15,9 +15,15 @@ export const chickenApi = {
 	history: () => call<{ results: ChickenRound[] }>("get", CHICKEN.ROUNDS),
 	bet: (bet: number, difficulty: ChickenDifficulty) =>
 		call<ChickenRoundState>("post", CHICKEN.ROUNDS, { bet, difficulty }),
-	/** One lane, or with `to` up to that lane and cash out there (Go Max = last lane). */
-	step: (id: string, to?: number) =>
-		call<ChickenRoundState>("post", withId(CHICKEN.STEP, id), to ? { to } : {}),
+	/**
+	 * One lane, or with `to` up to that lane and cash out there (Go Max = last lane).
+	 * `fromStep` is the lane on screen; the server refuses (409) if it has moved since.
+	 */
+	step: (id: string, fromStep: number, to?: number) =>
+		call<ChickenRoundState>("post", withId(CHICKEN.STEP, id), {
+			from_step: fromStep,
+			...(to ? { to } : {}),
+		}),
 	cashOut: (id: string) =>
 		call<ChickenRoundState>("post", withId(CHICKEN.CASHOUT, id)),
 };

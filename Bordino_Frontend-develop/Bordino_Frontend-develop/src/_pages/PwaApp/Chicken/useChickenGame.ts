@@ -46,34 +46,66 @@ export default function useChickenGame() {
 		};
 	}, []);
 
-	/** Runs one request at a time (a double tap must not send two steps). */
-	const run = useCallback(async (request: () => Promise<ChickenRoundState>) => {
-		if (busyRef.current) return null;
-		busyRef.current = true;
-		setBusy(true);
-		setError(null);
-		try {
-			const state = await request();
-			setRound(state.round);
-			setBalance(state.balance);
-			if (state.round.revealed) {
-				setHistory((prev) =>
-					[state.round, ...prev.filter((r) => r.id !== state.round.id)].slice(0, HISTORY_SIZE),
-				);
-			}
-			return state.round;
-		} catch (e) {
-			setError(gameErrorMessage(e));
-			return null;
-		} finally {
-			busyRef.current = false;
-			setBusy(false);
-		}
+	const remember = useCallback((finished: ChickenRound) => {
+		setHistory((prev) =>
+			[finished, ...prev.filter((r) => r.id !== finished.id)].slice(0, HISTORY_SIZE),
+		);
 	}, []);
+
+	/**
+	 * After a failed request the outcome is unknown (the server may have done it and the answer
+	 * got lost, or the round moved on — a 409): read the authoritative state back.
+	 */
+	const reconcile = useCallback(async (shownId: string | null) => {
+		try {
+			const cfg = await chickenApi.config();
+			setConfig(cfg);
+			setBalance(cfg.balance);
+			if (cfg.active_round) {
+				setRound(cfg.active_round);
+				return;
+			}
+			if (shownId) {
+				const recent = await chickenApi.history();
+				const finished = recent.results.find((r) => r.id === shownId);
+				if (finished) {
+					setRound(finished);
+					remember(finished);
+				}
+			}
+		} catch {
+			// Still offline; the error stays on screen and the next tap retries.
+		}
+	}, [remember]);
+
+	/** Runs one request at a time (a double tap must not send two steps). */
+	const run = useCallback(
+		async (request: () => Promise<ChickenRoundState>, shownId: string | null) => {
+			if (busyRef.current) return null;
+			busyRef.current = true;
+			setBusy(true);
+			setError(null);
+			try {
+				const state = await request();
+				setRound(state.round);
+				setBalance(state.balance);
+				if (state.round.revealed) remember(state.round);
+				return state.round;
+			} catch (e) {
+				setError(gameErrorMessage(e));
+				await reconcile(shownId);
+				return null;
+			} finally {
+				busyRef.current = false;
+				setBusy(false);
+			}
+		},
+		[reconcile, remember],
+	);
 
 	const placeBet = useCallback(
 		async (amount: number, difficulty: ChickenDifficulty) => {
-			const placed = await run(() => chickenApi.bet(amount, difficulty));
+			const placed = await run(() => chickenApi.bet(amount, difficulty), null);
 			if (placed) {
 				setConfig((prev) => (prev ? { ...prev, next_nonce: placed.nonce + 1 } : prev));
 			}
@@ -83,12 +115,13 @@ export default function useChickenGame() {
 	);
 
 	const step = useCallback(
-		(to?: number) => (round ? run(() => chickenApi.step(round.id, to)) : Promise.resolve(null)),
+		(to?: number) =>
+			round ? run(() => chickenApi.step(round.id, round.step, to), round.id) : Promise.resolve(null),
 		[round, run],
 	);
 
 	const cashOut = useCallback(
-		() => (round ? run(() => chickenApi.cashOut(round.id)) : Promise.resolve(null)),
+		() => (round ? run(() => chickenApi.cashOut(round.id), round.id) : Promise.resolve(null)),
 		[round, run],
 	);
 

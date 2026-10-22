@@ -36,10 +36,14 @@ export function formatPoints(value: number) {
 	return Math.floor(value).toLocaleString("fa-IR");
 }
 
-/** Stake's "Profit on Win": what a win at `target` adds on top of the bet. */
-export function profitOnWin(bet: number, target: number | null) {
+/**
+ * Stake's "Profit on Win": what a win at `target` adds on top of the bet, never more than the
+ * server's per-round payout cap allows (it cashes out at the cap on its own).
+ */
+export function profitOnWin(bet: number, target: number | null, maxPayout?: number) {
 	if (!target || !Number.isFinite(target) || bet <= 0) return 0;
-	return Math.floor(bet * target) - bet;
+	const payout = Math.floor(bet * target);
+	return (maxPayout ? Math.min(payout, maxPayout) : payout) - bet;
 }
 
 /**

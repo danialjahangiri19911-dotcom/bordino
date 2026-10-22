@@ -23,6 +23,7 @@ from apps.crash.services import fair
 from apps.crash.services.rounds import (
     CrashError,
     RoundNotFound,
+    StaleRound,
     customer_for,
     points_account,
     seed_for,
@@ -136,13 +137,19 @@ def _win(round_: ChickenRound, multipliers, now):
     )
 
 
-def step(user, round_id, to=None, now=None) -> ChickenRound:
-    """Cross one lane, or with `to` cross up to that lane and cash out there (Go Max = lanes)."""
+def step(user, round_id, to=None, now=None, from_step=None) -> ChickenRound:
+    """Cross one lane, or with `to` cross up to that lane and cash out there (Go Max = lanes).
+
+    `from_step` is the lane the player sees; if it differs (a lost response), nothing moves, so a
+    retried tap can never cross a lane the player did not choose.
+    """
     now = now or timezone.now()
     with transaction.atomic():
         round_ = _locked_round(user, round_id)
         if round_.status != ChickenRound.Status.ACTIVE:
             return round_  # a repeated click after the round ended
+        if from_step is not None and from_step != round_.step:
+            raise StaleRound()
         target = round_.step + 1 if to is None else int(to)
         if not round_.step < target <= round_.lanes:
             raise CrashError("شمارهٔ خط نامعتبر است.")

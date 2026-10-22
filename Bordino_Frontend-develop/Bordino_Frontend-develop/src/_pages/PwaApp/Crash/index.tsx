@@ -41,11 +41,32 @@ function adjust(current: number, base: number, rule: AutoAdjust) {
 	return Math.max(1, Math.round(current * (1 + (Number(rule.percent) || 0) / 100)));
 }
 
-/** Re-render every animation frame while `active`, returning the current timestamp. */
-function useFrameClock(active: boolean) {
+/** True when the player asked the system for less motion. */
+function usePrefersReducedMotion() {
+	const [reduced, setReduced] = useState(false);
+	useEffect(() => {
+		const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+		if (!query) return undefined;
+		const update = () => setReduced(query.matches);
+		update();
+		query.addEventListener?.("change", update);
+		return () => query.removeEventListener?.("change", update);
+	}, []);
+	return reduced;
+}
+
+/**
+ * Re-render while `active`: every animation frame, or 4 times a second with reduced motion
+ * (the multiplier still has to update for the player to cash out).
+ */
+function useFrameClock(active: boolean, reduced: boolean) {
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => {
 		if (!active) return undefined;
+		if (reduced) {
+			const timer = setInterval(() => setNow(Date.now()), 250);
+			return () => clearInterval(timer);
+		}
 		let frame = 0;
 		const tick = () => {
 			setNow(Date.now());
@@ -53,9 +74,12 @@ function useFrameClock(active: boolean) {
 		};
 		frame = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(frame);
-	}, [active]);
+	}, [active, reduced]);
 	return now;
 }
+
+/** Grace after the highest possible crash before the page says the connection is lost. */
+const RECONNECT_GRACE_MS = 3000;
 
 export default function CrashGame() {
 	const { push } = useRouter();
@@ -69,10 +93,16 @@ export default function CrashGame() {
 	const [autoRunning, setAutoRunning] = useState(false);
 	const [fairOpen, setFairOpen] = useState(false);
 
+	const reducedMotion = usePrefersReducedMotion();
 	const live = !!round && !round.revealed;
-	useFrameClock(live);
+	useFrameClock(live, reducedMotion);
 	const growth = config?.growth_per_ms ?? 0.00006;
-	const elapsedMs = round ? game.serverNow() - Date.parse(round.started_at) : 0;
+	const rawElapsedMs = round ? game.serverNow() - Date.parse(round.started_at) : 0;
+	// No round can outlive its multiplier cap: past that point the answer is just late, so the
+	// curve stops there instead of growing without bound while the connection is down.
+	const capMs = round ? Math.log(Number(round.max_multiplier) || 1000) / growth : Infinity;
+	const elapsedMs = Math.min(rawElapsedMs, capMs);
+	const reconnecting = live && rawElapsedMs > capMs + RECONNECT_GRACE_MS;
 
 	let phase: CrashPhase = "idle";
 	if (round?.revealed) phase = "crashed";
@@ -80,18 +110,17 @@ export default function CrashGame() {
 
 	const liveMultiplier = phase === "running" ? multiplierAt(elapsedMs, growth) : 1;
 	const target = round ? Number(round.target_multiplier) : null;
-	// The curve passing the target means the server has paid it (the crash point is higher).
-	const autoReached = phase === "running" && round?.status === "active" && !!target && liveMultiplier >= target;
+	// Passing the target locally is not a win yet: the server confirms it (the long-poll answers
+	// at that moment). Until then the button says it is waiting, and nothing shows a payout.
+	const autoPending =
+		phase === "running" && round?.status === "active" && !!target && liveMultiplier >= target;
 
 	const cashout = useMemo(() => {
 		if (round?.status === "won" && round.cashout_multiplier) {
 			return { multiplier: Number(round.cashout_multiplier), payout: round.payout };
 		}
-		if (autoReached && round && target) {
-			return { multiplier: target, payout: Math.floor(round.bet * target) };
-		}
 		return null;
-	}, [round, autoReached, target]);
+	}, [round]);
 
 	const betValue = Number(bet) || 0;
 	const cashoutValue = Number(cashoutAt) || null;
@@ -179,6 +208,14 @@ export default function CrashGame() {
 			: { label: "شروع شرط خودکار", disabled: !!betProblem || roundBusy || busy || !config, onClick: startAuto };
 	} else if (phase === "starting") {
 		action = { label: "در حال شروع…", disabled: true, onClick: () => undefined };
+	} else if (phase === "running" && reconnecting) {
+		action = { label: "در حال اتصال دوباره…", disabled: true, onClick: () => undefined };
+	} else if (phase === "running" && autoPending) {
+		action = {
+			label: `در انتظار تأیید ${formatMultiplier(target ?? 0)}…`,
+			disabled: true,
+			onClick: () => undefined,
+		};
 	} else if (phase === "running" && cashout) {
 		action = { label: `برداشت شد ${formatMultiplier(cashout.multiplier)}`, disabled: true, onClick: () => undefined };
 	} else if (phase === "running" && round) {
@@ -296,6 +333,7 @@ export default function CrashGame() {
 				multiplier={liveMultiplier}
 				crashPoint={round?.revealed && round.crash_point ? Number(round.crash_point) : null}
 				cashout={cashout}
+				reconnecting={reconnecting}
 			/>
 
 			<Box sx={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }} aria-live="polite">
@@ -314,7 +352,7 @@ export default function CrashGame() {
 					cashoutAt={cashoutAt}
 					onCashoutAtChange={setCashoutAt}
 					onCashoutStep={stepCashout}
-					profit={profitOnWin(betValue, cashoutValue)}
+					profit={profitOnWin(betValue, cashoutValue, config?.max_payout)}
 					balance={balance}
 					auto={auto}
 					onAutoChange={setAuto}
@@ -349,8 +387,8 @@ export default function CrashGame() {
 						lastRevealed.server_seed,
 						lastRevealed.client_seed,
 						lastRevealed.nonce,
-						config.house_edge,
-						config.max_multiplier,
+						lastRevealed.house_edge,
+						lastRevealed.max_multiplier,
 					);
 					if (result === null) return "بررسی در مرورگر فقط روی نشانی https کار می‌کند.";
 					return result === lastRevealed.crash_point

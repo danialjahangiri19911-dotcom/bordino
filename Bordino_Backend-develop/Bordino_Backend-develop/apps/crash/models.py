@@ -106,6 +106,10 @@ class CrashRound(AbstractBaseModel):
     )
     # Auto cash-out forced by CrashConfiguration.max_payout at bet time.
     payout_cap_multiplier = models.DecimalField(max_digits=12, decimal_places=2)
+    # The parameters the crash point was generated with, so a round stays verifiable after
+    # an admin changes the configuration.
+    house_edge = models.DecimalField(max_digits=5, decimal_places=4, default=Decimal("0.0100"))
+    max_multiplier = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1000.00"))
 
     server_seed = models.CharField(max_length=64)
     server_seed_hash = models.CharField(max_length=64)

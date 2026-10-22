@@ -12,6 +12,9 @@ export interface CrashRound {
 	server_seed_hash: string;
 	client_seed: string;
 	nonce: number;
+	/** The parameters the crash point was generated with (for re-verification). */
+	house_edge: string;
+	max_multiplier: string;
 	/** Only true once the curve has reached the crash point. */
 	revealed: boolean;
 	crash_point: string | null;

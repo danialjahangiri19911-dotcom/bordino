@@ -7,21 +7,29 @@ import type { CrashConfig, CrashRound } from "@/api/games/crash/types";
 
 const HISTORY_SIZE = 20;
 
+/** True when `next` is an older view of the same round than `prev` (a late response). */
+function isOlder(prev: CrashRound, next: CrashRound) {
+	if (prev.revealed && !next.revealed) return true;
+	return prev.status !== "active" && next.status === "active";
+}
+
 /**
  * One player's crash session: config, balance, the current round and recent results.
- * The server decides everything; this hook only keeps the client's clock in step with it
- * and waits (long-poll) for the crash of the running round.
+ * The server decides everything; this hook keeps the client's clock in step with it, waits
+ * (long-poll) for the running round to win or crash, and never lets a late response from an
+ * older request or an older round replace newer state.
  */
 export default function useCrashGame() {
 	const [config, setConfig] = useState<CrashConfig | null>(null);
 	const [balance, setBalance] = useState(0);
-	const [round, setRound] = useState<CrashRound | null>(null);
+	const [round, setRoundState] = useState<CrashRound | null>(null);
 	const [history, setHistory] = useState<CrashRound[]>([]);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [loading, setLoading] = useState(true);
 
 	const offsetRef = useRef(0);
+	const roundRef = useRef<CrashRound | null>(null);
 	const waitingRef = useRef<string | null>(null);
 	const mountedRef = useRef(true);
 
@@ -32,47 +40,96 @@ export default function useCrashGame() {
 		offsetRef.current = Date.parse(serverTime) - (sentAt + Date.now()) / 2;
 	};
 
-	/** Never let a late, unrevealed answer overwrite a round that is already revealed. */
-	const applyRound = useCallback((next: CrashRound) => {
-		setRound((prev) =>
-			prev && prev.id === next.id && prev.revealed && !next.revealed ? prev : next,
+	const setRound = useCallback((next: CrashRound | null) => {
+		roundRef.current = next;
+		setRoundState(next);
+	}, []);
+
+	const remember = useCallback((finished: CrashRound) => {
+		setHistory((prev) =>
+			[finished, ...prev.filter((r) => r.id !== finished.id)].slice(0, HISTORY_SIZE),
 		);
 	}, []);
+
+	/**
+	 * Apply a server answer about `next`. Ignored when it belongs to a round that is no longer
+	 * on screen, or is older than what is shown; the balance travels with it under the same check.
+	 */
+	const apply = useCallback(
+		(next: CrashRound, nextBalance?: number) => {
+			const prev = roundRef.current;
+			if (prev && (prev.id !== next.id || isOlder(prev, next))) return false;
+			setRound(next);
+			if (nextBalance !== undefined) setBalance(nextBalance);
+			if (next.revealed) remember(next);
+			return true;
+		},
+		[remember, setRound],
+	);
 
 	const waitForCrash = useCallback(
 		async (id: string) => {
 			if (waitingRef.current === id) return;
 			waitingRef.current = id;
-			while (mountedRef.current && waitingRef.current === id) {
+			const stillMine = () =>
+				mountedRef.current && waitingRef.current === id && roundRef.current?.id === id;
+			while (stillMine()) {
 				try {
 					const state = await crashApi.wait(id);
-					if (!mountedRef.current) break;
-					setBalance(state.balance);
-					applyRound(state.round);
-					if (state.round.revealed) {
-						setHistory((prev) =>
-							[state.round, ...prev.filter((r) => r.id !== id)].slice(0, HISTORY_SIZE),
-						);
-						break;
-					}
+					if (!stillMine()) break;
+					apply(state.round, state.balance);
+					if (state.round.revealed) break;
 				} catch (e) {
+					if (!stillMine()) break;
 					setError(crashErrorMessage(e));
 					await new Promise((resolve) => setTimeout(resolve, 2000));
 				}
 			}
 			if (waitingRef.current === id) waitingRef.current = null;
 		},
-		[applyRound],
+		[apply],
 	);
+
+	/**
+	 * After a failed request the outcome is unknown (the server may have done it and the answer
+	 * got lost): read the authoritative state back before allowing anything else.
+	 */
+	const reconcile = useCallback(async () => {
+		try {
+			const sentAt = Date.now();
+			const cfg = await crashApi.config();
+			syncClock(cfg.server_time, sentAt);
+			if (!mountedRef.current) return;
+			setConfig(cfg);
+			setBalance(cfg.balance);
+			if (cfg.active_round) {
+				if (roundRef.current?.id !== cfg.active_round.id) setRound(cfg.active_round);
+				waitForCrash(cfg.active_round.id);
+				return;
+			}
+			const shown = roundRef.current;
+			if (shown && !shown.revealed) {
+				const recent = await crashApi.history();
+				const finished = recent.results.find((r) => r.id === shown.id);
+				if (finished) apply(finished);
+			}
+		} catch {
+			// Still offline; the error message stays and the next action retries.
+		}
+	}, [apply, setRound, waitForCrash]);
 
 	useEffect(() => {
 		mountedRef.current = true;
 		(async () => {
 			try {
+				// Sync the clock on the config answer alone; a slow history call must not skew it.
 				const sentAt = Date.now();
-				const [cfg, recent] = await Promise.all([crashApi.config(), crashApi.history()]);
+				const configured = crashApi.config().then((cfg) => {
+					syncClock(cfg.server_time, sentAt);
+					return cfg;
+				});
+				const [cfg, recent] = await Promise.all([configured, crashApi.history()]);
 				if (!mountedRef.current) return;
-				syncClock(cfg.server_time, sentAt);
 				setConfig(cfg);
 				setBalance(cfg.balance);
 				setHistory(recent.results.filter((r) => r.revealed));
@@ -90,7 +147,7 @@ export default function useCrashGame() {
 			mountedRef.current = false;
 			waitingRef.current = null;
 		};
-	}, [waitForCrash]);
+	}, [setRound, waitForCrash]);
 
 	const placeBet = useCallback(
 		async (amount: number, autoCashout: string | null) => {
@@ -100,6 +157,7 @@ export default function useCrashGame() {
 				const sentAt = Date.now();
 				const state = await crashApi.bet(amount, autoCashout);
 				syncClock(state.server_time, sentAt);
+				waitingRef.current = null;
 				setRound(state.round);
 				setBalance(state.balance);
 				setConfig((prev) =>
@@ -109,27 +167,29 @@ export default function useCrashGame() {
 				return state.round;
 			} catch (e) {
 				setError(crashErrorMessage(e));
+				await reconcile();
 				return null;
 			} finally {
 				setBusy(false);
 			}
 		},
-		[waitForCrash],
+		[reconcile, setRound, waitForCrash],
 	);
 
 	const cashOut = useCallback(async () => {
-		if (!round || round.status !== "active") return;
+		const current = roundRef.current;
+		if (!current || current.status !== "active") return;
 		setBusy(true);
 		try {
-			const state = await crashApi.cashOut(round.id);
-			applyRound(state.round);
-			setBalance(state.balance);
+			const state = await crashApi.cashOut(current.id);
+			apply(state.round, state.balance);
 		} catch (e) {
 			setError(crashErrorMessage(e));
+			await reconcile();
 		} finally {
 			setBusy(false);
 		}
-	}, [round, applyRound]);
+	}, [apply, reconcile]);
 
 	const changeSeed = useCallback(async (clientSeed: string) => {
 		try {

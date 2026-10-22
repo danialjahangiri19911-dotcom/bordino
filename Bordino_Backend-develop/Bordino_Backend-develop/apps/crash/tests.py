@@ -436,3 +436,71 @@ class ChickenApiTests(TestCase):
         rows = self.result(self.api.get("/api/v1/wallet/points/transactions/"))["results"]
         types = {row["type"] for row in rows}
         self.assertTrue({"chicken_bet", "chicken_win"} <= types, types)
+
+
+@override_settings(CACHES=LOCMEM)
+class ReviewFixTests(TestCase):
+    """Codex review 2026-10-22: early win confirmation, stale chicken steps, fairness snapshots."""
+
+    def setUp(self):
+        self.user = RoundTests.make_player("9120000501", 1000)
+        self.now = timezone.now()
+
+    def crash_round(self, auto=None, crash="3.00"):
+        round_, _ = rounds.place_bet(self.user, 100, auto, now=self.now)
+        CrashRound.objects.filter(pk=round_.pk).update(crash_point=D(crash))
+        round_.refresh_from_db()
+        return round_
+
+    def test_long_poll_wakes_at_a_winning_auto_target(self):
+        round_ = self.crash_round(auto=D("1.50"), crash="3.00")
+        self.assertEqual(rounds.wake_at(round_), at(round_, "1.50", extra_ms=0))
+
+    def test_long_poll_waits_for_the_crash_when_the_target_loses(self):
+        round_ = self.crash_round(auto=D("4.00"), crash="3.00")
+        self.assertEqual(rounds.wake_at(round_), rounds.crash_at(round_))
+
+    def test_long_poll_waits_for_the_crash_after_a_manual_win(self):
+        round_ = self.crash_round(auto=D("1.50"), crash="3.00")
+        round_ = rounds.cash_out(self.user, round_.pk, now=at(round_, "1.20"))
+        self.assertEqual(rounds.wake_at(round_), rounds.crash_at(round_))
+
+    def test_win_at_wake_time_is_confirmed_but_not_revealed(self):
+        round_ = self.crash_round(auto=D("1.50"), crash="3.00")
+        moment = at(round_, "1.50")
+        rounds.settle_due(now=moment)
+        round_.refresh_from_db()
+        payload = rounds.round_payload(round_, now=moment)
+        self.assertEqual((payload["status"], payload["payout"]), ("won", 150))
+        self.assertIsNone(payload["crash_point"])
+
+    def test_round_keeps_the_parameters_it_was_generated_with(self):
+        round_ = self.crash_round()
+        config = CrashConfiguration.current()
+        config.house_edge = D("0.0500")
+        config.save()
+        payload = rounds.round_payload(round_)
+        self.assertEqual((payload["house_edge"], payload["max_multiplier"]), ("0.0100", "1000.00"))
+        self.assertEqual(
+            fair.crash_point(round_.server_seed, round_.client_seed, round_.nonce, round_.house_edge, round_.max_multiplier),
+            fair.crash_point(round_.server_seed, round_.client_seed, round_.nonce, D("0.01"), D("1000")),
+        )
+
+    def test_chicken_step_from_a_stale_lane_moves_nothing(self):
+        round_, _ = chicken.place_bet(self.user, 100, "easy")
+        ChickenRound.objects.filter(pk=round_.pk).update(hit_lane=None)
+        chicken.step(self.user, round_.pk, from_step=0)  # lane 1; pretend the answer was lost
+        with self.assertRaises(rounds.StaleRound):
+            chicken.step(self.user, round_.pk, from_step=0)  # the retried tap
+        round_.refresh_from_db()
+        self.assertEqual(round_.step, 1)
+
+    def test_chicken_stale_step_is_a_409(self):
+        api = APIClient()
+        api.force_authenticate(self.user)
+        round_, _ = chicken.place_bet(self.user, 100, "easy")
+        ChickenRound.objects.filter(pk=round_.pk).update(hit_lane=None)
+        url = f"/api/v1/games/chicken/rounds/{round_.pk}/step/"
+        self.assertEqual(api.post(url, {"from_step": 0}, format="json").status_code, 200)
+        self.assertEqual(api.post(url, {"from_step": 0}, format="json").status_code, 409)
+        self.assertEqual(api.post(url, {"from_step": 1}, format="json").status_code, 200)

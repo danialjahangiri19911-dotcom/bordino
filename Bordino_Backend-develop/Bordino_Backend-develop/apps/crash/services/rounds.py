@@ -35,12 +35,30 @@ class RoundNotFound(CrashError):
         super().__init__("دست پیدا نشد.")
 
 
+class StaleRound(CrashError):
+    """The client acted on an out-of-date view of the round (e.g. a lost response)."""
+
+    def __init__(self):
+        super().__init__("وضعیت دست تغییر کرده بود؛ به‌روز شد. دوباره امتحان کن.")
+
+
 def _ms(delta: timedelta) -> float:
     return delta.total_seconds() * 1000
 
 
 def crash_at(round_: CrashRound):
     return round_.started_at + timedelta(milliseconds=fair.ms_to_reach(round_.crash_point))
+
+
+def wake_at(round_: CrashRound):
+    """When a long-poll should answer: at the crash, or earlier at the moment the round wins on
+    its own (auto target or payout cap), so the win is confirmed without waiting for the crash.
+    Answering at the target reveals nothing new: the curve has visibly reached it by then."""
+    end = crash_at(round_)
+    target = round_.target_multiplier
+    if round_.status == CrashRound.Status.ACTIVE and target <= round_.crash_point:
+        end = min(end, round_.started_at + timedelta(milliseconds=fair.ms_to_reach(target)))
+    return end
 
 
 def is_revealed(round_: CrashRound, now=None) -> bool:
@@ -111,6 +129,8 @@ def place_bet(user, bet: int, auto_cashout=None, now=None) -> tuple[CrashRound, 
             bet=bet,
             auto_cashout=auto_cashout,
             payout_cap_multiplier=payout_cap,
+            house_edge=config.house_edge,
+            max_multiplier=config.max_multiplier,
             server_seed=server_seed,
             server_seed_hash=fair.hash_seed(server_seed),
             client_seed=seed.client_seed,
@@ -223,6 +243,8 @@ def round_payload(round_: CrashRound, now=None) -> dict:
         "server_seed_hash": round_.server_seed_hash,
         "client_seed": round_.client_seed,
         "nonce": round_.nonce,
+        "house_edge": str(round_.house_edge),
+        "max_multiplier": str(round_.max_multiplier),
         "revealed": revealed,
         "crash_point": str(round_.crash_point) if revealed else None,
         "server_seed": round_.server_seed if revealed else None,

@@ -18,13 +18,20 @@ interface Props {
 	multiplier: number;
 	crashPoint: number | null;
 	cashout: { multiplier: number; payout: number } | null;
+	/** The answer is overdue (connection lost): say so instead of inventing a result. */
+	reconnecting?: boolean;
 }
 
-const Y_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
-const X_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300];
-
-function pickStep(span: number, steps: number[], maxTicks: number) {
-	return steps.find((s) => span / s <= maxTicks) ?? steps[steps.length - 1];
+/**
+ * A 1/2/5×10^n axis step giving at most `maxTicks` ticks for any span, so the number of grid
+ * lines drawn per frame stays bounded however large the multiplier gets.
+ */
+function niceStep(span: number, maxTicks: number, min: number) {
+	if (!Number.isFinite(span) || span <= 0) return min;
+	const raw = span / maxTicks;
+	const magnitude = 10 ** Math.floor(Math.log10(raw));
+	const step = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= raw) ?? 10 * magnitude;
+	return Math.max(min, step);
 }
 
 function msToReach(multiplier: number, growthPerMs: number) {
@@ -53,6 +60,7 @@ function draw(canvas: HTMLCanvasElement, props: Props) {
 				: 0;
 	const shownM =
 		phase === "crashed" && crashPoint ? crashPoint : exactMultiplierAt(shownMs, growthPerMs);
+	if (!Number.isFinite(shownM) || !Number.isFinite(shownMs)) return;
 
 	const pad = { left: 46, right: 14, top: 14, bottom: 26 };
 	const plotW = width - pad.left - pad.right;
@@ -69,7 +77,7 @@ function draw(canvas: HTMLCanvasElement, props: Props) {
 	ctx.lineWidth = 1;
 
 	// Y axis: multipliers.
-	const yStep = pickStep(yMax - 1, Y_STEPS, 5);
+	const yStep = niceStep(yMax - 1, 5, 0.1);
 	ctx.textAlign = "right";
 	ctx.textBaseline = "middle";
 	for (let v = 1; v <= yMax + 1e-9; v += yStep) {
@@ -84,7 +92,7 @@ function draw(canvas: HTMLCanvasElement, props: Props) {
 	}
 
 	// X axis: seconds.
-	const xStep = pickStep(xMax / 1000, X_STEPS, 5);
+	const xStep = niceStep(xMax / 1000, 5, 1);
 	ctx.textAlign = "center";
 	ctx.textBaseline = "top";
 	for (let s = xStep; s * 1000 <= xMax; s += xStep) {
@@ -168,7 +176,7 @@ export default function CrashGraph(props: Props) {
 		return () => observer.disconnect();
 	}, []);
 
-	const { phase, multiplier, crashPoint, elapsedMs, cashout } = props;
+	const { phase, multiplier, crashPoint, elapsedMs, cashout, reconnecting } = props;
 
 	let headline: React.ReactNode;
 	if (phase === "crashed" && crashPoint) {
@@ -187,9 +195,16 @@ export default function CrashGraph(props: Props) {
 		);
 	} else if (phase === "running") {
 		headline = (
-			<Typography sx={{ fontSize: 44, fontWeight: 800, color: CRASH_COLORS.text, lineHeight: 1.1 }}>
-				{formatMultiplier(multiplier)}
-			</Typography>
+			<>
+				<Typography sx={{ fontSize: 44, fontWeight: 800, color: CRASH_COLORS.text, lineHeight: 1.1 }}>
+					{formatMultiplier(multiplier)}
+				</Typography>
+				{reconnecting && (
+					<Typography sx={{ color: CRASH_COLORS.muted, fontWeight: 600, fontSize: 13, mt: 0.5 }}>
+						در حال اتصال دوباره…
+					</Typography>
+				)}
+			</>
 		);
 	} else if (phase === "starting") {
 		headline = (

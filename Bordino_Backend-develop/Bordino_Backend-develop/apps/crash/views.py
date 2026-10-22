@@ -37,11 +37,12 @@ class CrashThrottle(UserRateThrottle):
 
 
 def _error(exc: rounds.CrashError):
-    code = (
-        status.HTTP_404_NOT_FOUND
-        if isinstance(exc, rounds.RoundNotFound)
-        else status.HTTP_400_BAD_REQUEST
-    )
+    if isinstance(exc, rounds.RoundNotFound):
+        code = status.HTTP_404_NOT_FOUND
+    elif isinstance(exc, rounds.StaleRound):
+        code = status.HTTP_409_CONFLICT
+    else:
+        code = status.HTTP_400_BAD_REQUEST
     return Response({"error": exc.message}, status=code)
 
 
@@ -212,7 +213,8 @@ def _round_state(user, round_id):
 
 @require_GET
 async def round_wait_view(request, round_id):
-    """Long-poll: answers when the round's curve reaches its crash point (or after 20 s).
+    """Long-poll: answers when the round wins on its own, when its curve reaches the crash
+    point, or after 20 s — whichever is first.
 
     Async so a waiting player holds no worker thread; the crash point is only in the answer
     once the crash has happened.
@@ -226,7 +228,7 @@ async def round_wait_view(request, round_id):
         return _json(404, {"error": "دست پیدا نشد."})
     round_, _ = state
 
-    delay = (rounds.crash_at(round_) - timezone.now()).total_seconds()
+    delay = (rounds.wake_at(round_) - timezone.now()).total_seconds()
     if delay > 0:
         # A few ms of slack so the reveal check never runs just before the crash instant.
         await asyncio.sleep(min(delay + 0.02, WAIT_MAX_SECONDS))
@@ -247,6 +249,8 @@ class ChickenBetSerializer(serializers.Serializer):
 class ChickenStepSerializer(serializers.Serializer):
     # Absent = one lane; a lane number = cross up to it and cash out there (Go Max = last lane).
     to = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    # The lane the player sees the chicken on; a mismatch (lost response) returns 409.
+    from_step = serializers.IntegerField(min_value=0, required=False, allow_null=True)
 
 
 def _chicken_state(request, round_):
@@ -341,7 +345,12 @@ class ChickenStepView(APIView):
         serializer = ChickenStepSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            round_ = chicken.step(request.user, round_id, serializer.validated_data.get("to"))
+            round_ = chicken.step(
+                request.user,
+                round_id,
+                serializer.validated_data.get("to"),
+                from_step=serializer.validated_data.get("from_step"),
+            )
         except rounds.CrashError as exc:
             return _error(exc)
         return Response(_chicken_state(request, round_))
