@@ -82,12 +82,3 @@ export const GUIDE_SECTIONS: GuideSection[] = [
 		],
 	},
 ];
-
-export const GUIDE_PRIZE_TIERS = [
-	{ matched: 1, desc: "یک توپ مشابه", amount: "۱,۰۰۰ تومان" },
-	{ matched: 2, desc: "دو توپ مشابه", amount: "۵,۰۰۰ تومان" },
-	{ matched: 3, desc: "سه توپ مشابه", amount: "۲۰,۰۰۰ تومان" },
-	{ matched: 4, desc: "چهار توپ مشابه", amount: "۱۰۰,۰۰۰ تومان" },
-	{ matched: 5, desc: "پنج توپ مشابه", amount: "۲۰۰,۰۰۰ تومان" },
-	{ matched: 6, desc: "جکپات (Jackpot)", amount: "۱,۰۰۰,۰۰۰ تومان" },
-];

@@ -12,6 +12,7 @@ import WinnersList from "./Winners";
 import useGetLotteryDetail from "@/api/lottery/hooks/useGetLotteryDetail";
 import useGetLotteryFullDetail from "@/api/lottery/hooks/useGetLotteryFullDetail";
 import BasicTabs from "@/libs/components/Tabs";
+import LoadState from "@/libs/components/common/LoadState";
 import Box from "@/libs/components/atoms/Box";
 import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 import styled from "@/libs/styles/styled";
@@ -20,17 +21,37 @@ export default function LotteryDetail() {
 	const { id } = useParams<{ id: string }>();
 
 	// اطلاعاتِ پایه (هم برای فعال هم برگزارشده کار می‌کند)
-	const { data: detailRes } = useGetLotteryDetail({ id });
+	const {
+		data: detailRes,
+		isLoading: detailLoading,
+		error: detailError,
+		refetch: refetchDetail,
+	} = useGetLotteryDetail({ id });
 	const detail = detailRes?.result;
 	const isCompleted = detail?.status === "completed";
 
 	// نتایج (شمارهٔ برنده و جمعِ جایزه) فقط برای قرعه‌کشیِ برگزارشده
-	const { data: results } = useGetLotteryFullDetail({
+	const {
+		data: results,
+		error: resultsError,
+		refetch: refetchResults,
+	} = useGetLotteryFullDetail({
 		id,
 		enabled: isCompleted,
 	});
 
-	if (!detail) return null;
+	if (!detail || (isCompleted && resultsError)) {
+		// Not a blank page, and not "0 تومان, no winners" when the results failed to load.
+		return (
+			<PwaAppPageLayout>
+				<LoadState
+					loading={detailLoading}
+					error={detailError || resultsError}
+					onRetry={() => (detailError ? refetchDetail() : refetchResults())}
+				/>
+			</PwaAppPageLayout>
+		);
+	}
 
 	// برای قرعه‌کشیِ فعال هنوز قرعه کشیده نشده: جایزه = موجودیِ جایزه، بدون توپِ برنده
 	const totalPrize = isCompleted

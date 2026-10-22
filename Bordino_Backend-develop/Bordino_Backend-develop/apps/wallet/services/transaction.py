@@ -67,15 +67,19 @@ class TransactionService:
         return transaction_record
 
     @transaction.atomic
-    def create_prize_payment(self, dto: CreatePrizePaymentDTO):
-        """Create lottery prize payment transaction"""
+    def create_prize_payment(self, dto: CreatePrizePaymentDTO, paid=True):
+        """Create lottery prize payment transaction (pending when the transfer failed)"""
 
         transaction_record = LotteryPrizeTransaction.objects.create(
             lottery=dto.ticket.lottery,
             ticket=dto.ticket,
             prize_amount=dto.amount,
             description=_("Lottery prize for ticket: {}").format(dto.ticket.name),
-            status=LotteryPrizeTransaction.Status.COMPLETED,
+            status=(
+                LotteryPrizeTransaction.Status.COMPLETED
+                if paid
+                else LotteryPrizeTransaction.Status.PENDING
+            ),
         )
 
         return transaction_record

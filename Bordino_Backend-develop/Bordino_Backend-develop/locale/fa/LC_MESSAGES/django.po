@@ -953,3 +953,69 @@ msgstr "اول مرحله‌های قبلی را کامل کنید."
 
 msgid "Registration already completed."
 msgstr "ثبت‌نام قبلاً کامل شده است."
+
+msgid "Ticket sales for this lottery are closed."
+msgstr "فروش بلیط این قرعه‌کشی تمام شده است."
+
+msgid "Numbers must be between 1 and 40."
+msgstr "شماره‌ها باید بین ۱ تا ۴۰ باشند."
+
+msgid "This lottery has ended; a new one has started."
+msgstr "این قرعه‌کشی تمام شده و قرعه‌کشی تازه‌ای شروع شده است؛ صفحه را دوباره باز کنید."
+
+msgid "The ticket price has changed."
+msgstr "قیمت بلیط تغییر کرده است؛ صفحه را دوباره باز کنید."
+
+msgid "This withdrawal was already requested with other details."
+msgstr "این درخواست برداشت قبلاً با مشخصات دیگری ثبت شده است."
+
+msgid "Amount, account and bank account of a transaction cannot be changed."
+msgstr "مبلغ، کیف و حساب بانکی تراکنش قابل تغییر نیست."
+
+msgid "A finished transaction cannot change its status."
+msgstr "وضعیت تراکنشِ پایان‌یافته قابل تغییر نیست."
+
+msgid "All active levels together cannot exceed 100%."
+msgstr "جمع درصد همهٔ سطح‌های فعال نمی‌تواند از ۱۰۰٪ بیشتر شود."
+
+msgid "The lottery has not been drawn yet."
+msgstr "قرعه‌کشی هنوز انجام نشده است."
+
+msgid "This wallet account is not active."
+msgstr "این کیف فعال نیست."
+
+msgid "Withdrawal would exceed maximum negative currency limit."
+msgstr "موجودی برای این برداشت کافی نیست."
+
+msgid "Currency account not found"
+msgstr "کیف نقدی پیدا نشد."
+
+msgid "Bank account not found"
+msgstr "حساب بانکی پیدا نشد یا هنوز تأیید نشده است."
+
+msgid "Wallet has expired"
+msgstr "اعتبار کیف پول تمام شده است."
+
+msgid "Points account not found."
+msgstr "کیف امتیاز پیدا نشد."
+
+msgid "Cannot spin: would exceed maximum negative points limit."
+msgstr "امتیاز کافی برای چرخاندن گردونه نداری."
+
+msgid "Insufficient balance to complete this ticket purchase."
+msgstr "امتیاز کافی برای خرید این بلیط نداری."
+
+msgid "You already have a ticket with these numbers."
+msgstr "با این شماره‌ها قبلاً بلیط خریده‌ای."
+
+msgid "No active lottery found."
+msgstr "قرعه‌کشی فعالی وجود ندارد."
+
+msgid "Withdrawal request created"
+msgstr "درخواست برداشت ثبت شد."
+
+msgid "Each number in a ticket must be unique."
+msgstr "شماره‌های یک بلیط نباید تکراری باشند."
+
+msgid "Invalid amount"
+msgstr "مبلغ نامعتبر است."

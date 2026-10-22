@@ -15,6 +15,7 @@ import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 import Back from "@/libs/components/layouts/PwaAppLayout/customRightActions/Back";
 import LoadingButton from "@/libs/components/loading/LoadingButton";
 import styled from "@/libs/styles/styled";
+import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
 
 export default function BuyTicket() {
 	const {
@@ -75,15 +76,25 @@ export default function BuyTicket() {
 							const num = i + 1;
 							const isSelected = selectedBalls.includes(num);
 
+							const full = selectedBalls.length === 6 && !isSelected;
+							// A real button: Tab reaches it, Enter/Space choose it, and its state
+							// is announced (aria-pressed).
 							return (
 								<Box
 									key={num}
+									component="button"
+									type="button"
+									aria-label={`توپ ${toPersianDigits(num)}`}
+									aria-pressed={isSelected}
+									disabled={full}
 									onClick={() => handleBallClick(num)}
 									sx={{
-										cursor:
-											selectedBalls.length === 6 && !isSelected
-												? "not-allowed"
-												: "pointer",
+										p: 0,
+										border: 0,
+										background: "none",
+										borderRadius: "50%",
+										cursor: full ? "not-allowed" : "pointer",
+										"&:focus-visible": { outline: "2px solid #1976d2", outlineOffset: 2 },
 									}}
 								>
 									<Ball

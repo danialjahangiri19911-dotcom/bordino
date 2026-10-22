@@ -1,9 +1,12 @@
 "use client";
 
-import { GUIDE_PRIZE_TIERS, GUIDE_SECTIONS, IMAGE_BASE } from "./content";
+import { GUIDE_SECTIONS, IMAGE_BASE } from "./content";
 import Box from "@libs/components/atoms/Box";
 import Typography from "@libs/components/atoms/Typography";
 import styled from "@libs/styles/styled";
+
+import type { Lottery } from "@/api/lottery/types/getLotteryListType";
+import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
 
 // رنگ‌ها عیناً از فایل فیگما (node 1839-31016)
 const PINK = "#E64056";
@@ -38,7 +41,31 @@ function PrizeBalls({ matched }: Readonly<{ matched: number }>) {
 	);
 }
 
+const MATCH_WORDS = ["", "یک", "دو", "سه", "چهار", "پنج", "شش"];
+
+/** The prize table of the running lottery, as settlement pays it (no made-up amounts). */
+function usePrizeTiers() {
+	const { activeLotteries } = useExtractLotteries();
+	const rules: Lottery["prize_rules"] = activeLotteries?.prize_rules ?? [];
+	const tiers: { matched: number; desc: string; amount: string }[] = rules
+		.filter((rule) => rule.match_count < TOTAL_BALLS)
+		.map((rule) => ({
+			matched: rule.match_count,
+			desc: `${MATCH_WORDS[rule.match_count] ?? rule.match_count} توپ مشابه`,
+			amount: `${Number(rule.prize_amount).toLocaleString("fa-IR")} تومان`,
+		}));
+	if (activeLotteries) {
+		tiers.push({
+			matched: TOTAL_BALLS,
+			desc: "جکپات (Jackpot)",
+			amount: "باقیماندهٔ صندوق، بین برندگان",
+		});
+	}
+	return tiers;
+}
+
 export default function GuideContent() {
+	const prizeTiers = usePrizeTiers();
 	return (
 		<Wrapper>
 			<Typography sx={titleSx}>راهنمای کامل قرعه‌کشی</Typography>
@@ -118,8 +145,13 @@ export default function GuideContent() {
 							<HeadCell>توضیح</HeadCell>
 							<HeadCell>مبلغ جایزه</HeadCell>
 						</TableHeadRow>
-						{GUIDE_PRIZE_TIERS.map((tier) => (
-							<TableRow key={tier.amount}>
+						{!prizeTiers.length && (
+							<TableRow>
+								<BodyCell>جوایز هر قرعه‌کشی با شروع آن اعلام می‌شود.</BodyCell>
+							</TableRow>
+						)}
+						{prizeTiers.map((tier) => (
+							<TableRow key={tier.matched}>
 								<Box sx={{ flex: 1, display: "flex", justifyContent: "center" }}>
 									<PrizeBalls matched={tier.matched} />
 								</Box>
@@ -149,7 +181,7 @@ export default function GuideContent() {
 							}}
 						>
 							{
-								"هر بلیط به صورت مستقل بررسی می‌شود\nاگر در یک سطح چند برنده وجود داشته باشد، جایزه آن سطح بین برندگان تقسیم می‌شود.\nجایزه بزرگ مربوط به ۶ توپ، طبق قوانین اعلام‌شده پرداخت خواهد شد.\nنتیجه قرعه‌کشی و وضعیت هر بلیط، به‌صورت شفاف در بخش قرعه‌کشی‌های برگزار شده، قابل مشاهده است."
+								"هر بلیط به صورت مستقل بررسی می‌شود؛ هر بلیط برنده، مبلغ سطح خودش را می‌گیرد.\nجکپات (۶ توپ) باقیماندهٔ صندوق جایزه است و بین بلیط‌های جکپات تقسیم می‌شود.\nاگر صندوق برای همهٔ جوایز کافی نباشد، همهٔ جوایز به یک نسبت کم می‌شوند.\nشماره‌های برنده را سرور پس از پایان فروش، به‌صورت تصادفی انتخاب می‌کند.\nنتیجه قرعه‌کشی و وضعیت هر بلیط، در بخش قرعه‌کشی‌های قبلی قابل مشاهده است."
 							}
 						</Typography>
 					</TextCol>

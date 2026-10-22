@@ -113,6 +113,8 @@ def place_bet(user, bet: int, auto_cashout=None, now=None) -> tuple[CrashRound, 
         account = TokenWalletAccount.objects.select_for_update().get(pk=account.pk)
         if CrashRound.objects.filter(customer=customer, status=CrashRound.Status.ACTIVE).exists():
             raise CrashError("یک دست هنوز در جریان است.")
+        if account.status != TokenWalletAccount.WalletStatus.VALID:
+            raise CrashError("کیف امتیاز شما فعال نیست.")
         if account.amount < bet:
             raise CrashError("امتیاز کافی برای این شرط نداری.")
 

@@ -12,6 +12,7 @@ import Typography from "@/libs/components/atoms/Typography";
 import ArrowBackIo from "@/libs/components/icons/components/ArrowBackIo";
 import styled from "@/libs/styles/styled";
 import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
+import LoadState from "@/libs/components/common/LoadState";
 import { addParamsToUrl, addSearchParamsToUrl } from "@/libs/utils/urls";
 
 interface Props {
@@ -22,10 +23,13 @@ interface Props {
 
 export default function MyTickets({ lotteryId, winningNumbers = [] }: Props) {
 	const { push } = useRouter();
-	const { data, isLoading } = useGetLotteryTickets({ id: lotteryId });
+	const { data, isLoading, error, refetch } = useGetLotteryTickets({ id: lotteryId });
 	const tickets = data?.result ?? [];
 
-	if (isLoading) return null;
+	// A failed load is not "you have no tickets".
+	if (isLoading || error) {
+		return <LoadState loading={isLoading} error={error} onRetry={() => refetch()} />;
+	}
 
 	if (tickets.length === 0) {
 		return (

@@ -55,12 +55,23 @@ class CurrencyTransaction(BaseTransaction):
         # A finished withdrawal stays finished: its money was paid out or given back already,
         # and changing it again would move the balance a second time.
         if self.pk:
-            previous = (
-                CurrencyTransaction.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            stored = (
+                CurrencyTransaction.objects.filter(pk=self.pk)
+                .values("status", "amount", "source_wallet_id", "bank_account_id")
+                .first()
             )
-            if previous in self.FINAL and previous != self.status:
+            if stored and stored["status"] in self.FINAL and stored["status"] != self.status:
                 raise ValidationError(
                     {"status": _("A finished transaction cannot change its status.")}
+                )
+            # What was reserved cannot be edited afterwards (a refund gives back the original).
+            if stored and (
+                stored["amount"] != self.amount
+                or stored["source_wallet_id"] != self.source_wallet_id
+                or stored["bank_account_id"] != self.bank_account_id
+            ):
+                raise ValidationError(
+                    _("Amount, account and bank account of a transaction cannot be changed.")
                 )
 
     def __str__(self):

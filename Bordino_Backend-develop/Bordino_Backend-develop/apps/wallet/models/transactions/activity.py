@@ -25,5 +25,14 @@ class ActivityTransaction(BaseTransaction):
 
     metadata = models.JSONField(default=dict, blank=True)
 
+    class Meta(BaseTransaction.Meta):
+        constraints = [
+            # Each action is rewarded once per customer (RecordActionService); the database
+            # holds that even when several claims arrive at the same moment.
+            models.UniqueConstraint(
+                fields=("customer", "section", "action_type"), name="activity_once_per_customer"
+            )
+        ]
+
     def __str__(self):
         return f"{self.section}/{self.action_type}: {self.customer}"

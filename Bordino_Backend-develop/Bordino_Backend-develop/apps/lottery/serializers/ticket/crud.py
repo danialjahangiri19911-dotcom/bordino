@@ -72,6 +72,10 @@ class TicketPurchaseWithNumbersSerializer(BaseModelSerializer):
     token_wallet_account_id = serializers.CharField(
         required=False, allow_null=True, write_only=True
     )
+    # The lottery and price the player saw when picking (optional for older clients): if either
+    # has changed, the purchase is refused instead of charging for a different offer.
+    lottery_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+    expected_price = serializers.IntegerField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Ticket
@@ -80,6 +84,8 @@ class TicketPurchaseWithNumbersSerializer(BaseModelSerializer):
             "reference",
             "numbers",
             "token_wallet_account_id",
+            "lottery_id",
+            "expected_price",
         )
 
     def get_reference(self, obj):
@@ -98,7 +104,7 @@ class TicketPurchaseWithNumbersSerializer(BaseModelSerializer):
             raise DRFValidationError(_("Each number in a ticket must be unique."))
         if any(not 1 <= n <= HIGHEST_NUMBER for n in numbers):
             raise DRFValidationError(_("Numbers must be between 1 and 40."))
-        return numbers
+        return sorted(numbers)
 
     def create(self, validated_data):
         request = self.context.get("request")
@@ -110,6 +116,8 @@ class TicketPurchaseWithNumbersSerializer(BaseModelSerializer):
                 customer=request.user.customer,
                 numbers=validated_data["numbers"],
                 token_wallet_account_id=validated_data.get("token_wallet_account_id"),
+                lottery_id=validated_data.get("lottery_id"),
+                expected_price=validated_data.get("expected_price"),
             )
         except DjangoValidationError as e:
             if hasattr(e, "message_dict"):

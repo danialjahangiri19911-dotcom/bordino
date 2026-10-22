@@ -3,6 +3,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -25,6 +26,12 @@ class Lottery(AbstractBaseModel):
         indexes = [
             models.Index(fields=["status"]),
             models.Index(fields=["start_date", "end_date"]),
+        ]
+        constraints = [
+            # Purchases go to "the" active lottery; two would make every purchase fail.
+            models.UniqueConstraint(
+                fields=["status"], condition=Q(status="active"), name="one_active_lottery"
+            ),
         ]
 
     name = models.CharField(verbose_name=_("name"), max_length=20)
@@ -49,9 +56,17 @@ class Lottery(AbstractBaseModel):
         blank=True,
         help_text="The 6 winning numbers (1–40), drawn by the server at settlement",
     )
+    # At least 1: a negative price would credit the buyer (the ticket signal debits -price).
     ticket_price = models.DecimalField(
-        verbose_name=_("ticket_price"), max_digits=20, decimal_places=0, default=0
+        verbose_name=_("ticket_price"),
+        max_digits=20,
+        decimal_places=0,
+        default=1,
+        validators=[MinValueValidator(1)],
     )
+    # When the server drew `numbers` (committed before any payout, so a failed payout is retried
+    # with the same numbers, never a new draw).
+    drawn_at = models.DateTimeField(null=True, blank=True, editable=False)
     status = models.CharField(
         verbose_name=_("Status"),
         max_length=20,

@@ -32,9 +32,14 @@ export function persianNumberConverter(text: string) {
 const PERSIAN_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
 
 /** تبدیلِ ارقامِ انگلیسی به فارسی برای نمایش (مثلِ ۲۰۴۸). */
-/** The whole number in a typed amount: digits of any script, separators ignored ("۱٬۰۰۰" → 1000). */
+/**
+ * The whole number in a typed amount: digits of any script, thousands separators ignored
+ * ("۱٬۰۰۰" → 1000). Anything else — a decimal point, a sign, letters — makes it NaN rather than
+ * a different number ("1.5" is not 15, "-100" is not 100).
+ */
 export function parseAmount(text: string): number {
-	return Number(persianNumberConverter(text).replace(/[^0-9]/g, ""));
+	const cleaned = persianNumberConverter(text.trim()).replace(/[\s,٬،']/g, "");
+	return /^[0-9]+$/.test(cleaned) ? Number(cleaned) : Number.NaN;
 }
 
 export function toPersianDigits(value: string | number) {

@@ -94,3 +94,120 @@ class DrawTests(TestCase):
         r = api.patch("/api/v1/lotteries/ticket/numbers/", {"numbers": [1, 2, 3, 4, 5, 41]}, format="json")
         self.assertEqual(r.status_code, 400, r.content)
         self.assertEqual(Ticket.objects.count(), 0)
+
+    def test_no_ticket_after_the_draw_even_inside_the_sales_window(self):
+        self.end_sales()
+        LotteryWinnerService(self.lottery).draw()
+        Lottery.objects.filter(pk=self.lottery.pk).update(end_date=timezone.now() + timedelta(hours=1))
+        with self.assertRaises(ValidationError):
+            self.buy([1, 2, 3, 4, 5, 6])
+
+    def test_a_failed_payout_keeps_the_draw_and_pays_nobody_twice(self):
+        self.buy([1, 2, 3, 4, 5, 6])
+        self.end_sales()
+        with mock.patch(
+            "apps.lottery.services.lottery.lottery_winner.draw_numbers",
+            return_value=[1, 20, 21, 22, 23, 24],
+        ) as drawn, mock.patch(
+            "apps.wallet.services.currency_wallet_account.transfer."
+            "CurrencyWalletAccountTransferService.send_prize_to_customer",
+            side_effect=ValidationError("Wallet has expired"),
+        ):
+            LotteryWinnerService(self.lottery).process_winners()
+        self.assertEqual(drawn.call_count, 1)
+        self.lottery.refresh_from_db()
+        self.assertEqual(
+            (self.lottery.status, self.lottery.numbers), (Lottery.Status.COMPLETED, [1, 20, 21, 22, 23, 24])
+        )
+        from apps.wallet.models import LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(LotteryPrizeTransaction.objects.get().status, "pending")
+
+    def test_a_retry_after_the_draw_uses_the_same_numbers(self):
+        self.end_sales()
+        with mock.patch(
+            "apps.lottery.services.lottery.lottery_winner.draw_numbers", return_value=[2, 3, 4, 5, 6, 7]
+        ):
+            LotteryWinnerService(self.lottery).draw()
+        with mock.patch(
+            "apps.lottery.services.lottery.lottery_winner.draw_numbers", return_value=[30, 31, 32, 33, 34, 35]
+        ):
+            LotteryWinnerService(self.lottery).process_winners()
+        self.lottery.refresh_from_db()
+        self.assertEqual(self.lottery.numbers, [2, 3, 4, 5, 6, 7])
+
+    def test_purchase_for_a_changed_offer_is_refused(self):
+        with self.assertRaises(ValidationError):
+            TicketPurchaseService().purchase_with_numbers(
+                self.player.customer, [1, 2, 3, 4, 5, 6], expected_price=5
+            )
+        with self.assertRaises(ValidationError):
+            TicketPurchaseService().purchase_with_numbers(
+                self.player.customer, [1, 2, 3, 4, 5, 6], lottery_id="00000000-0000-0000-0000-000000000000"
+            )
+        self.assertEqual(Ticket.objects.count(), 0)
+
+    def test_the_same_numbers_in_another_order_are_the_same_ticket(self):
+        self.buy([1, 2, 3, 4, 5, 6])
+        with self.assertRaises(ValidationError):
+            self.buy([6, 5, 4, 3, 2, 1])
+        self.assertEqual(Ticket.objects.count(), 1)
+
+    def test_referral_rewards_skip_the_buyer_and_stay_within_the_price(self):
+        from apps.lottery.models import ReferralRewardConfig  # pylint: disable=import-outside-toplevel
+
+        inviter = make_customer("9120000803", points=0)
+        self.player.customer.invited_by = inviter
+        self.player.customer.save(update_fields=["invited_by"])
+        inviter.customer.invited_by = self.player  # a cycle made before the check existed
+        inviter.customer.save(update_fields=["invited_by"])
+        ReferralRewardConfig.objects.bulk_create(
+            [ReferralRewardConfig(level=1, token_percentage=80), ReferralRewardConfig(level=2, token_percentage=80)]
+        )
+        before = balance.points_account(self.player).amount
+        self.buy([1, 2, 3, 4, 5, 6])
+        self.assertEqual(balance.points_account(self.player).amount, before - 10)  # no self-reward
+        self.assertEqual(balance.points_account(inviter).amount, 8)
+
+    def test_referral_percentages_cannot_exceed_100(self):
+        from apps.lottery.models import ReferralRewardConfig  # pylint: disable=import-outside-toplevel
+
+        ReferralRewardConfig.objects.create(level=1, token_percentage=70)
+        with self.assertRaises(ValidationError):
+            ReferralRewardConfig(level=2, token_percentage=40).full_clean()
+
+    def test_negative_prices_and_prizes_are_refused(self):
+        self.lottery.ticket_price = -10
+        with self.assertRaises(ValidationError):
+            self.lottery.full_clean()
+        with self.assertRaises(ValidationError):
+            PrizeRule(lottery=self.lottery, match_count=2, prize_amount=-50).full_clean()
+
+    def test_only_one_lottery_can_be_active(self):
+        from django.db import IntegrityError  # pylint: disable=import-outside-toplevel
+
+        # save() validates first (ValidationError); the database constraint backs it (IntegrityError).
+        with self.assertRaises((IntegrityError, ValidationError)):
+            Lottery.objects.create(
+                name="second", owner=self.lottery.owner, token=self.lottery.token, ticket_price=10,
+                status=Lottery.Status.ACTIVE, start_date=self.lottery.start_date, end_date=self.lottery.end_date,
+            )
+
+
+@override_settings(CACHES=LOCMEM)
+class ReferralCycleTests(TestCase):
+    def test_an_invitee_cannot_become_their_inviters_inviter(self):
+        a = make_customer("9120000811")
+        b = make_customer("9120000812")
+        b.customer.invited_by = a
+        b.customer.save(update_fields=["invited_by"])
+        from apps.user_management.services.user.registration import (  # pylint: disable=import-outside-toplevel
+            UserRegistrationService,
+        )
+
+        with self.assertRaises(ValueError):
+            UserRegistrationService()._validate_and_store_referral_code(  # pylint: disable=protected-access
+                b.customer.referral_code, a
+            )
+        a.customer.refresh_from_db()
+        self.assertIsNone(a.customer.invited_by)

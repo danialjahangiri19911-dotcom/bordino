@@ -9,6 +9,10 @@ export interface Lottery {
 	token: string;
 	/** «مبلغ جایزه» (۲ × امتیازهای خرج‌شده برای خرید بلیط) به تومان */
 	balance_in_money: string;
+	/** Points per ticket (sent back with a purchase: a changed price is refused, not charged). */
+	ticket_price: string;
+	/** Toman per ticket for each number of matching balls (6 = jackpot, shared remainder). */
+	prize_rules: { match_count: number; prize_amount: string }[];
 }
 
 interface LotteryListResponse {

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -103,6 +104,38 @@ class WithdrawTests(TestCase):
         tx.status = CurrencyTransaction.Status.FAILED
         with self.assertRaises(ValidationError):
             tx.full_clean()
+
+    def test_deleting_a_stale_copy_after_a_refund_refunds_nothing_more(self):
+        self.withdraw(40_000)
+        stale = CurrencyTransaction.objects.get()
+        fresh = CurrencyTransaction.objects.get()
+        fresh.status = CurrencyTransaction.Status.FAILED
+        fresh.save()
+        stale.delete()  # still says "pending" in memory
+        self.assertEqual(rial(self.user), 100_000)
+
+    def test_an_edited_amount_is_not_what_gets_refunded(self):
+        self.withdraw(40_000)
+        tx = CurrencyTransaction.objects.get()
+        tx.amount = 90_000
+        tx.status = CurrencyTransaction.Status.FAILED
+        with self.assertRaises(ValidationError):  # the edit itself is refused
+            tx.save()
+        # Even bypassing validation, the refund is the stored reservation, not the edit.
+        CurrencyTransaction.objects.filter(pk=tx.pk).update(status="pending")
+        tx = CurrencyTransaction.objects.get()
+        tx.status = CurrencyTransaction.Status.FAILED
+        tx.amount = 90_000
+        with mock.patch.object(CurrencyTransaction, "full_clean"):
+            tx.save()
+        self.assertEqual(rial(self.user), 100_000)
+        tx.refresh_from_db()
+        self.assertEqual(tx.amount, 40_000)
+
+    def test_the_same_request_id_with_other_details_is_a_conflict(self):
+        self.assertEqual(self.withdraw(30_000, request_id="r-1").status_code, 201)
+        self.assertEqual(self.withdraw(50_000, request_id="r-1").status_code, 409)
+        self.assertEqual(rial(self.user), 70_000)
 
     def test_another_users_bank_account_is_refused(self):
         other = make_customer("9120000702")
@@ -293,3 +326,49 @@ class IbanTests(TestCase):
         self.assertTrue(is_valid_iban(normalize_iban("۰۶۲۹۶۰۰۰۰۰۰۰۱۰۰۳۲۴۲۰۰۰۰۱")))
         self.assertFalse(is_valid_iban(normalize_iban("IR" + "0" * 24)))
         self.assertFalse(is_valid_iban(normalize_iban("x")))
+
+
+@override_settings(CACHES=LOCMEM)
+class GuardTests(TestCase):
+    def test_an_activity_is_rewarded_once_per_customer_in_the_database(self):
+        from django.db import IntegrityError, transaction  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models import ActivityTransaction  # pylint: disable=import-outside-toplevel
+
+        user = make_customer("9120000751")
+        ActivityTransaction.objects.create(customer=user.customer, section="sudoku", action_type="win_game")
+        with self.assertRaises((IntegrityError, ValidationError)), transaction.atomic():
+            ActivityTransaction.objects.create(customer=user.customer, section="sudoku", action_type="win_game")
+
+    def test_games_refuse_an_inactive_points_account(self):
+        from apps.crash.services import rounds  # pylint: disable=import-outside-toplevel
+
+        user = make_customer("9120000752", points=500)
+        TokenWalletAccount.objects.filter(wallet__owner=user).update(status="blocked")
+        with self.assertRaises(rounds.CrashError):
+            rounds.place_bet(user, 10, None)
+        self.assertEqual(points(user), 500)
+
+    def test_wheel_spin_limit_holds_in_the_spin_itself(self):
+        from apps.lottery.services.lottery.lottery_wheel import (  # pylint: disable=import-outside-toplevel
+            LotteryWheelService,
+        )
+
+        user = make_customer("9120000753", points=100)
+        sponsor = Sponsor.objects.create(user=make_customer("9120000754"))
+        wheel = LotteryWheel.objects.create(
+            name="w", owner=sponsor, cost_per_spin=10, max_spins=100, max_spins_per_customer=1
+        )
+        LotteryWheelPrize.objects.create(
+            lottery_wheel=wheel, name="empty", prize_amount=0, probability=100,
+            prize_type=LotteryWheelPrize.PrizeType.EMPTY,
+        )
+        service = LotteryWheelService()
+        dto = service.SpinWheelDTO(
+            customer=user.customer, lottery_wheel=wheel,
+            token_wallet_account=balance.points_account(user), multiplier=1,
+        )
+        service.spin_wheel(dto)
+        with self.assertRaises(ValidationError):
+            service.spin_wheel(dto)  # both passed the serializer's check
+        self.assertEqual(points(user), 90)

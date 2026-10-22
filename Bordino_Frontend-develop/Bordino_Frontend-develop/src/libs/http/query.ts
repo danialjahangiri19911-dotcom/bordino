@@ -72,7 +72,12 @@ async function refreshAccessToken(refreshToken: string) {
 
 			return { newAccessToken: access, newRefreshToken: refresh };
 		} catch (error: any) {
-			if (error.response?.status === 401) {
+			// Only the session this refresh belonged to ends: if someone logged in meanwhile
+			// (another tab), their newer session stays.
+			if (
+				error.response?.status === 401 &&
+				useAuthStore.getState().refreshToken === stored.refreshToken
+			) {
 				useAuthStore.getState().logout();
 				useUserStore.getState().clearUser();
 			}

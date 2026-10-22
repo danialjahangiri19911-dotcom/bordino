@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
+import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
 import useExtractLotteryTickets from "@/api/lottery/utils/useExtractLotteryTickets";
 import { LOTTERY as LOTTERY_URL } from "@/api/urls";
 import { LOTTERY, TICKET_DETAIL, WALLET } from "@/constants/routes";
@@ -79,7 +80,7 @@ export default function useButTicket() {
 
 	const { submitHandler, isSending } = useMutate<
 		ResponseApiData<BuyTicketResponse>,
-		{ numbers: number[] }
+		{ numbers: number[]; lottery_id?: string; expected_price?: number }
 	>({
 		url: LOTTERY_URL.BUY_TICKET_NUMBERS,
 		method: "PATCH",
@@ -87,9 +88,16 @@ export default function useButTicket() {
 		onError: handleButTicketError,
 	});
 
+	// The lottery and price on screen go along: if either changed meanwhile, the server refuses
+	// instead of charging for a different offer.
+	const { activeLotteries } = useExtractLotteries();
 	const handleSubmit = useCallback(() => {
-		submitHandler({ numbers: selectedBalls });
-	}, [selectedBalls, submitHandler]);
+		submitHandler({
+			numbers: selectedBalls,
+			lottery_id: activeLotteries?.id,
+			expected_price: activeLotteries ? Number(activeLotteries.ticket_price) : undefined,
+		});
+	}, [activeLotteries, selectedBalls, submitHandler]);
 
 	const handleBack = () => {
 		push(WALLET.path);

@@ -1,10 +1,21 @@
 import { useMemo } from "react";
 
 import useGetLotteryList from "@/api/lottery/hooks/useGetLotteryList";
+import type { Lottery, LotteryListApiResponse } from "@/api/lottery/types/getLotteryListType";
+import type { Res } from "@/libs/http/query";
 import { getRemainingSeconds } from "@/libs/utils/date";
 
 export default function useExtractLotteries() {
-	const { data: lotteries } = useGetLotteryList();
+	// While a lottery's sales have closed but it is not settled yet, ask again every 30 s so the
+	// result shows up without leaving the page.
+	const { data: lotteries } = useGetLotteryList({
+		refetchInterval: (query: { state: { data?: Res<LotteryListApiResponse> } }) => {
+			const active = query.state.data?.data?.result?.results?.find(
+				(lottery: Lottery) => lottery.status === "active",
+			);
+			return active && new Date(active.end_date).getTime() <= Date.now() ? 30_000 : false;
+		},
+	});
 
 	const lotteryData = useMemo(() => {
 		if (!lotteries?.result.results) return [];

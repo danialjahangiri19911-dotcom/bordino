@@ -10,6 +10,7 @@ from django.db.models import Q
 
 from apps.crash.models import ChickenRound, CrashRound
 from apps.lottery.models import LotteryWheelPrize, LotteryWheelSpinLog
+from apps.users.models import ProfileReward
 from apps.wallet.models import (
     ActivityTransaction,
     CurrencyTransaction,
@@ -20,6 +21,7 @@ from apps.wallet.models import (
     ReferralRewardTransaction,
     TokenTransaction,
 )
+from apps.wallet.services.balance import POINTS_SYMBOL
 
 GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸"}
 ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸"}
@@ -93,27 +95,33 @@ def points_history(user, token_account=None):
             _row(t.id, "points_transfer", "انتقال امتیاز", t.amount, incoming, t.create_time, _logo(t.token))
         )
 
-    for t in ActivityTransaction.objects.filter(
-        customer=customer, status=ActivityTransaction.Status.COMPLETED, score_value__gt=0
-    ):
-        title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
-        rows.append(_row(t.id, "activity_reward", title, t.score_value, True, t.create_time))
+    # These always move the points (L) account: listed for it, not for another token's account.
+    if token_account is None or token_account.token.symbol == POINTS_SYMBOL:
+        for t in ActivityTransaction.objects.filter(
+            customer=customer, status=ActivityTransaction.Status.COMPLETED, score_value__gt=0
+        ):
+            title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
+            rows.append(_row(t.id, "activity_reward", title, t.score_value, True, t.create_time))
 
-    for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):
-        rows.append(
-            _row(c.id, "game_play", GAME_TITLES.get(c.game_name, "بازی"), c.cost, False, c.create_time)
-        )
+        for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):
+            title = GAME_TITLES.get(c.game_name, "بازی")
+            rows.append(_row(c.id, "game_play", title, c.cost, False, c.create_time))
 
-    for s in LotteryWheelSpinLog.objects.filter(customer=customer, cost__gt=0).select_related(
-        "lottery_wheel"
-    ):
-        rows.append(_row(s.id, "wheel_spin", "چرخش گردونه", s.cost, False, s.create_time))
+        for s in LotteryWheelSpinLog.objects.filter(customer=customer, cost__gt=0):
+            rows.append(_row(s.id, "wheel_spin", "چرخش گردونه", s.cost, False, s.create_time))
 
-    for t in LotteryWheelPrizeTransaction.objects.filter(customer=customer).select_related("prize"):
-        kind = t.prize_type or t.prize.prize_type
-        if kind == LotteryWheelPrize.PrizeType.RECHARGE:
-            amount = t.amount if t.amount is not None else t.prize.prize_amount
-            rows.append(_row(t.id, "wheel_prize", "جایزهٔ گردونه", amount, True, t.create_time))
+        for t in LotteryWheelPrizeTransaction.objects.filter(customer=customer).select_related(
+            "prize"
+        ):
+            kind = t.prize_type or t.prize.prize_type
+            if kind == LotteryWheelPrize.PrizeType.RECHARGE:
+                amount = t.amount if t.amount is not None else t.prize.prize_amount
+                rows.append(_row(t.id, "wheel_prize", "جایزهٔ گردونه", amount, True, t.create_time))
+
+        for r in ProfileReward.objects.filter(customer=customer, points__gt=0):
+            rows.append(
+                _row(r.id, "profile_reward", "پاداش تکمیل پروفایل", r.points, True, r.create_time)
+            )
 
     crash = CrashRound.objects.filter(customer=customer)
     chicken = ChickenRound.objects.filter(customer=customer)

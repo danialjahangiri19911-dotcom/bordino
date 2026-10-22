@@ -47,9 +47,24 @@ class CurrencyWithdrawViewSet(ViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if request_id and CurrencyTransaction.objects.filter(
-                source_wallet=currency_account, request_id=request_id
-            ).exists():
+            earlier = (
+                CurrencyTransaction.objects.filter(
+                    source_wallet=currency_account, request_id=request_id
+                ).first()
+                if request_id
+                else None
+            )
+            if earlier:
+                # The same withdrawal again (its answer was lost): the first result. The same id
+                # with a different amount or bank account is not a retry — refuse it.
+                same = int(earlier.amount) == amount and str(earlier.bank_account_id) == str(
+                    serializer.validated_data["bank_account_id"]
+                )
+                if not same:
+                    return Response(
+                        {"error": _("This withdrawal was already requested with other details.")},
+                        status=status.HTTP_409_CONFLICT,
+                    )
                 return Response(
                     {"message": _("Withdrawal request created")}, status=status.HTTP_201_CREATED
                 )

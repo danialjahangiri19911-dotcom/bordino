@@ -25,13 +25,19 @@ class TicketPurchaseService:
         self.transaction_service = TransactionService()
 
     def _get_referral_chain(self, customer, max_level=2):
-        """Get the chain of inviters up to max_level"""
+        """Get the chain of inviters up to max_level — never the buyer, never anyone twice (two
+        accounts that invited each other would otherwise reward the buyer for their own ticket)."""
         referral_chain = []
+        seen = {customer.pk}
         current_user = customer.user
         current_level = 1
 
         while current_user.customer.invited_by and current_level <= max_level:
-            referral_chain.append((current_level, current_user.customer.invited_by.customer))
+            inviter = current_user.customer.invited_by.customer
+            if inviter.pk in seen:
+                break
+            seen.add(inviter.pk)
+            referral_chain.append((current_level, inviter))
             current_user = current_user.customer.invited_by
             current_level += 1
 
@@ -49,15 +55,32 @@ class TicketPurchaseService:
         except ReferralRewardConfig.DoesNotExist:
             return 0
 
-    def _calculate_total_referral_tokens(self, required_tokens: int, referral_chain) -> int:
-        """Calculate total tokens that will be given to referrers"""
-        total_referral_tokens = 0
-        for level, __ in referral_chain:
-            reward_tokens = self._calculate_referral_reward_tokens(required_tokens, level)
-            total_referral_tokens += reward_tokens
-        return total_referral_tokens
+    def _referral_rewards(self, required_tokens: int, referral_chain) -> list:
+        """(level, referrer, tokens) for each referrer, computed once. Together they never exceed
+        what the buyer paid, whatever the configured percentages add up to."""
+        rewards, budget = [], required_tokens
+        for level, referrer in referral_chain:
+            tokens = min(self._calculate_referral_reward_tokens(required_tokens, level), budget)
+            budget -= tokens
+            rewards.append((level, referrer, tokens))
+        return rewards
 
-    def purchase_with_numbers(self, customer: Customer, numbers, token_wallet_account_id=None):
+    def _check_offer(self, lottery, lottery_id=None, expected_price=None):
+        # "active" until the draw job runs, which can be minutes after the end time: tickets are
+        # sold only between start and end.
+        if not lottery.is_active:
+            raise ValidationError(_("Ticket sales for this lottery are closed."))
+        # The player picked numbers for a given lottery at a given price; if it has changed
+        # meanwhile (one ended, another began), they must see the new offer first.
+        if lottery_id and str(lottery.pk) != str(lottery_id):
+            raise ValidationError(_("This lottery has ended; a new one has started."))
+        if expected_price is not None and int(lottery.ticket_price) != int(expected_price):
+            raise ValidationError(_("The ticket price has changed."))
+
+    def purchase_with_numbers(
+        self, customer: Customer, numbers, token_wallet_account_id=None, lottery_id=None,
+        expected_price=None,
+    ):
         """Create and pay for a single ticket with the given numbers in one atomic
         step.
 
@@ -65,6 +88,8 @@ class TicketPurchaseService:
         referrers are rewarded and the lottery balance is credited together, or
         nothing happens at all.
         """
+        # One order for every combination (the draw ignores order): 6,5,4,3,2,1 is 1,2,3,4,5,6.
+        numbers = sorted(numbers)
         try:
             lottery = Lottery.objects.get(status=Lottery.Status.ACTIVE)
         except Lottery.MultipleObjectsReturned as e:
@@ -73,10 +98,7 @@ class TicketPurchaseService:
             ) from e
         except Lottery.DoesNotExist as e:
             raise ValidationError(_("No active lottery found.")) from e
-        # "active" until the draw job runs, which can be minutes after the end time: tickets are
-        # sold only between start and end.
-        if not lottery.is_active:
-            raise ValidationError(_("Ticket sales for this lottery are closed."))
+        self._check_offer(lottery, lottery_id, expected_price)
 
         if token_wallet_account_id:
             try:
@@ -121,6 +143,13 @@ class TicketPurchaseService:
 
         try:
             with transaction.atomic():
+                # The lottery first, as settlement does: a purchase and the draw never overlap
+                # (a ticket paid for after the draw would never be settled), and purchases are
+                # serialised, so referral credits to each other's accounts cannot deadlock.
+                lottery = Lottery.objects.select_for_update().get(pk=lottery.pk)
+                if lottery.status != Lottery.Status.ACTIVE or lottery.drawn_at:
+                    raise ValidationError(_("Ticket sales for this lottery are closed."))
+                self._check_offer(lottery, lottery_id, expected_price)
                 # The check above ran on a plain read; two purchases at once could both pass it.
                 # Again under the row lock, which holds until this transaction (and the debit
                 # its signal makes) commits.
@@ -149,15 +178,9 @@ class TicketPurchaseService:
                     status=LotteryTicketTransaction.Status.COMPLETED,
                 )
 
-                total_referral_tokens = self._calculate_total_referral_tokens(
-                    amount, referral_chain
-                )
-                self._process_referral_rewards(
-                    token=token,
-                    required_tokens=amount,
-                    referral_chain=referral_chain,
-                    ticket=ticket,
-                )
+                rewards = self._referral_rewards(amount, referral_chain)
+                total_referral_tokens = sum(tokens for _level, _ref, tokens in rewards)
+                self._process_referral_rewards(token=token, rewards=rewards, ticket=ticket)
 
                 lottery_tokens = amount - total_referral_tokens
                 Lottery.objects.filter(id=lottery.id).update(
@@ -170,15 +193,11 @@ class TicketPurchaseService:
 
         return ticket
 
-    def _process_referral_rewards(
-        self, token, required_tokens: int, referral_chain: list, ticket: Ticket
-    ):
-        """Process token rewards for all eligible referrers"""
+    def _process_referral_rewards(self, token, rewards: list, ticket: Ticket):
+        """Pay the rewards computed by `_referral_rewards` (the same amounts the pool is
+        reduced by)."""
 
-        for level, referrer in referral_chain:
-            # Calculate reward tokens
-            reward_tokens = self._calculate_referral_reward_tokens(required_tokens, level)
-
+        for level, referrer, reward_tokens in rewards:
             if reward_tokens > 0:
                 # Get or create referrer's wallet account for this token
                 referrer_wallet = (

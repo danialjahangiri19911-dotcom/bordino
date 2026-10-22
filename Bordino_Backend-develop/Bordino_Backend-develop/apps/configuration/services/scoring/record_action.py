@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 from apps.configuration.repositories.game import GameConfigurationQueryRepository
 from apps.configuration.services.scoring.dto import AwardScoreDTO
@@ -64,15 +66,29 @@ class RecordActionService:
             raise ValueError("Play the game before its rewards can be recorded")
 
         score_service = ScoreService()
-        activity_transaction = score_service.award_score(
-            AwardScoreDTO(
-                user=user,
-                section=section,
-                action_type=action_type,
-                metadata=metadata,
-                description=description,
+        try:
+            activity_transaction = score_service.award_score(
+                AwardScoreDTO(
+                    user=user,
+                    section=section,
+                    action_type=action_type,
+                    metadata=metadata,
+                    description=description,
+                )
             )
-        )
+        except (IntegrityError, ValidationError):
+            # Another claim for the same action got there first (unique per customer): one
+            # reward, and this request reports it like any repeat.
+            existing = ActivityTransactionQueryRepository.get_by_customer_section_action(
+                customer=customer, section=section, action_type=action_type
+            )
+            if existing is None:
+                raise
+            return RecordActionResult(
+                activity_transaction=existing,
+                already_exists=True,
+                message="Action already recorded",
+            )
 
         return RecordActionResult(
             activity_transaction=activity_transaction,

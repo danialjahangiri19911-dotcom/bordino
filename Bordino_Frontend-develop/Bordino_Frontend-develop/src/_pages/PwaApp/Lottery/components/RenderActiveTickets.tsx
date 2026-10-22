@@ -16,12 +16,15 @@ interface Props {
 	ballSx?: BoxProps["sx"];
 	sx?: BoxProps["sx"];
 	data?: LotteryTicketsApiResponse;
+	/** No lottery is running: there is nothing to buy tickets for (rather than a blank tab). */
+	noLottery?: boolean;
 }
 
 export default function RenderActiveTickets({
 	ballSx,
 	sx,
 	data,
+	noLottery = false,
 }: Readonly<Props>) {
 	const { push } = useRouter();
 
@@ -33,7 +36,13 @@ export default function RenderActiveTickets({
 				</>
 			)}
 
-			{data && !data.result?.length && (
+			{noLottery && (
+				<Typography variant="14-regular" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
+					قرعه‌کشی فعالی نیست؛ با شروع قرعه‌کشی بعدی می‌توانید بلیط بخرید.
+				</Typography>
+			)}
+
+			{!noLottery && data && !data.result?.length && (
 				<Typography variant="14-regular" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
 					هنوز بلیطی نخریده‌اید.
 				</Typography>

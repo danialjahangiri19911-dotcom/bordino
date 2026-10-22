@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -22,6 +23,20 @@ class ReferralRewardConfig(AbstractBaseModel):
         help_text=_("Percentage of required tokens to reward"),
     )
     is_active = models.BooleanField(verbose_name=_("Is Active"), default=True)
+
+    def clean(self):
+        super().clean()
+        # All levels together may give away at most what the buyer paid.
+        others = (
+            ReferralRewardConfig.objects.filter(is_active=True)
+            .exclude(pk=self.pk)
+            .aggregate(total=models.Sum("token_percentage"))["total"]
+            or 0
+        )
+        if self.is_active and others + self.token_percentage > 100:
+            raise ValidationError(
+                {"token_percentage": _("All active levels together cannot exceed 100%.")}
+            )
 
     def __str__(self):
         return f"Level {self.level}: {self.token_percentage}% tokens"

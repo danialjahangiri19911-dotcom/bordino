@@ -20,7 +20,7 @@ export default function useLottery() {
 	const lotteryTabs = [
 		{
 			label: "بلیط‌های من",
-			content: <RenderActiveTickets data={lotteryTickets} />,
+			content: <RenderActiveTickets data={lotteryTickets} noLottery={!activeLotteries} />,
 		},
 		{
 			label: "قرعه‌کشی‌های قبلی",

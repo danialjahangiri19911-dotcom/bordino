@@ -1,8 +1,9 @@
 from django.db import connection, transaction
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from apps.wallet.models.transactions.activity import ActivityTransaction
+from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
 from apps.wallet.models.transactions.currency import CurrencyTransaction
 from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransaction
 from apps.wallet.models.transactions.referral import ReferralRewardTransaction
@@ -213,31 +214,60 @@ def _is_withdrawal(instance):
     return instance.source_wallet_id is not None and instance.bank_account_id is not None
 
 
+_RESERVATION = ("status", "amount", "source_wallet_id", "bank_account_id")
+
+
+def _stored(instance):
+    """The transaction as stored, locked until the caller's transaction commits (the admin saves
+    and deletes inside one): what a refund is based on, never the possibly stale or edited
+    in-memory copy."""
+    rows = CurrencyTransaction.objects.filter(pk=instance.pk)
+    if connection.in_atomic_block:
+        rows = rows.select_for_update()
+    return rows.values(*_RESERVATION).first()
+
+
 @receiver(pre_save, sender=CurrencyTransaction)
 def store_previous_status_currency(sender, instance, **kwargs):
-    instance._previous_status = None
-    if instance.pk:
-        # Locked until the save commits (the admin saves inside a transaction): two admins
-        # saving "failed" at once refund once, the second sees "failed" as the previous status.
-        rows = CurrencyTransaction.objects.filter(pk=instance.pk)
-        if connection.in_atomic_block:
-            rows = rows.select_for_update()
-        instance._previous_status = rows.values_list("status", flat=True).first()
+    instance._stored = _stored(instance) if instance.pk else None
+    instance._previous_status = instance._stored["status"] if instance._stored else None
+    if instance._stored:
+        # What was reserved does not change after the request: amount, account and bank stay.
+        instance.amount = instance._stored["amount"]
+        instance.source_wallet_id = instance._stored["source_wallet_id"]
+        instance.bank_account_id = instance._stored["bank_account_id"]
+
+
+def _refund(stored):
+    account = CurrencyWalletAccount.objects.filter(pk=stored["source_wallet_id"]).first()
+    if account:
+        balance.add_currency(account, stored["amount"])
 
 
 @receiver(post_save, sender=CurrencyTransaction)
 def refund_failed_withdrawal(sender, instance, created, **kwargs):
-    if created or not _is_withdrawal(instance):
+    stored = getattr(instance, "_stored", None)
+    if created or not stored or stored["bank_account_id"] is None:
         return
     given_back = (CurrencyTransaction.Status.FAILED, CurrencyTransaction.Status.CANCELLED)
-    if (
-        getattr(instance, "_previous_status", None) == CurrencyTransaction.Status.PENDING
-        and instance.status in given_back
-    ):
-        balance.add_currency(instance.source_wallet, instance.amount)
+    if stored["status"] == CurrencyTransaction.Status.PENDING and instance.status in given_back:
+        _refund(stored)
+
+
+@receiver(pre_delete, sender=CurrencyTransaction)
+def store_deleted_withdrawal(sender, instance, **kwargs):
+    instance._stored = _stored(instance)
 
 
 @receiver(post_delete, sender=CurrencyTransaction)
 def refund_deleted_pending_withdrawal(sender, instance, **kwargs):
-    if _is_withdrawal(instance) and instance.status == CurrencyTransaction.Status.PENDING:
-        balance.add_currency(instance.source_wallet, instance.amount)
+    # By the stored status: a copy loaded before another admin marked it failed (refunded) or
+    # completed (paid) must not refund again.
+    stored = getattr(instance, "_stored", None)
+    if (
+        stored
+        and stored["bank_account_id"] is not None
+        and stored["source_wallet_id"] is not None
+        and stored["status"] == CurrencyTransaction.Status.PENDING
+    ):
+        _refund(stored)

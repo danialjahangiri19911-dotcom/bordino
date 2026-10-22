@@ -42,7 +42,7 @@ class TicketCRUDView(
 
     @extend_schema(
         summary="Buy a ticket with chosen numbers",
-        description="Create and pay for one ticket with 6 numbers (each between 1 and 100). "
+        description="Create and pay for one ticket with 6 different numbers (each 1–40). "
         "Points are deducted atomically as the ticket is created.",
         request=TicketPurchaseWithNumbersSerializer,
         responses={

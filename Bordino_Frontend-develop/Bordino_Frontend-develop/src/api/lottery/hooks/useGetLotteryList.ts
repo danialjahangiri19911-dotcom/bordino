@@ -7,7 +7,8 @@ export default function useGetLotteryList(
 	props: ExtendableOptions<LotteryListApiResponse> = {},
 ) {
 	const { data, isLoading, error, refetch } = useQuery<LotteryListApiResponse>({
-		url: LOTTERY.GET_LOTTERY_LIST,
+		// Every lottery (the server's maximum page), not the first 20: older results stay reachable.
+		url: `${LOTTERY.GET_LOTTERY_LIST}?page_size=100`,
 		headers: true,
 		...props,
 	});

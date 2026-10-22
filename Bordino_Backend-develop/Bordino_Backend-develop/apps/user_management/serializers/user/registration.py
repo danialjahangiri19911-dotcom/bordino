@@ -4,6 +4,7 @@ from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from apps.django_helper.drf.serializers import BaseModelSerializer
+from apps.user_management.services.otp.otp import OtpNotSent
 from apps.user_management.services.user.registration import UserRegistrationService
 
 User = get_user_model()
@@ -21,11 +22,16 @@ class UserRegistrationSerializer(BaseModelSerializer):
         fields = ("phone_number",)
 
     def create(self, validated_data):
-        user, created = self.user_registration_service.register(
-            self.user_registration_service.RegisterDTO(
-                validated_data["phone_number"],
+        try:
+            user, created = self.user_registration_service.register(
+                self.user_registration_service.RegisterDTO(
+                    validated_data["phone_number"],
+                )
             )
-        )
+        except OtpNotSent as exc:
+            raise serializers.ValidationError(
+                _("The SMS could not be sent. Please try again in a moment.")
+            ) from exc
 
         return {"user": user, "created": created}
 

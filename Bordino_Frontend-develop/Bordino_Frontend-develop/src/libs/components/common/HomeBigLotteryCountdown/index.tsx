@@ -30,17 +30,19 @@ export default function HomeBigLotteryCountdown({
 }: Readonly<Props>) {
 	const [count, setCount] = useState<number>(remainingTime);
 
+	// Counted down to a fixed moment, not one second per tick: a phone that slept or a tab in
+	// the background shows the right time again as soon as it is back.
 	useEffect(() => {
-		setCount(remainingTime);
+		const deadline = Date.now() + remainingTime * 1000;
+		const tick = () => setCount(Math.max(0, Math.round((deadline - Date.now()) / 1000)));
+		tick();
+		const interval = setInterval(tick, 1000);
+		document.addEventListener("visibilitychange", tick);
+		return () => {
+			clearInterval(interval);
+			document.removeEventListener("visibilitychange", tick);
+		};
 	}, [remainingTime]);
-
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setCount((prev) => (prev > 0 ? prev - 1 : 0));
-		}, 1000);
-
-		return () => clearInterval(interval);
-	}, []);
 
 	const formatTime = useShowRemainingTime({ seconds: count });
 

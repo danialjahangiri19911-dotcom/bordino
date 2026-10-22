@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils.translation import gettext_lazy as _
 
 from apps.lottery.models import (
@@ -92,6 +92,22 @@ class LotteryWheelService:
         prizes = dto.lottery_wheel.lottery_wheel_prizes.all()
 
         self._validate_prizes(prizes)
+
+        # The spin limits again, under the wheel's row lock (wheel first, then the account, the
+        # same order everywhere): two requests that both passed the serializer's check must not
+        # both spin past the limit.
+        wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
+        total = LotteryWheelSpin.objects.filter(lottery_wheel=wheel).aggregate(n=Sum("count"))["n"] or 0
+        if total >= wheel.max_spins:
+            raise ValidationError(_("Maximum spins for this wheel has been reached"))
+        mine = (
+            LotteryWheelSpin.objects.filter(lottery_wheel=wheel, customer=dto.customer)
+            .values_list("count", flat=True)
+            .first()
+            or 0
+        )
+        if mine >= wheel.max_spins_per_customer:
+            raise ValidationError(_("You have reached your maximum spins for this wheel"))
 
         # Locked, checked and debited in one go: two spins at once cannot both pass the check,
         # and no other change to the account is overwritten.

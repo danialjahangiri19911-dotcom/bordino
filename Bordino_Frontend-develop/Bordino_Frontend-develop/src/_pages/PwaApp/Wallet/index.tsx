@@ -28,6 +28,7 @@ import BasicTabs from "@/libs/components/Tabs";
 import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
 import Back from "@/libs/components/layouts/PwaAppLayout/customRightActions/Back";
 import { isoStringToString } from "@/libs/utils/date";
+import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
 
 export default function Wallet() {
 	const [metaData, setMetaData] = useState<WalletSchema>();
@@ -131,10 +132,9 @@ export default function Wallet() {
 		const currentPoints = Number(pointsWallet?.current_points);
 		const requiredPoints = Number(pointsWallet?.required_points);
 		const remainingPoints = Number(pointsWallet?.remaining_points);
-		const expireDate = isoStringToString(pointsWallet?.expire_time, true, false)
-			.split("/")
-			.slice(0, 2)
-			.join(".");
+		const expireDate = toPersianDigits(
+			isoStringToString(pointsWallet?.expire_time, true, false),
+		);
 
 		const progressPercentage =
 			requiredPoints > 0
@@ -243,7 +243,7 @@ export default function Wallet() {
 							امتیاز باقیمانده برای گرفتن بلیط : {remainingPoints}
 						</Typography>
 						<Typography variant="12-regular" color="rgba(113, 113, 113, 1)">
-							تاریخ انقصا: {expireDate}
+							تاریخ انقضا: {expireDate}
 						</Typography>
 						<Box display="flex" justifyContent="center">
 							<Button

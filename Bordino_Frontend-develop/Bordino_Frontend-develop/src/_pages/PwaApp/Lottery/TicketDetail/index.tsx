@@ -13,6 +13,7 @@ import useGetTicketDetail from "@/api/lottery/hooks/useGetTIcketDetail";
 import { TICKET_DETAIL as TicketDetailImage } from "@/constants/imagePaths";
 import { BUY_TICKET, LOTTERY } from "@/constants/routes";
 import ImageBox from "@/libs/components/ImageBox";
+import LoadState from "@/libs/components/common/LoadState";
 import Box from "@/libs/components/atoms/Box";
 import Button from "@/libs/components/atoms/Button";
 import Divider from "@/libs/components/atoms/Divider";
@@ -49,7 +50,7 @@ export default function TicketDetail() {
 	const { id } = useParams<{ id: string }>();
 	const { push, back } = useRouter();
 	const searchParams = useSearchParams();
-	const { data, isLoading } = useGetTicketDetail({ id });
+	const { data, isLoading, error, refetch } = useGetTicketDetail({ id });
 
 	// این صفحه دو حالت دارد:
 	//  - جریانِ خرید (وقتی پارامترِ count در URL هست): نوار پیشرفت و دکمهٔ «ثبت بلیط بعدی»
@@ -85,7 +86,11 @@ export default function TicketDetail() {
 	const ballNumbers = data?.result?.numbers || [];
 
 	if (isLoading || !data) {
-		return null;
+		return (
+			<PwaAppPageLayout>
+				<LoadState loading={isLoading || !error} error={error} onRetry={() => refetch()} />
+			</PwaAppPageLayout>
+		);
 	}
 
 	// ───────────────────────── حالتِ مشاهده (فیگما) ─────────────────────────

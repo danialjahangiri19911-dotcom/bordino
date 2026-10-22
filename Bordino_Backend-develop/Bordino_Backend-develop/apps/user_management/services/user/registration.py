@@ -10,7 +10,7 @@ from apps.user_management.repositories.otp.command import OTPCommandRepository
 from apps.user_management.repositories.referral_code.command import ReferralCodeCommandRepository
 from apps.user_management.repositories.user.command import UserCommandRepository
 from apps.user_management.repositories.user.query import UserQueryRepository
-from apps.user_management.services.otp.otp import OTPService
+from apps.user_management.services.otp.otp import OtpNotSent, OTPService
 from apps.users.models.customer import Customer
 from apps.users.models.user import User
 from apps.wallet.services.currency_wallet_account.creation import (
@@ -103,6 +103,13 @@ class UserRegistrationService:
 
             if referrer_customer.user == user:
                 raise ValueError("Cannot use your own referral code")
+            # Nor anyone this user (directly or further up) invited: A→B→A would make the buyer
+            # their own referrer.
+            ancestor, hops = referrer_customer, 0
+            while ancestor.invited_by_id and hops < 20:
+                if ancestor.invited_by_id == user.pk:
+                    raise ValueError("Referral cycle")
+                ancestor, hops = ancestor.invited_by.customer, hops + 1
 
             if not referrer_customer.user.is_active:
                 raise ValueError("Referrer is not active")
@@ -151,8 +158,10 @@ class UserRegistrationService:
 
     def _send_sms(self, phone_number, code):
         if not self.otp_service.send_otp(phone_number, code):
-            # Not sent: drop the code so «ارسال مجدد» works right away instead of after its TTL.
+            # Not sent: drop the code and fail the registration (its transaction rolls back the
+            # new account), so the player sees the error and simply tries again.
             self.otp_command_repository.delete_otp(phone_number)
+            raise OtpNotSent()
 
     def _create_wallet_for_user(self, user: User):
         wallet = self.wallet_service.create_wallet(self.wallet_service.CreateWalletDTO(user))
