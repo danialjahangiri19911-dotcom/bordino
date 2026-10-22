@@ -9,12 +9,15 @@ from apps.lottery.models import LotteryWheelSpin
 from apps.lottery.serializers.lottery_wheel_prize.minimal import LotteryWheelPrizeMinimalSerializer
 from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService
 from apps.wallet.models import TokenWalletAccount
+from apps.wallet.services import balance
 from apps.wallet.services.utils import get_max_negative_limit, would_deduction_exceed_negative_limit
 
 
 class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
+    # Accepted for old clients and ignored: the spin is always paid from the player's own points
+    # account, which the server picks (an id from the client could name anyone's account).
     token_wallet_account = serializers.PrimaryKeyRelatedField(
-        queryset=TokenWalletAccount.objects.all(), write_only=True
+        queryset=TokenWalletAccount.objects.all(), write_only=True, required=False
     )
     multiplier = serializers.IntegerField(
         min_value=1, max_value=5, default=1, write_only=True, required=False
@@ -55,7 +58,10 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
     def validate(self, validated_data):
         lottery_wheel = validated_data["lottery_wheel"]
         user = self.context["request"].user
-        token_wallet_account = validated_data["token_wallet_account"]
+        token_wallet_account = balance.points_account(user)
+        if token_wallet_account is None:
+            raise serializers.ValidationError(_("Points account not found."))
+        validated_data["token_wallet_account"] = token_wallet_account
 
         # Check total spins for the wheel (only this wheel)
         total_spins = (

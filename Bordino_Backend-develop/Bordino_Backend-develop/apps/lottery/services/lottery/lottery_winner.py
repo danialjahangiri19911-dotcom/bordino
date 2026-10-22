@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.lottery.models import Lottery, Ticket
+from apps.wallet.services import balance
 from apps.wallet.services.currency_wallet_account.transfer import (
     CurrencyWalletAccountTransferService,
 )
@@ -123,9 +124,9 @@ class LotteryWinnerService:
                 dto=CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
                     prize_amount=prize,
                     customer=ticket.customer,
-                    destination_wallet_account=ticket.customer.user.wallet.currency_wallet_accounts.filter(
-                        primary=True
-                    ).first(),
+                    # `user.wallet` no longer exists (the relation is `wallets`): settlement
+                    # raised and rolled back, leaving every winner unpaid.
+                    destination_wallet_account=balance.currency_account(ticket.customer.user),
                 )
             )
             self.transaction_service.create_prize_payment(

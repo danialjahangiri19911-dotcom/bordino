@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 from django.utils.translation import gettext_lazy as _
 
 from apps.lottery.models import (
@@ -17,7 +18,7 @@ from apps.wallet.services.currency_wallet_account.transfer import (
     CurrencyWalletAccountTransferService,
 )
 from apps.wallet.services.transaction import TransactionService
-from apps.wallet.services.utils import get_max_negative_limit, would_deduction_exceed_negative_limit
+from apps.wallet.services import balance
 
 
 class LotteryWheelService:
@@ -92,15 +93,15 @@ class LotteryWheelService:
 
         self._validate_prizes(prizes)
 
-        if would_deduction_exceed_negative_limit(
-            dto.token_wallet_account.amount,
+        # Locked, checked and debited in one go: two spins at once cannot both pass the check,
+        # and no other change to the account is overwritten.
+        account = balance.lock(dto.token_wallet_account)
+        balance.check_debit(
+            account,
             dto.lottery_wheel.cost_per_spin,
-            get_max_negative_limit(dto.token_wallet_account),
-        ):
-            raise ValidationError(_("Cannot spin: would exceed maximum negative points limit."))
-
-        dto.token_wallet_account.amount -= int(dto.lottery_wheel.cost_per_spin)
-        dto.token_wallet_account.save()
+            _("Cannot spin: would exceed maximum negative points limit."),
+        )
+        balance.add_points(account, -int(dto.lottery_wheel.cost_per_spin))
 
         multiplier = max(1, int(dto.multiplier or 1))
         selected_prize = self.select_prize(prizes, multiplier)
@@ -132,8 +133,7 @@ class LotteryWheelService:
                     ).first()
                     if specified:
                         target_account = specified
-                target_account.amount += int(selected_prize.prize_amount)
-                target_account.save()
+                balance.add_points(target_account, selected_prize.prize_amount)
             case LotteryWheelPrize.PrizeType.EMPTY:
                 # پوچ: جایزه‌ای واریز نمی‌شود
                 pass
@@ -155,8 +155,8 @@ class LotteryWheelService:
             customer=dto.customer,
         )
         if not created:
-            spin.count += 1
-            spin.save()
+            LotteryWheelSpin.objects.filter(pk=spin.pk).update(count=F("count") + 1)
+            spin.refresh_from_db(fields=["count"])
 
         # لاگِ هر چرخش: ضریبِ انتخابی + چرخ + جایزه + زمانِ چرخش (create_time)
         LotteryWheelSpinLog.objects.create(

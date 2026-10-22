@@ -36,6 +36,7 @@ import TransactionsCard from "@/libs/components/cards/wallet/TransactionsCard";
 import AddIcon from "@/libs/components/icons/components/Pluse";
 import useMutate from "@/libs/http/useMutate";
 import { isoStringToString } from "@/libs/utils/date";
+import { parseAmount } from "@/libs/utils/persianNumberConverter";
 import { addParamsToUrl, addSearchParamsToUrl } from "@/libs/utils/urls";
 
 interface UseWalletProps {
@@ -193,12 +194,13 @@ export default function useWallet({
 		});
 
 	const handleWithdraw = useCallback(
-		(data: { amount: string; ibanId: string }) => {
-			const numericAmount = Number(data.amount.replace(/[^0-9]/g, ""));
+		(data: { amount: string; ibanId: string; requestId: string }) => {
+			const numericAmount = parseAmount(data.amount);
 			if (numericAmount > 0 && data.ibanId) {
 				withdrawCurrency({
 					amount: numericAmount,
 					bank_account_id: data.ibanId,
+					request_id: data.requestId,
 				});
 			}
 		},

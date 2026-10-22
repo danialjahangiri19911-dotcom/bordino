@@ -33,7 +33,7 @@ function CurrencyTransactionCard({
 					alignItems="flex-start"
 				>
 					<Typography variant="14-medium" color="text.primary">
-						{formatAmount(amount)} ریال
+						{formatAmount(amount)} تومان
 					</Typography>
 					<Box
 						display="flex"

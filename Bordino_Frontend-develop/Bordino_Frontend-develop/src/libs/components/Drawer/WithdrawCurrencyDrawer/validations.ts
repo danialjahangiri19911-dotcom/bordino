@@ -1,12 +1,9 @@
 import * as yup from "yup";
 
-import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
+import { parseAmount } from "@/libs/utils/persianNumberConverter";
 
-const extractNumericValue = (value: string): number => {
-	const cleaned = value.replace(/[^\d۰-۹]/g, "");
-	const converted = persianNumberConverter(cleaned);
-	return Number(converted);
-};
+// The same parsing as the submit (WithdrawCurrencyDrawer): what is checked is what is sent.
+const extractNumericValue = parseAmount;
 
 export const createWithdrawCurrencySchema = (availableBalance: number) =>
 	yup.object({

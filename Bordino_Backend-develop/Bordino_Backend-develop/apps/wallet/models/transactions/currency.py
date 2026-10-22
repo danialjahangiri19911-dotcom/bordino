@@ -1,4 +1,7 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 from apps.wallet.models.currency import Currency
 from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
@@ -33,6 +36,32 @@ class CurrencyTransaction(BaseTransaction):
         blank=True,
         related_name="transactions",
     )
+    # The app's id for one withdrawal: a retried request with the same id is the same withdrawal.
+    request_id = models.CharField(max_length=64, null=True, blank=True, editable=False)
+
+    FINAL = ("completed", "failed", "cancelled")
+
+    class Meta(BaseTransaction.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source_wallet", "request_id"),
+                condition=Q(request_id__isnull=False),
+                name="currency_tx_unique_request_id",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        # A finished withdrawal stays finished: its money was paid out or given back already,
+        # and changing it again would move the balance a second time.
+        if self.pk:
+            previous = (
+                CurrencyTransaction.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+            if previous in self.FINAL and previous != self.status:
+                raise ValidationError(
+                    {"status": _("A finished transaction cannot change its status.")}
+                )
 
     def __str__(self):
         return f"{self.amount} {self.currency.symbol}"

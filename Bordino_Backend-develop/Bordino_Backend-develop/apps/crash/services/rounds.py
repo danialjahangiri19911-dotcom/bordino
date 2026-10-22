@@ -19,7 +19,7 @@ from apps.crash.models import CrashConfiguration, CrashRound, CrashSeed
 from apps.crash.services import fair
 from apps.users.models import Customer
 from apps.wallet.models import TokenWalletAccount
-from apps.wallet.repositories.wallet.query import WalletQueryRepository
+from apps.wallet.services import balance
 
 MIN_TARGET = Decimal("1.01")
 
@@ -74,9 +74,8 @@ def customer_for(user) -> Customer:
 
 
 def points_account(user):
-    """The player's points account: the same one GamePlayChargeService and the wallet page use."""
-    wallets = WalletQueryRepository.customer_wallet(user)
-    return TokenWalletAccount.objects.filter(wallet__in=wallets).first()
+    """The player's points (L) account: the same one every other points payment uses."""
+    return balance.points_account(user)
 
 
 def seed_for(customer: Customer) -> CrashSeed:

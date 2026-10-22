@@ -10,6 +10,7 @@ from apps.lottery.repositories.ticket.command import TicketCommandRepository
 from apps.users.models import Customer
 from apps.wallet.models import TokenWalletAccount
 from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransaction
+from apps.wallet.services import balance
 from apps.wallet.repositories.token_wallet_account.query import TokenWalletAccountQueryRepository
 from apps.wallet.services.token_wallet_account.creation import TokenWalletAccountCreationService
 from apps.wallet.services.transaction import TransactionService
@@ -116,6 +117,15 @@ class TicketPurchaseService:
 
         try:
             with transaction.atomic():
+                # The check above ran on a plain read; two purchases at once could both pass it.
+                # Again under the row lock, which holds until this transaction (and the debit
+                # its signal makes) commits.
+                token_wallet_account = balance.lock(token_wallet_account)
+                balance.check_debit(
+                    token_wallet_account,
+                    amount,
+                    _("Insufficient balance to complete this ticket purchase."),
+                )
                 ticket = self.ticket_command_repository.create_ticket(
                     customer=customer,
                     lottery=lottery,
@@ -175,7 +185,7 @@ class TicketPurchaseService:
                 if not referrer_wallet:
                     referrer_wallet = self.token_wallet_account_creation_service.create_token_wallet_account_by_system(
                         self.token_wallet_account_creation_service.CreateTokenWalletAccountDTO(
-                            wallet=referrer.user.wallet,
+                            wallet=balance.customer_wallet(referrer.user),
                             name=f"کیف پول {token.symbol}",
                             symbol=token.symbol,
                         )

@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.users.models import Customer
 from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
+from apps.wallet.services import balance
 from apps.wallet.services.utils import is_wallet_expired
 
 
@@ -22,5 +23,7 @@ class CurrencyWalletAccountTransferService:
         if is_wallet_expired(wallet):
             raise ValidationError("Wallet has expired")
 
-        dto.destination_wallet_account.balance += dto.prize_amount
-        dto.destination_wallet_account.save()
+        if dto.destination_wallet_account is None:
+            raise ValidationError("Currency account not found")
+        # One UPDATE: a withdrawal or another prize at the same moment is not overwritten.
+        balance.add_currency(dto.destination_wallet_account, dto.prize_amount)

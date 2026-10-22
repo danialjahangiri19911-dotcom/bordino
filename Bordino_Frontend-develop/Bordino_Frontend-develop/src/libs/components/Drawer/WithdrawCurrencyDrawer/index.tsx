@@ -12,6 +12,7 @@ import TextField from "@libs/components/fields/Textfield";
 import styled from "@libs/styles/styled";
 
 import type { BankAccount } from "@/api/wallet/types/getBankAccountsType";
+import { parseAmount } from "@/libs/utils/persianNumberConverter";
 import type { CurrecncyWalletSchema } from "@/api/wallet/types/getCurrencySummaryType";
 import type { BaseDrawerModalProps } from "@/libs/components/Drawer/BaseDrawer";
 import BaseDrawer from "@/libs/components/Drawer/BaseDrawer";
@@ -19,9 +20,16 @@ import BaseDrawer from "@/libs/components/Drawer/BaseDrawer";
 interface Props extends Omit<BaseDrawerModalProps, "children"> {
 	currencyWallet: CurrecncyWalletSchema;
 	bankAccounts?: BankAccount[];
-	onWithdraw?: (data: { amount: string; ibanId: string }) => void;
+	onWithdraw?: (data: { amount: string; ibanId: string; requestId: string }) => void;
 	onAddIban?: () => void;
 	isWithdrawing?: boolean;
+}
+
+function newRequestId() {
+	// randomUUID needs a secure context; the plain-http address falls back to time + random.
+	return typeof crypto !== "undefined" && crypto.randomUUID
+		? crypto.randomUUID()
+		: `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export default function WithdrawCurrencyDrawer({
@@ -37,6 +45,8 @@ export default function WithdrawCurrencyDrawer({
 	const availableBalance = Number(currencyWallet.balance) || 0;
 	const form = useWithdrawCurrencyForm(availableBalance);
 	const [showIbanSelection, setShowIbanSelection] = useState(false);
+	// One id per withdrawal: a retry of the same one (its answer lost) is not a second withdrawal.
+	const [requestId, setRequestId] = useState(newRequestId);
 
 	const onInventoryWithdrawal = () => {
 		form.setValue("amount", availableBalance.toString(), {
@@ -62,29 +72,29 @@ export default function WithdrawCurrencyDrawer({
 	const onSubmit: SubmitHandler<WithdrawCurrencyFormValue> = useCallback(
 		(data) => {
 			if (onWithdraw) {
-				const numericAmount = data.amount.replace(/[^0-9]/g, "");
+				// Persian/Arabic digits converted first, as in validation (they were dropped
+				// before: «۱۰۰۰» sent nothing and «1۰۰۰» sent 1).
 				onWithdraw({
-					amount: numericAmount,
+					amount: String(parseAmount(data.amount)),
 					ibanId: data.bankAccountId,
+					requestId,
 				});
 			}
 		},
-		[onWithdraw],
+		[onWithdraw, requestId],
 	);
 
-	// Reset form when drawer closes
+	// Reset form when drawer closes; the next withdrawal gets a new id.
 	useEffect(() => {
 		if (!open) {
 			form.reset();
 			setShowIbanSelection(false);
+			setRequestId(newRequestId());
 		}
 	}, [open, form]);
 
 	const formatAmount = (amount: string | number) => {
-		const numAmount =
-			typeof amount === "string"
-				? Number(amount.replace(/[^0-9]/g, ""))
-				: amount;
+		const numAmount = typeof amount === "string" ? parseAmount(amount) : amount;
 		return numAmount.toLocaleString("fa-IR");
 	};
 
