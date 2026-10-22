@@ -214,7 +214,7 @@ def _round_state(user, round_id):
 @require_GET
 async def round_wait_view(request, round_id):
     """Long-poll: answers when the round wins on its own, when its curve reaches the crash
-    point, or after 20 s — whichever is first.
+    point, at once when its status differs from `?seen=`, or after 20 s — whichever is first.
 
     Async so a waiting player holds no worker thread; the crash point is only in the answer
     once the crash has happened.
@@ -228,7 +228,12 @@ async def round_wait_view(request, round_id):
         return _json(404, {"error": "دست پیدا نشد."})
     round_, _ = state
 
+    # `seen` = the status on the player's screen. A different one (e.g. an auto cash-out that won
+    # while this request was on its way) is news: answer now instead of sleeping to the crash.
+    seen = request.GET.get("seen")
     delay = (rounds.wake_at(round_) - timezone.now()).total_seconds()
+    if seen and seen != round_.status:
+        delay = 0
     if delay > 0:
         # A few ms of slack so the reveal check never runs just before the crash instant.
         await asyncio.sleep(min(delay + 0.02, WAIT_MAX_SECONDS))

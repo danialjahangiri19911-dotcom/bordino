@@ -30,6 +30,8 @@ export default function useCrashGame() {
 
 	const offsetRef = useRef(0);
 	const roundRef = useRef<CrashRound | null>(null);
+	// Server time of the answer the shown balance came from; an older snapshot never replaces it.
+	const balanceAtRef = useRef(0);
 	const waitingRef = useRef<string | null>(null);
 	const mountedRef = useRef(true);
 
@@ -39,6 +41,13 @@ export default function useCrashGame() {
 	const syncClock = (serverTime: string, sentAt: number) => {
 		offsetRef.current = Date.parse(serverTime) - (sentAt + Date.now()) / 2;
 	};
+
+	const updateBalance = useCallback((next: number, serverTime: string) => {
+		const at = Date.parse(serverTime);
+		if (at < balanceAtRef.current) return;
+		balanceAtRef.current = at;
+		setBalance(next);
+	}, []);
 
 	const setRound = useCallback((next: CrashRound | null) => {
 		roundRef.current = next;
@@ -56,15 +65,15 @@ export default function useCrashGame() {
 	 * on screen, or is older than what is shown; the balance travels with it under the same check.
 	 */
 	const apply = useCallback(
-		(next: CrashRound, nextBalance?: number) => {
+		(next: CrashRound, nextBalance?: { balance: number; server_time: string }) => {
 			const prev = roundRef.current;
 			if (prev && (prev.id !== next.id || isOlder(prev, next))) return false;
 			setRound(next);
-			if (nextBalance !== undefined) setBalance(nextBalance);
+			if (nextBalance) updateBalance(nextBalance.balance, nextBalance.server_time);
 			if (next.revealed) remember(next);
 			return true;
 		},
-		[remember, setRound],
+		[remember, setRound, updateBalance],
 	);
 
 	const waitForCrash = useCallback(
@@ -75,9 +84,9 @@ export default function useCrashGame() {
 				mountedRef.current && waitingRef.current === id && roundRef.current?.id === id;
 			while (stillMine()) {
 				try {
-					const state = await crashApi.wait(id);
+					const state = await crashApi.wait(id, roundRef.current?.status);
 					if (!stillMine()) break;
-					apply(state.round, state.balance);
+					apply(state.round, state);
 					if (state.round.revealed) break;
 				} catch (e) {
 					if (!stillMine()) break;
@@ -101,22 +110,35 @@ export default function useCrashGame() {
 			syncClock(cfg.server_time, sentAt);
 			if (!mountedRef.current) return;
 			setConfig(cfg);
-			setBalance(cfg.balance);
+			updateBalance(cfg.balance, cfg.server_time);
 			if (cfg.active_round) {
 				if (roundRef.current?.id !== cfg.active_round.id) setRound(cfg.active_round);
 				waitForCrash(cfg.active_round.id);
 				return;
 			}
+			// No round running: the one on screen, or a bet whose answer was lost, may have finished
+			// meanwhile. The server's history is the record of both.
+			const recent = await crashApi.history();
+			if (!mountedRef.current) return;
+			const finished = recent.results.filter((r) => r.revealed);
+			setHistory(finished.slice(0, HISTORY_SIZE));
 			const shown = roundRef.current;
-			if (shown && !shown.revealed) {
-				const recent = await crashApi.history();
-				const finished = recent.results.find((r) => r.id === shown.id);
-				if (finished) apply(finished);
+			const same = shown && finished.find((r) => r.id === shown.id);
+			if (same) {
+				apply(same);
+				return;
+			}
+			const latest = finished[0];
+			if (
+				latest &&
+				(!shown || Date.parse(latest.started_at) > Date.parse(shown.started_at))
+			) {
+				setRound(latest);
 			}
 		} catch {
 			// Still offline; the error message stays and the next action retries.
 		}
-	}, [apply, setRound, waitForCrash]);
+	}, [apply, setRound, updateBalance, waitForCrash]);
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -131,7 +153,7 @@ export default function useCrashGame() {
 				const [cfg, recent] = await Promise.all([configured, crashApi.history()]);
 				if (!mountedRef.current) return;
 				setConfig(cfg);
-				setBalance(cfg.balance);
+				updateBalance(cfg.balance, cfg.server_time);
 				setHistory(recent.results.filter((r) => r.revealed));
 				if (cfg.active_round) {
 					setRound(cfg.active_round);
@@ -147,7 +169,7 @@ export default function useCrashGame() {
 			mountedRef.current = false;
 			waitingRef.current = null;
 		};
-	}, [setRound, waitForCrash]);
+	}, [setRound, updateBalance, waitForCrash]);
 
 	const placeBet = useCallback(
 		async (amount: number, autoCashout: string | null) => {
@@ -159,7 +181,7 @@ export default function useCrashGame() {
 				syncClock(state.server_time, sentAt);
 				waitingRef.current = null;
 				setRound(state.round);
-				setBalance(state.balance);
+				updateBalance(state.balance, state.server_time);
 				setConfig((prev) =>
 					prev ? { ...prev, next_nonce: state.round.nonce + 1 } : prev,
 				);
@@ -173,7 +195,7 @@ export default function useCrashGame() {
 				setBusy(false);
 			}
 		},
-		[reconcile, setRound, waitForCrash],
+		[reconcile, setRound, updateBalance, waitForCrash],
 	);
 
 	const cashOut = useCallback(async () => {
@@ -182,7 +204,7 @@ export default function useCrashGame() {
 		setBusy(true);
 		try {
 			const state = await crashApi.cashOut(current.id);
-			apply(state.round, state.balance);
+			apply(state.round, state);
 		} catch (e) {
 			setError(crashErrorMessage(e));
 			await reconcile();

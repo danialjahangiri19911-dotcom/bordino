@@ -23,8 +23,16 @@ export const crashApi = {
 		}),
 	cashOut: (id: string) =>
 		call<CrashRoundState>("post", withId(CRASH.CASHOUT, id)),
-	/** Long-poll: resolves when the round crashes (or after ~20 s with revealed=false). */
-	wait: (id: string) => call<CrashRoundState>("get", withId(CRASH.WAIT, id)),
+	/**
+	 * Long-poll: resolves when the round crashes (or after ~20 s with revealed=false). `seen` is
+	 * the status on screen; when the server's differs (a win the player has not seen) it answers
+	 * at once.
+	 */
+	wait: (id: string, seen?: string) =>
+		call<CrashRoundState>(
+			"get",
+			withId(CRASH.WAIT, id) + (seen ? `?seen=${encodeURIComponent(seen)}` : ""),
+		),
 	setSeed: (clientSeed: string) =>
 		call<CrashSeed>("post", CRASH.SEED, { client_seed: clientSeed }),
 };

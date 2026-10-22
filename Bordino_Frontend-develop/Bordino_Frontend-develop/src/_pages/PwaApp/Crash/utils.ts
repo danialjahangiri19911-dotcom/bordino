@@ -42,8 +42,11 @@ export function formatPoints(value: number) {
  */
 export function profitOnWin(bet: number, target: number | null, maxPayout?: number) {
 	if (!target || !Number.isFinite(target) || bet <= 0) return 0;
-	const payout = Math.floor(bet * target);
-	return (maxPayout ? Math.min(payout, maxPayout) : payout) - bet;
+	// Like the server: the cap is a multiplier floored to 2 decimals, and the payout is
+	// floor(bet × multiplier). Whole hundredths keep the float error out of the floor.
+	let cents = Math.round(target * 100);
+	if (maxPayout) cents = Math.min(cents, Math.floor((maxPayout * 100) / bet));
+	return Math.floor((bet * cents) / 100) - bet;
 }
 
 /**

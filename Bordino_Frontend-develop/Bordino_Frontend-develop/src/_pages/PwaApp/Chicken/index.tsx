@@ -126,9 +126,16 @@ export default function ChickenGame() {
 		await game.step(to);
 	};
 
-	const current = round?.current_multiplier ? Number(round.current_multiplier) : null;
-	const cashValue = active && current ? Math.floor(round!.bet * current) : 0;
-	const nextMultiplier = selected ? multipliers[selected - 1] : round?.next_multiplier;
+	// While the chicken hops toward the server's answer, the buttons describe the lane it stands
+	// on now, not the lane the answer put it on (that would give the result away).
+	const atLane = animating ? shown : round?.step ?? 0;
+	const current = animating
+		? atLane > 0 ? Number(multipliers[atLane - 1]) : null
+		: round?.current_multiplier ? Number(round.current_multiplier) : null;
+	const cashValue = (active || animating) && current ? Math.floor(round!.bet * current) : 0;
+	const nextMultiplier = selected
+		? multipliers[selected - 1]
+		: animating ? multipliers[atLane] : round?.next_multiplier;
 	const playing = active && !animating;
 
 	// Space bar: Go while playing, Bet otherwise.
@@ -248,7 +255,7 @@ export default function ChickenGame() {
 								onClick={game.cashOut}
 								disabled={!playing || busy || !round?.step}
 							>
-								{round?.step ? `برداشت ${formatPoints(cashValue)}` : "برداشت"}
+								{atLane ? `برداشت ${formatPoints(cashValue)}` : "برداشت"}
 							</BigButton>
 						</Box>
 						<Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>

@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import time
 from datetime import timedelta
 from decimal import Decimal
 
@@ -504,3 +505,21 @@ class ReviewFixTests(TestCase):
         self.assertEqual(api.post(url, {"from_step": 0}, format="json").status_code, 200)
         self.assertEqual(api.post(url, {"from_step": 0}, format="json").status_code, 409)
         self.assertEqual(api.post(url, {"from_step": 1}, format="json").status_code, 200)
+
+    def test_wait_answers_at_once_with_a_win_the_player_has_not_seen(self):
+        # Codex pass 2: an auto win settled before the poll arrived must not sleep until the crash.
+        round_, _ = rounds.place_bet(self.user, 100, D("1.01"))
+        CrashRound.objects.filter(pk=round_.pk).update(
+            crash_point=D("100.00"), started_at=timezone.now() - timedelta(seconds=2)
+        )
+        token = str(RefreshToken.for_user(self.user).access_token)
+        began = time.monotonic()
+        r = self.client.get(
+            f"/api/v1/games/crash/rounds/{round_.pk}/wait/?seen=active",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertLess(time.monotonic() - began, 5)
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json().get("result", r.json())
+        self.assertEqual((body["round"]["status"], body["round"]["payout"]), ("won", 101))
+        self.assertIsNone(body["round"]["crash_point"])

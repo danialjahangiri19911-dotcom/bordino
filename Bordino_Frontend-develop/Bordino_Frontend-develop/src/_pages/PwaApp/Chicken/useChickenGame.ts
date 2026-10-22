@@ -60,19 +60,20 @@ export default function useChickenGame() {
 		try {
 			const cfg = await chickenApi.config();
 			setConfig(cfg);
-			setBalance(cfg.balance);
 			if (cfg.active_round) {
 				setRound(cfg.active_round);
+				setBalance(cfg.balance);
 				return;
 			}
-			if (shownId) {
-				const recent = await chickenApi.history();
-				const finished = recent.results.find((r) => r.id === shownId);
-				if (finished) {
-					setRound(finished);
-					remember(finished);
-				}
+			// A finished round and the balance it produced go on screen together (one render), so
+			// the hop animation can hold the balance back until the chicken gets there.
+			const recent = shownId ? await chickenApi.history() : null;
+			const finished = recent?.results.find((r) => r.id === shownId);
+			if (finished) {
+				setRound(finished);
+				remember(finished);
 			}
+			setBalance(cfg.balance);
 		} catch {
 			// Still offline; the error stays on screen and the next tap retries.
 		}
