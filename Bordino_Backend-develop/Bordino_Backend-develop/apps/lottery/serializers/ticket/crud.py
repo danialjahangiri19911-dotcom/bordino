@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from apps.django_helper.drf.serializers import BaseModelSerializer
 from apps.lottery.models import Lottery, Ticket
 from apps.lottery.services.ticket.purchase import TicketPurchaseService
+from apps.lottery.services.lottery.draw import HIGHEST_NUMBER
 
 
 class TicketCRUDSerializer(BaseModelSerializer):
@@ -95,6 +96,8 @@ class TicketPurchaseWithNumbersSerializer(BaseModelSerializer):
             )
         if len(set(numbers)) != len(numbers):
             raise DRFValidationError(_("Each number in a ticket must be unique."))
+        if any(not 1 <= n <= HIGHEST_NUMBER for n in numbers):
+            raise DRFValidationError(_("Numbers must be between 1 and 40."))
         return numbers
 
     def create(self, validated_data):

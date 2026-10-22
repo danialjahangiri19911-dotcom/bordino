@@ -31,7 +31,8 @@ export default function Lottery() {
 			rightAction={!!amount && <ScoreIconMessage score={amount} />}
 		>
 			<HomeBigLotteryCountdown
-				giftPrice={120000000}
+				giftPrice={Number(activeLotteries?.balance_in_money ?? 0)}
+				active={!!activeLotteries}
 				remainingTime={remainingTime}
 				sx={{ mx: 2 }}
 				title={activeLotteries?.name}

@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.django_helper.models.base import AbstractBaseModel
+from apps.lottery.services.lottery.draw import HIGHEST_NUMBER, NUMBERS_PER_DRAW
 from apps.users.models import Sponsor
 from apps.wallet.models import Token
 
@@ -39,10 +40,14 @@ class Lottery(AbstractBaseModel):
     balance = models.DecimalField(
         verbose_name=_("Balance"), max_digits=20, decimal_places=0, default=0
     )
+    # Drawn by the server when the lottery is settled (services/lottery/draw.py), never typed in:
+    # empty until then.
     numbers = ArrayField(
-        models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(100)]),
-        size=6,
-        help_text="An array of 6 integers, each between 1 and 100",
+        models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(HIGHEST_NUMBER)]),
+        size=NUMBERS_PER_DRAW,
+        null=True,
+        blank=True,
+        help_text="The 6 winning numbers (1–40), drawn by the server at settlement",
     )
     ticket_price = models.DecimalField(
         verbose_name=_("ticket_price"), max_digits=20, decimal_places=0, default=0

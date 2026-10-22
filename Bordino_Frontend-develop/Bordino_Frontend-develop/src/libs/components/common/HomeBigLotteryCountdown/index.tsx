@@ -15,6 +15,8 @@ interface Props {
 	onShowDetails?: () => void;
 	sx?: BoxProps["sx"];
 	extraContent?: ReactNode;
+	/** Is a lottery running? Without one there is no prize or time to show (not "0 تومان, 00:00"). */
+	active?: boolean;
 }
 
 export default function HomeBigLotteryCountdown({
@@ -24,8 +26,9 @@ export default function HomeBigLotteryCountdown({
 	onShowDetails,
 	sx,
 	extraContent,
+	active = true,
 }: Readonly<Props>) {
-	const [count, setCount] = useState<number>(0);
+	const [count, setCount] = useState<number>(remainingTime);
 
 	useEffect(() => {
 		setCount(remainingTime);
@@ -74,16 +77,32 @@ export default function HomeBigLotteryCountdown({
 						sx={{ ...mascotSx, right: "-27px", top: "-35px" }}
 					/>
 
+					{!active ? (
+						<Content>
+							<Typography variant="14-bold" sx={{ color: "#F9F9F9", textAlign: "center" }}>
+								قرعه‌کشی فعالی در حال حاضر نیست
+							</Typography>
+							<Typography variant="12-regular" sx={{ color: "#EDEDED", textAlign: "center" }}>
+								قرعه‌کشی بعدی به‌زودی اعلام می‌شود.
+							</Typography>
+						</Content>
+					) : (
 					<Content>
 						<Box display="flex" flexDirection="row" alignItems="center" gap="4px">
 							<Typography variant="14-medium" sx={{ color: "#EDEDED" }}>
 								مبلغ جایزه:
 							</Typography>
 							<Typography variant="14-bold" sx={{ color: "#F9F9F9" }}>
-								{giftPrice.toLocaleString()} تومان
+								{giftPrice.toLocaleString("fa-IR")} تومان
 							</Typography>
 						</Box>
 
+						{count <= 0 ? (
+							// Sales closed; the server draws the numbers within a few minutes.
+							<Typography variant="14-medium" sx={{ color: "#F9F9F9" }} role="status">
+								زمان خرید بلیط تمام شد؛ نتیجه به‌زودی اعلام می‌شود.
+							</Typography>
+						) : (
 						<TimerRow>
 							{Object.entries(formatTime).map(([label, value], index, arr) => (
 								<Fragment key={label}>
@@ -113,7 +132,9 @@ export default function HomeBigLotteryCountdown({
 								</Fragment>
 							))}
 						</TimerRow>
+						)}
 					</Content>
+					)}
 				</Banner>
 				{extraContent}
 			</Box>

@@ -33,6 +33,12 @@ export default function RenderActiveTickets({
 				</>
 			)}
 
+			{data && !data.result?.length && (
+				<Typography variant="14-regular" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
+					هنوز بلیطی نخریده‌اید.
+				</Typography>
+			)}
+
 			{data?.result?.map((ticket, index, array) => (
 				<Fragment key={ticket.id}>
 					<TicketComponent

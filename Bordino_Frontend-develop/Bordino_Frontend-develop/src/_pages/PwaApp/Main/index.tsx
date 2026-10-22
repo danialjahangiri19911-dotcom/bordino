@@ -44,6 +44,7 @@ export default function Main() {
 			<Stack rowGap="32px" mx="16px">
 				<HomeBigLotteryCountdown
 					giftPrice={Number(activeLotteries?.balance_in_money ?? 0)}
+					active={!!activeLotteries}
 					onShowDetails={() => push(LOTTERY_GUIDE.path)}
 					remainingTime={remainingTime}
 				/>

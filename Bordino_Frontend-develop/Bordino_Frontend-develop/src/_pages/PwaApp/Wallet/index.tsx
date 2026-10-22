@@ -88,7 +88,7 @@ export default function Wallet() {
 						>
 							<Typography variant="14-regular">موجودی:</Typography>
 							<Typography variant="14-medium" color="text.primary">
-								{currencyWallet.balance} تومان
+								{Number(currencyWallet.balance || 0).toLocaleString("fa-IR")} تومان
 							</Typography>
 						</Box>
 						{currencyWallet.expire_date && (

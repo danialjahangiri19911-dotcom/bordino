@@ -39,7 +39,7 @@ class CurrencyWalletAccountCreationService:
                 wallet_type=CurrencyPresetWallet.WalletType.CUSTOMER,
                 currency=currency,
                 defaults={
-                    "name": "کیف پول ریالی",
+                    "name": "کیف پول تومانی",
                     "actions": [
                         CurrencyPresetWallet.Action.DEPOSIT,
                         CurrencyPresetWallet.Action.WITHDRAW,

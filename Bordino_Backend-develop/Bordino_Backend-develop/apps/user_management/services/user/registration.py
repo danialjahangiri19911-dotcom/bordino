@@ -158,7 +158,8 @@ class UserRegistrationService:
         wallet = self.wallet_service.create_wallet(self.wallet_service.CreateWalletDTO(user))
         self.currency_wallet_account_service.create_currency_wallet_account_by_system(
             self.currency_wallet_account_service.CreateCurrencyWalletAccountDTO(
-                wallet=wallet, name="کیف پول ریالی", symbol="IRR", primary=True
+                # The app counts money in toman everywhere (prizes, withdrawals, balances).
+                wallet=wallet, name="کیف پول تومانی", symbol="IRT", primary=True
             )
         )
         self.token_wallet_account_service.create_token_wallet_account_by_system(

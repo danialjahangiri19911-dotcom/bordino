@@ -48,9 +48,11 @@ class Command(BaseCommand):
             {
                 "task": process_lottery_winners,
                 "name": "process_lottery_winners",
+                # Every 5 minutes: a lottery is drawn within minutes of its end time (it used to
+                # wait for midnight). Only lotteries past their end date are touched.
                 "cron": {
-                    "minute": "0",
-                    "hour": "0",
+                    "minute": "*/5",
+                    "hour": "*",
                     "day_of_week": "*",
                     "day_of_month": "*",
                     "month_of_year": "*",

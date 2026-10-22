@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import register
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from apps.django_helper.admin.base import BaseAdmin
@@ -18,10 +19,7 @@ class LotteryForm(forms.ModelForm):
             "owner": _("اسپانسر/مالکِ قرعه‌کشی."),
             "token": _("بلیطِ این قرعه‌کشی با کدام نوعِ امتیاز (Token) خریداری می‌شود."),
             "balance": _("موجودیِ صندوقِ جوایزِ این قرعه‌کشی."),
-            "numbers": _(
-                "۶ عددِ برنده (هرکدام بین ۱ تا ۱۰۰). با تعدادِ تطابقِ شماره‌ها، "
-                "جایزه طبقِ «قوانینِ جایزه» تعیین می‌شود."
-            ),
+
             "ticket_price": _("قیمتِ هر بلیط (به واحدِ امتیازِ همان Token)."),
             "status": _(
                 "draft=پیش‌نویس | active=فعال (نیازمندِ تاریخِ شروع/پایانِ معتبر) | "
@@ -49,6 +47,8 @@ class LotteryAdmin(BaseAdmin):
     list_filter = ("status",)
     search_fields = ("name",)
     actions = ["run_process"]
+    # Drawn by the server at settlement (random, after sales close); shown, never typed in.
+    readonly_fields = ("numbers",)
 
     fieldsets = (
         (
@@ -82,7 +82,11 @@ class LotteryAdmin(BaseAdmin):
     def run_process(self, request, queryset):
         for obj in queryset:
             service = LotteryWinnerService(obj)
-            result = service.process_winners()
+            try:
+                result = service.process_winners()
+            except ValidationError as exc:
+                self.message_user(request, f"{obj.name}: {' '.join(exc.messages)}", messages.ERROR)
+                continue
             self.message_user(
                 request,
                 f"Successfully processed lottery {obj.name}:\n"

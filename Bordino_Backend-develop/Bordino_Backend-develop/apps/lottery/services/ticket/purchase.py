@@ -73,6 +73,10 @@ class TicketPurchaseService:
             ) from e
         except Lottery.DoesNotExist as e:
             raise ValidationError(_("No active lottery found.")) from e
+        # "active" until the draw job runs, which can be minutes after the end time: tickets are
+        # sold only between start and end.
+        if not lottery.is_active:
+            raise ValidationError(_("Ticket sales for this lottery are closed."))
 
         if token_wallet_account_id:
             try:

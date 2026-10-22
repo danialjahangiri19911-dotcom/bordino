@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.lottery.models import Lottery, Ticket
+from apps.lottery.services.lottery.draw import draw_numbers
 from apps.wallet.services import balance
 from apps.wallet.services.currency_wallet_account.transfer import (
     CurrencyWalletAccountTransferService,
@@ -97,8 +98,18 @@ class LotteryWinnerService:
 
     @transaction.atomic
     def process_winners(self):
-        """Process all winners for the lottery"""
+        """Draw the winning numbers and pay the winners, once.
+
+        The lottery row is locked and re-read first: the beat job and the admin action can run at
+        the same moment, and only the first may settle (the second sees it completed and stops).
+        The numbers are drawn here, after sales closed; anything typed in before is replaced.
+        """
+        self.lottery = Lottery.objects.select_for_update().get(pk=self.lottery.pk)
         self._validate_lottery_state()
+        self.lottery.numbers = draw_numbers()
+        # update(), not save(): save() runs full_clean, which refuses an active lottery whose end
+        # date has passed — the very state a lottery is in when it is drawn.
+        Lottery.objects.filter(pk=self.lottery.pk).update(numbers=self.lottery.numbers)
 
         allocations, expired = self._compute_allocations()
 
