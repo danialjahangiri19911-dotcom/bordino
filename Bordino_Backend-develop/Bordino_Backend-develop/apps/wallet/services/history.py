@@ -110,18 +110,26 @@ def points_history(user, token_account=None):
         for s in LotteryWheelSpinLog.objects.filter(customer=customer, cost__gt=0):
             rows.append(_row(s.id, "wheel_spin", "چرخش گردونه", s.cost, False, s.create_time))
 
-        for t in LotteryWheelPrizeTransaction.objects.filter(customer=customer).select_related(
-            "prize"
-        ):
-            kind = t.prize_type or t.prize.prize_type
-            if kind == LotteryWheelPrize.PrizeType.RECHARGE:
-                amount = t.amount if t.amount is not None else t.prize.prize_amount
-                rows.append(_row(t.id, "wheel_prize", "جایزهٔ گردونه", amount, True, t.create_time))
 
         for r in ProfileReward.objects.filter(customer=customer, points__gt=0):
             rows.append(
                 _row(r.id, "profile_reward", "پاداش تکمیل پروفایل", r.points, True, r.create_time)
             )
+
+    # Points prizes of the wheel, under the account they credited (older rows: the points account).
+    showing_points = token_account is None or token_account.token.symbol == POINTS_SYMBOL
+    for t in LotteryWheelPrizeTransaction.objects.filter(customer=customer).select_related("prize"):
+        kind = t.prize_type or t.prize.prize_type
+        if kind != LotteryWheelPrize.PrizeType.RECHARGE:
+            continue
+        if token_account is not None and (
+            t.token_account_id != token_account.pk
+            if t.token_account_id
+            else not showing_points
+        ):
+            continue
+        amount = t.amount if t.amount is not None else t.prize.prize_amount
+        rows.append(_row(t.id, "wheel_prize", "جایزهٔ گردونه", amount, True, t.create_time))
 
     crash = CrashRound.objects.filter(customer=customer)
     chicken = ChickenRound.objects.filter(customer=customer)
@@ -165,7 +173,11 @@ def currency_history(user, currency_account=None):
 
     for t in LotteryPrizeTransaction.objects.filter(ticket__customer=customer).select_related("lottery"):
         title = f"جایزهٔ {t.lottery.name}" if t.lottery else "جایزهٔ قرعه‌کشی"
-        rows.append(_row(t.id, "lottery_prize", title, t.prize_amount, True, t.create_time))
+        row = _row(t.id, "lottery_prize", title, t.prize_amount, True, t.create_time, status=t.status)
+        # Won but not paid yet (the transfer failed; the team pays it by hand): not a credit yet.
+        if t.status == LotteryPrizeTransaction.Status.PENDING:
+            row["status_label"] = "در انتظار پرداخت"
+        rows.append(row)
 
     for t in LotteryWheelPrizeTransaction.objects.filter(customer=customer).select_related("prize"):
         kind = t.prize_type or t.prize.prize_type

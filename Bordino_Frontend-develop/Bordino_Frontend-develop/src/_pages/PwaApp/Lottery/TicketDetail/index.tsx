@@ -71,10 +71,14 @@ export default function TicketDetail() {
 				addSearchParamsToUrl(BUY_TICKET.path, {
 					count: String(ticketCount),
 					done: String(assignCount),
+					// Same accepted offer for the next ticket of this purchase.
+					...(searchParams.get("lottery") && searchParams.get("price")
+						? { lottery: searchParams.get("lottery")!, price: searchParams.get("price")! }
+						: {}),
 				}),
 			);
 		}
-	}, [isFinished, assignCount, ticketCount, push]);
+	}, [isFinished, assignCount, ticketCount, push, searchParams]);
 
 	const actionButtonText = useMemo(() => {
 		if (isFinished) {

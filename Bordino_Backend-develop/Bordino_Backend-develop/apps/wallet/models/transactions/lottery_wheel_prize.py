@@ -33,6 +33,14 @@ class LotteryWheelPrizeTransaction(BaseTransaction):
     # the prize row can be edited later, the history must not change with it. Null = older rows.
     amount = models.DecimalField(max_digits=20, decimal_places=0, null=True, blank=True)
     prize_type = models.CharField(max_length=20, blank=True, default="")
+    # The token account a recharge prize went to (null: cash prize, or an older row = points).
+    token_account = models.ForeignKey(
+        "wallet.TokenWalletAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="wheel_prize_transactions",
+    )
 
     def __str__(self):
         return (

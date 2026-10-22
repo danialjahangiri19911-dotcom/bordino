@@ -4,18 +4,29 @@ import { useRouter } from "next/navigation";
 
 import Box from "@libs/components/atoms/Box";
 
-import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
+import usePastLotteries from "@/api/lottery/hooks/usePastLotteries";
+import type { Lottery } from "@/api/lottery/types/getLotteryListType";
 import { DEFAULT_IMAGE } from "@/constants/imagePaths";
 import { LOTTERY_DETAIL } from "@/constants/routes";
+import Button from "@/libs/components/atoms/Button";
 import Divider from "@/libs/components/atoms/Divider";
 import Typography from "@/libs/components/atoms/Typography";
 import LotteryCard from "@/libs/components/cards/wallet/LotteryCard";
+import LoadState from "@/libs/components/common/LoadState";
 import { isoStringToString } from "@/libs/utils/date";
 import { addParamsToUrl } from "@/libs/utils/urls";
 
 export default function RenderPassLotteries() {
-	const { notActiveLotteries } = useExtractLotteries();
+	// Its own paged list (all completed lotteries, 20 at a time), not the first page of the mixed list.
+	const past = usePastLotteries();
+	const notActiveLotteries: Lottery[] = (past.data?.pages ?? []).flatMap(
+		(page: { results: Lottery[] } | undefined) => page?.results ?? [],
+	);
 	const { push } = useRouter();
+
+	if (past.isLoading || past.isError) {
+		return <LoadState loading={past.isLoading} error={past.error} onRetry={() => past.refetch()} />;
+	}
 
 	if (!notActiveLotteries.length) {
 		return (
@@ -52,6 +63,16 @@ export default function RenderPassLotteries() {
 					)}
 				</Fragment>
 			))}
+			{past.hasNextPage && (
+				<Button
+					variant="outlined"
+					onClick={() => past.fetchNextPage()}
+					disabled={past.isFetchingNextPage}
+					sx={{ alignSelf: "center" }}
+				>
+					{past.isFetchingNextPage ? "در حال بارگذاری…" : "نمایش بیشتر"}
+				</Button>
+			)}
 		</Box>
 	);
 }

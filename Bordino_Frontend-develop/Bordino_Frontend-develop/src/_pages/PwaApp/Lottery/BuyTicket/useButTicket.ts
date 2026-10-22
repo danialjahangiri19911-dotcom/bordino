@@ -39,6 +39,21 @@ export default function useButTicket() {
 	// ticket is created (and paid for) when its numbers are submitted.
 	const count = Math.max(1, Number(searchParams.get("count")) || 1);
 	const done = Math.max(0, Number(searchParams.get("done")) || 0);
+	// The offer the player accepted (from the exchange drawer, carried ticket to ticket); without
+	// one, the price shown on this page is the offer.
+	const { activeLotteries } = useExtractLotteries();
+	const offerLottery = searchParams.get("lottery") ?? activeLotteries?.id;
+	const offerPriceParam = searchParams.get("price");
+	const offerPrice =
+		offerPriceParam !== null
+			? Number(offerPriceParam)
+			: activeLotteries
+				? Number(activeLotteries.ticket_price)
+				: undefined;
+	const offerParams: Record<string, string> =
+		offerLottery && offerPrice !== undefined
+			? { lottery: offerLottery, price: String(offerPrice) }
+			: {};
 
 	const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 	const [selectedBalls, setSelectedBalls] = useState<number[]>([]);
@@ -65,7 +80,7 @@ export default function useButTicket() {
 			push(
 				addSearchParamsToUrl(
 					addParamsToUrl(TICKET_DETAIL.path, { id: data.result.id }),
-					{ count: String(count), done: String(done + 1) },
+					{ count: String(count), done: String(done + 1), ...offerParams },
 				),
 			);
 		},
@@ -88,16 +103,12 @@ export default function useButTicket() {
 		onError: handleButTicketError,
 	});
 
-	// The lottery and price on screen go along: if either changed meanwhile, the server refuses
-	// instead of charging for a different offer.
-	const { activeLotteries } = useExtractLotteries();
+	// The accepted lottery and price go along: if either changed meanwhile, the server refuses
+	// instead of charging for a different offer. No offer (no lottery running): nothing to send.
 	const handleSubmit = useCallback(() => {
-		submitHandler({
-			numbers: selectedBalls,
-			lottery_id: activeLotteries?.id,
-			expected_price: activeLotteries ? Number(activeLotteries.ticket_price) : undefined,
-		});
-	}, [activeLotteries, selectedBalls, submitHandler]);
+		if (!offerLottery || offerPrice === undefined) return;
+		submitHandler({ numbers: selectedBalls, lottery_id: offerLottery, expected_price: offerPrice });
+	}, [offerLottery, offerPrice, selectedBalls, submitHandler]);
 
 	const handleBack = () => {
 		push(WALLET.path);
@@ -124,5 +135,7 @@ export default function useButTicket() {
 		submitButtonText,
 		lotteryTickets,
 		handlePrevTicket,
+		offerPrice,
+		hasOffer: !!offerLottery && offerPrice !== undefined,
 	};
 }

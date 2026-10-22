@@ -6,14 +6,15 @@ import type { Res } from "@/libs/http/query";
 import { getRemainingSeconds } from "@/libs/utils/date";
 
 export default function useExtractLotteries() {
-	// While a lottery's sales have closed but it is not settled yet, ask again every 30 s so the
-	// result shows up without leaving the page.
+	// While a lottery runs, ask again every minute (so an open page notices its end by itself),
+	// and every 30 s once sales closed and the draw is pending, so the result shows up.
 	const { data: lotteries } = useGetLotteryList({
 		refetchInterval: (query: { state: { data?: Res<LotteryListApiResponse> } }) => {
 			const active = query.state.data?.data?.result?.results?.find(
 				(lottery: Lottery) => lottery.status === "active",
 			);
-			return active && new Date(active.end_date).getTime() <= Date.now() ? 30_000 : false;
+			if (!active) return false;
+			return new Date(active.end_date).getTime() <= Date.now() ? 30_000 : 60_000;
 		},
 	});
 

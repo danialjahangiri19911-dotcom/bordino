@@ -32,6 +32,7 @@ class TransactionService:
         customer: Customer
         lottery_wheel: LotteryWheel
         prize: LotteryWheelPrize
+        token_account: object = None  # the account a recharge prize credited
 
     @dataclass
     class CreateReferralRewardDTO:
@@ -93,6 +94,7 @@ class TransactionService:
             customer=dto.customer,
             prize=dto.prize,
             amount=dto.prize.prize_amount,  # already × multiplier (lottery_wheel.spin_wheel)
+            token_account=dto.token_account,
             prize_type=dto.prize.prize_type,
             description=_("Lottery wheel prize: {}").format(dto.prize.name),
             status=LotteryWheelPrizeTransaction.Status.COMPLETED,

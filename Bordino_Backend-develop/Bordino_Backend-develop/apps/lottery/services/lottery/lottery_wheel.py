@@ -128,6 +128,7 @@ class LotteryWheelService:
         if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
             selected_prize.prize_amount = selected_prize.prize_amount * multiplier
 
+        target_account = None  # the token account a recharge prize credited (for the history)
         match selected_prize.prize_type:
             case LotteryWheelPrize.PrizeType.CASH:
                 self.currency_wallet_account_transfer_service.send_prize_to_customer(
@@ -163,6 +164,7 @@ class LotteryWheelService:
                     customer=dto.customer,
                     lottery_wheel=dto.lottery_wheel,
                     prize=selected_prize,
+                    token_account=target_account,
                 )
             )
 

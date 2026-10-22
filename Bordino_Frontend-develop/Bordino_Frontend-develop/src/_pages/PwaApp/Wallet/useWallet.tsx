@@ -72,7 +72,7 @@ export default function useWallet({
 	const { data: bankAccountsData, refetch: refetchBankAccounts } =
 		useGetBankAccounts();
 
-	const { lotteryData } = useExtractLotteries();
+	const { lotteryData, activeLotteries } = useExtractLotteries();
 	const { push } = useRouter();
 	const queryClient = useQueryClient();
 
@@ -415,6 +415,7 @@ export default function useWallet({
 		handleAddIbanFromWithdraw,
 		selectedCurrencyWallet,
 		ticketPrice: lotteryDetail?.result.ticket_price,
+		activeLotteryId: activeLotteries?.id,
 		handleBuyTicket,
 		handleBack,
 	};

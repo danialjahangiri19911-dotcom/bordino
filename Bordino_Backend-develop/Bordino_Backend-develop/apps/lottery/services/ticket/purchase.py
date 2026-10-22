@@ -150,6 +150,11 @@ class TicketPurchaseService:
                 if lottery.status != Lottery.Status.ACTIVE or lottery.drawn_at:
                     raise ValidationError(_("Ticket sales for this lottery are closed."))
                 self._check_offer(lottery, lottery_id, expected_price)
+                # Price and token as they are now, under the lock: what is checked below is what
+                # is charged and what the pool records (an admin edit meanwhile cannot split them).
+                amount = int(lottery.ticket_price)
+                if token_wallet_account.token_id != lottery.token_id:
+                    raise ValidationError(_("This lottery has ended; a new one has started."))
                 # The check above ran on a plain read; two purchases at once could both pass it.
                 # Again under the row lock, which holds until this transaction (and the debit
                 # its signal makes) commits.

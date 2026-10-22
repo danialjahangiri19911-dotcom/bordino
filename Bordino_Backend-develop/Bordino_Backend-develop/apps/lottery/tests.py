@@ -211,3 +211,52 @@ class ReferralCycleTests(TestCase):
             )
         a.customer.refresh_from_db()
         self.assertIsNone(a.customer.invited_by)
+
+
+@override_settings(CACHES=LOCMEM)
+class Batch4cTests(TestCase):
+    """Codex pass 2 on batch 4b (2026-10-22)."""
+
+    setUp = DrawTests.setUp
+    buy = DrawTests.buy
+    end_sales = DrawTests.end_sales
+
+    def test_a_negative_prize_rule_cannot_be_saved(self):
+        with self.assertRaises(ValidationError):
+            PrizeRule.objects.create(lottery=self.lottery, match_count=3, prize_amount=-100)
+
+    def test_a_winner_without_a_currency_account_does_not_stop_settlement(self):
+        from apps.wallet.models import CurrencyWalletAccount, LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+        self.buy([1, 2, 3, 4, 5, 6])
+        CurrencyWalletAccount.objects.filter(wallet__owner=self.player).update(primary=False)
+        self.end_sales()
+        with mock.patch(
+            "apps.lottery.services.lottery.lottery_winner.draw_numbers", return_value=[1, 20, 21, 22, 23, 24]
+        ):
+            LotteryWinnerService(self.lottery).process_winners()
+        self.lottery.refresh_from_db()
+        self.assertEqual(self.lottery.status, Lottery.Status.COMPLETED)
+        self.assertEqual(LotteryPrizeTransaction.objects.get().status, "pending")
+
+    def test_tickets_are_stored_sorted_whatever_writes_them(self):
+        ticket = self.buy([6, 5, 4, 3, 2, 1])
+        ticket.numbers = [9, 8, 7, 6, 5, 4]
+        ticket.save()
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.numbers, [4, 5, 6, 7, 8, 9])
+
+    def test_a_long_referral_chain_back_to_the_user_is_refused(self):
+        from apps.user_management.services.user.registration import (  # pylint: disable=import-outside-toplevel
+            UserRegistrationService,
+        )
+
+        chain = [make_customer(f"91200009{i:02d}") for i in range(25)]
+        for invitee, inviter in zip(chain[1:], chain[:-1]):
+            invitee.customer.invited_by = inviter
+            invitee.customer.save(update_fields=["invited_by"])
+        # chain[0] naming the last one would close a 25-step loop.
+        with self.assertRaises(ValueError):
+            UserRegistrationService()._validate_and_store_referral_code(  # pylint: disable=protected-access
+                chain[-1].customer.referral_code, chain[0]
+            )

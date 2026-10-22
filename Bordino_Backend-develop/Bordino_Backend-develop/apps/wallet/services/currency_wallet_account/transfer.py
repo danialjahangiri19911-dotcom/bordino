@@ -19,11 +19,9 @@ class CurrencyWalletAccountTransferService:
 
     @transaction.atomic
     def send_prize_to_customer(self, dto: SendPrizeToCustomerDTO):
-        wallet = dto.destination_wallet_account.wallet
-        if is_wallet_expired(wallet):
-            raise ValidationError("Wallet has expired")
-
         if dto.destination_wallet_account is None:
             raise ValidationError("Currency account not found")
+        if is_wallet_expired(dto.destination_wallet_account.wallet):
+            raise ValidationError("Wallet has expired")
         # One UPDATE: a withdrawal or another prize at the same moment is not overwritten.
         balance.add_currency(dto.destination_wallet_account, dto.prize_amount)

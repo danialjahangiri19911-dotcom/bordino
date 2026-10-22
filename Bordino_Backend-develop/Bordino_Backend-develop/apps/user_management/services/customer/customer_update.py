@@ -199,7 +199,9 @@ class CustomerUpdateService:  # pylint: disable=too-many-instance-attributes
         """The customer row, locked and read fresh, when `step` may be submitted: the current
         step or an earlier one (changing an answer). Skipping ahead is refused, and no request
         can write a step value it read before another request moved it on."""
-        locked = Customer.objects.select_for_update().get(pk=customer.pk)
+        # NO KEY UPDATE: a ticket purchase inserting a row that references this customer (a
+        # KEY SHARE lock) is not blocked by it, so purchase and profile steps cannot deadlock.
+        locked = Customer.objects.select_for_update(no_key=True).get(pk=customer.pk)
         current = self.step_order.get(locked.registration_step, 0)
         if step != Customer.Step.PROFILE_SETUP and current < self.step_order[step]:
             raise ValidationError(_("Complete the previous steps first."))

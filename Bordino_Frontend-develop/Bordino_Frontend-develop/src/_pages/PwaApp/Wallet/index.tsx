@@ -57,6 +57,7 @@ export default function Wallet() {
 		walletTabs,
 		currencyWalletTabs,
 		ticketPrice,
+		activeLotteryId,
 		handleBack,
 	} = useWallet({ activeSlideIndex });
 
@@ -401,6 +402,7 @@ export default function Wallet() {
 					title="تبدیل امتیاز به بلیط"
 					metaData={metaData as WalletSchema}
 					ticketPrice={ticketPrice ?? 0}
+					lotteryId={activeLotteryId}
 				/>
 			)}
 			{/* Add Bank Account Drawer */}

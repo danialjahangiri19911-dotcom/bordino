@@ -1,6 +1,8 @@
+from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
+from django.utils.translation import gettext_lazy as _
 
 from apps.wallet.models.transactions.activity import ActivityTransaction
 from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
@@ -231,6 +233,16 @@ def _stored(instance):
 def store_previous_status_currency(sender, instance, **kwargs):
     instance._stored = _stored(instance) if instance.pk else None
     instance._previous_status = instance._stored["status"] if instance._stored else None
+    # Checked again here, under the lock: two admins may both have passed full_clean while it
+    # was pending; the second one finds it finished and is refused.
+    if (
+        instance._stored
+        and instance._stored["status"] in CurrencyTransaction.FINAL
+        and instance.status != instance._stored["status"]
+    ):
+        raise ValidationError(
+            {"status": _("A finished transaction cannot change its status.")}
+        )
     if instance._stored:
         # What was reserved does not change after the request: amount, account and bank stay.
         instance.amount = instance._stored["amount"]

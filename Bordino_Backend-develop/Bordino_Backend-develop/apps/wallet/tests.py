@@ -137,6 +137,18 @@ class WithdrawTests(TestCase):
         self.assertEqual(self.withdraw(50_000, request_id="r-1").status_code, 409)
         self.assertEqual(rial(self.user), 70_000)
 
+    def test_a_stale_admin_copy_cannot_finish_a_refunded_withdrawal(self):
+        self.withdraw(40_000)
+        first = CurrencyTransaction.objects.get()
+        second = CurrencyTransaction.objects.get()
+        first.status = CurrencyTransaction.Status.FAILED
+        first.save()  # refunded
+        second.status = CurrencyTransaction.Status.COMPLETED
+        with self.assertRaises(ValidationError):
+            second.save()
+        self.assertEqual(rial(self.user), 100_000)
+        self.assertEqual(CurrencyTransaction.objects.get().status, "failed")
+
     def test_another_users_bank_account_is_refused(self):
         other = make_customer("9120000702")
         self.bank_account.user = other
@@ -372,3 +384,24 @@ class GuardTests(TestCase):
         with self.assertRaises(ValidationError):
             service.spin_wheel(dto)  # both passed the serializer's check
         self.assertEqual(points(user), 90)
+
+
+@override_settings(CACHES=LOCMEM)
+class HistoryDestinationTests(TestCase):
+    def test_a_pending_lottery_prize_is_marked_as_not_paid(self):
+        from apps.lottery.models import Lottery, Ticket  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services.history import currency_history  # pylint: disable=import-outside-toplevel
+
+        user = make_customer("9120000761")
+        sponsor = Sponsor.objects.create(user=make_customer("9120000762"))
+        lottery = Lottery.objects.create(
+            name="l", owner=sponsor, ticket_price=1, status="completed",
+            token=balance.points_account(user).token,
+        )
+        ticket = Ticket.objects.create(lottery=lottery, customer=user.customer, numbers=[1, 2, 3, 4, 5, 6], name="t")
+        LotteryPrizeTransaction.objects.create(
+            lottery=lottery, ticket=ticket, prize_amount=500, status="pending"
+        )
+        (row,) = currency_history(user)
+        self.assertEqual((row["status"], row["status_label"]), ("pending", "در انتظار پرداخت"))

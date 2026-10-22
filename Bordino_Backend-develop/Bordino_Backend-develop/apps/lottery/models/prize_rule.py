@@ -10,6 +10,11 @@ class PrizeRule(models.Model):
         unique_together = ("lottery", "match_count")
         verbose_name = _("Prize Rule")
         verbose_name_plural = _("Prize Rules")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(prize_amount__gte=0), name="prize_rule_not_negative"
+            )
+        ]
 
     lottery = models.ForeignKey(
         Lottery,
@@ -33,3 +38,8 @@ class PrizeRule(models.Model):
 
     def __str__(self):
         return f"lottery {self.lottery}, {self.match_count} matches: {self.prize_amount} Toman"
+
+    def save(self, *args, **kwargs):
+        # A plain models.Model: validate here too (a negative prize would take money from the winner).
+        self.full_clean()
+        super().save(*args, **kwargs)

@@ -22,6 +22,8 @@ import { addSearchParamsToUrl } from "@/libs/utils/urls";
 interface Props extends Omit<BaseDrawerModalProps, "children"> {
 	metaData: WalletSchema;
 	ticketPrice: number | string;
+	/** The lottery whose price is shown: the purchase is bound to this offer. */
+	lotteryId?: string;
 }
 
 export default function ExchangeDrawer({
@@ -29,6 +31,7 @@ export default function ExchangeDrawer({
 	sx,
 	metaData,
 	ticketPrice,
+	lotteryId,
 	...restProps
 }: Readonly<Props>) {
 	const [ticketCount, setTicketCount] = useState(1);
@@ -75,10 +78,13 @@ export default function ExchangeDrawer({
 			push(
 				addSearchParamsToUrl(BUY_TICKET.path, {
 					count: String(ticketCount),
+					// The offer accepted here (lottery + price shown): every ticket of this purchase
+					// is bought at it, or refused if it changed.
+					...(lotteryId ? { lottery: lotteryId, price: String(numericTicketPrice) } : {}),
 				}),
 			);
 		}
-	}, [hasEnoughPoints, ticketCount, push, restProps]);
+	}, [hasEnoughPoints, ticketCount, push, restProps, lotteryId, numericTicketPrice]);
 
 	return (
 		<BaseDrawer

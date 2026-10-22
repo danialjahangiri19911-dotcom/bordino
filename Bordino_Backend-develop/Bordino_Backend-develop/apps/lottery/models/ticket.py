@@ -62,6 +62,13 @@ class Ticket(AbstractBaseModel):
     def __str__(self):
         return f"{self.name} - {self.lottery.name}"
 
+    def save(self, *args, **kwargs):
+        # One order per combination (matching ignores order), so the unique constraint and the
+        # duplicate check see 6,5,4,3,2,1 and 1,2,3,4,5,6 as the same ticket, whatever wrote it.
+        if self.numbers:
+            self.numbers = sorted(self.numbers)
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         if self.numbers and len(self.numbers) != 6:

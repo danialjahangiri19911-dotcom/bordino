@@ -89,27 +89,38 @@ class UserRegistrationService:
 
     def _validate_and_store_referral_code(self, referral_code: str, user: User):
         try:
-            # Locked: two logins at once must not both set (or overwrite) the inviter.
-            customer = self.customer_query_repository.all().select_for_update().get(user=user)
+            customer = self.customer_query_repository.all().get(user=user)
+            referrer_customer = self.customer_query_repository.filter_by_referral_code(
+                referral_code
+            )
+            if referrer_customer.user == user:
+                raise ValueError("Cannot use your own referral code")
+            # Both customers locked, lower id first (the same order for every pair): two people
+            # naming each other at the same moment are handled one after the other, and the
+            # second sees the first's inviter. NO KEY UPDATE does not block ticket purchases.
+            locked = {
+                c.pk: c
+                for c in Customer.objects.select_for_update(no_key=True)
+                .filter(pk__in=[customer.pk, referrer_customer.pk])
+                .order_by("pk")
+            }
+            customer, referrer_customer = locked[customer.pk], locked[referrer_customer.pk]
             if customer.invited_by:
                 raise ValueError("User already has a referral")
             # Only a new account (profile not set up yet) can name who invited it.
             if customer.registration_step != Customer.Step.PROFILE_SETUP:
                 raise ValueError("Referral codes are for new accounts only")
 
-            referrer_customer = self.customer_query_repository.filter_by_referral_code(
-                referral_code
-            )
-
-            if referrer_customer.user == user:
-                raise ValueError("Cannot use your own referral code")
             # Nor anyone this user (directly or further up) invited: A→B→A would make the buyer
-            # their own referrer.
-            ancestor, hops = referrer_customer, 0
-            while ancestor.invited_by_id and hops < 20:
+            # their own referrer. The whole chain, however long (stops at a repeat).
+            ancestor, seen = referrer_customer, {referrer_customer.pk}
+            while ancestor.invited_by_id:
                 if ancestor.invited_by_id == user.pk:
                     raise ValueError("Referral cycle")
-                ancestor, hops = ancestor.invited_by.customer, hops + 1
+                ancestor = Customer.objects.get(user_id=ancestor.invited_by_id)
+                if ancestor.pk in seen:
+                    break
+                seen.add(ancestor.pk)
 
             if not referrer_customer.user.is_active:
                 raise ValueError("Referrer is not active")

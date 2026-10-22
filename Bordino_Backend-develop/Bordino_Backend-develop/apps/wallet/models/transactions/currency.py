@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
@@ -73,6 +73,16 @@ class CurrencyTransaction(BaseTransaction):
                 raise ValidationError(
                     _("Amount, account and bank account of a transaction cannot be changed.")
                 )
+
+    def save(self, *args, **kwargs):
+        # One transaction for the whole change: the signals lock the stored row, re-check the
+        # transition under that lock and refund, all or nothing — also outside the admin.
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            return super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.amount} {self.currency.symbol}"

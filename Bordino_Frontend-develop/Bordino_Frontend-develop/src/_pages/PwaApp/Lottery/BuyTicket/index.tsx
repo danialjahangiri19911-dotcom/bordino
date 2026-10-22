@@ -30,6 +30,8 @@ export default function BuyTicket() {
 		submitButtonText,
 		lotteryTickets,
 		handlePrevTicket,
+		offerPrice,
+		hasOffer,
 	} = useButTicket();
 
 	return (
@@ -178,12 +180,18 @@ export default function BuyTicket() {
 						</SelectedBallsRow>
 					</Box>
 
+					{/* The price this ticket costs (the accepted offer), or why it cannot be bought. */}
+					<Typography variant="12-regular" color="text.secondary" textAlign="center">
+						{hasOffer
+							? `قیمت هر بلیط: ${toPersianDigits(offerPrice ?? 0)} امتیاز`
+							: "قرعه‌کشی فعالی نیست؛ با شروع قرعه‌کشی بعدی می‌توانید بلیط بخرید."}
+					</Typography>
 					<LoadingButton
 						variant="contained"
 						fullWidth
 						color="secondary"
 						isLoading={isSubmitting}
-						disabled={selectedBalls.length !== 6 || isSubmitting}
+						disabled={selectedBalls.length !== 6 || isSubmitting || !hasOffer}
 						onClick={handleSubmit}
 					>
 						{submitButtonText}

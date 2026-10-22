@@ -57,7 +57,11 @@ class LotteryWinnerService:
         """
         pool = Decimal(self.lottery.prize_amount_in_money or 0)
         jackpot_match = len(self.lottery.numbers or [])
-        rule_amount = {rule.match_count: Decimal(rule.prize_amount) for rule in self.prize_rules}
+        # Never below 0, before any total is taken (a negative rule must not inflate the jackpot).
+        rule_amount = {
+            rule.match_count: max(Decimal(rule.prize_amount), Decimal("0"))
+            for rule in self.prize_rules
+        }
 
         non_jackpot = []  # (ticket, match, base_amount)
         jackpot_tickets = []
