@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 
 import { useRouter } from "next/navigation";
 
@@ -8,14 +9,15 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { gameErrorMessage } from "@/api/games/request";
 import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
 import useExtractLotteryDetail from "@/api/lottery/utils/useExtractLotteryDetail";
 import { WALLET } from "@/api/urls";
 import useGetBankAccounts from "@/api/wallet/hooks/useGetBankAccounts";
 import useGetCurrencySummary from "@/api/wallet/hooks/useGetCurrencySummary";
-import useGetCurrencyTransactions from "@/api/wallet/hooks/useGetCurrencyTransactions";
 import useGetPointsSummary from "@/api/wallet/hooks/useGetPointsSummary";
-import useGetPointsTransactions from "@/api/wallet/hooks/useGetPointsTransactions";
+import useWalletHistory from "@/api/wallet/hooks/useWalletHistory";
+import type { WalletHistoryPage } from "@/api/wallet/types/walletHistoryType";
 import type {
 	CreateBankAccountApiResponse,
 	CreateBankAccountRequest,
@@ -33,9 +35,10 @@ import BankAccountCard from "@/libs/components/cards/wallet/BankAccountCard";
 import CurrencyTransactionCard from "@/libs/components/cards/wallet/CurrencyTransactionCard";
 import LotteryCard from "@/libs/components/cards/wallet/LotteryCard";
 import TransactionsCard from "@/libs/components/cards/wallet/TransactionsCard";
+import { normalizeIban } from "@/libs/components/Drawer/AddBankAccountDrawer/validations";
 import AddIcon from "@/libs/components/icons/components/Pluse";
 import useMutate from "@/libs/http/useMutate";
-import { isoStringToString } from "@/libs/utils/date";
+import { formatTehranDateTime, isoStringToString } from "@/libs/utils/date";
 import { parseAmount } from "@/libs/utils/persianNumberConverter";
 import { addParamsToUrl, addSearchParamsToUrl } from "@/libs/utils/urls";
 
@@ -46,15 +49,26 @@ interface UseWalletProps {
 export default function useWallet({
 	activeSlideIndex = 0,
 }: UseWalletProps = {}) {
-	const { data: pointsSummary, isLoading: isLoadingPoints } =
-		useGetPointsSummary();
+	const {
+		data: pointsSummary,
+		isLoading: isLoadingPoints,
+		error: pointsError,
+		refetch: refetchPointsSummary,
+	} = useGetPointsSummary();
 	const {
 		data: currencySummary,
 		refetch: refetchCurrencySummary,
 		isLoading: isLoadingCurrency,
+		error: currencyError,
 	} = useGetCurrencySummary();
 
 	const isWalletsLoading = isLoadingPoints || isLoadingCurrency;
+	// A failed load is not "no wallet": the page says it failed and offers to try again.
+	const walletsFailed = !isWalletsLoading && !!(pointsError || currencyError);
+	const retryWallets = useCallback(() => {
+		refetchPointsSummary();
+		refetchCurrencySummary();
+	}, [refetchPointsSummary, refetchCurrencySummary]);
 	const { data: bankAccountsData, refetch: refetchBankAccounts } =
 		useGetBankAccounts();
 
@@ -82,43 +96,44 @@ export default function useWallet({
 			? (activeWallet as CurrecncyWalletSchema).id
 			: undefined;
 
-	const { data: pointsTransactions } = useGetPointsTransactions({
-		tokenWalletAccountId: pointsWalletId,
-	});
+	// Every page loaded so far ("نمایش بیشتر" asks for the next one), newest first.
+	const pointsHistory = useWalletHistory("points", pointsWalletId);
+	const currencyHistory = useWalletHistory("currency", currencyWalletId);
 
-	const { data: currencyTransactions } = useGetCurrencyTransactions({
-		currencyWalletAccountId: currencyWalletId,
-	});
+	const pointsTransactionsData = useMemo(
+		() =>
+			(pointsHistory.data?.pages ?? [])
+				.flatMap((page: WalletHistoryPage | undefined) => page?.results ?? [])
+				.map((transaction) => ({
+					id: transaction.id,
+					title: transaction.title,
+					date: formatTehranDateTime(transaction.date),
+					amount: transaction.is_positive
+						? Number(transaction.amount)
+						: -Number(transaction.amount),
+					image: transaction.icon || DEFAULT_IMAGE,
+				})),
+		[pointsHistory.data],
+	);
 
-	const pointsTransactionsData = useMemo(() => {
-		if (!pointsTransactions?.result.results) return [];
-		return pointsTransactions.result.results.map((transaction) => ({
-			title: transaction.title,
-			date: isoStringToString(transaction.date, true, true),
-			amount: transaction.is_positive
-				? Number(transaction.amount)
-				: -Number(transaction.amount),
-			image: transaction.icon || DEFAULT_IMAGE,
-		}));
-	}, [pointsTransactions]);
-
-	const currencyTransactionsData = useMemo(() => {
-		if (!currencyTransactions?.result.results) return [];
-		return currencyTransactions.result.results.map((transaction) => {
-			const dateWithTime = isoStringToString(
-				transaction.create_time,
-				true,
-				true,
-			);
-			return {
-				id: transaction.id,
-				title: transaction.type,
-				date: dateWithTime,
-				amount: transaction.amount,
-				destination: transaction.destination_name,
-			};
-		});
-	}, [currencyTransactions]);
+	const currencyTransactionsData = useMemo(
+		() =>
+			(currencyHistory.data?.pages ?? [])
+				.flatMap((page: WalletHistoryPage | undefined) => page?.results ?? [])
+				.map((transaction) => ({
+					id: transaction.id,
+					title: transaction.title,
+					date: formatTehranDateTime(transaction.date),
+					amount: transaction.amount,
+					positive: transaction.is_positive,
+					statusLabel: transaction.status_label,
+					failed:
+						transaction.status === "failed" || transaction.status === "cancelled",
+					destination: transaction.destination_name ?? undefined,
+					reference: transaction.reference,
+				})),
+		[currencyHistory.data],
+	);
 
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [isAddBankAccountDrawerOpen, setIsAddBankAccountDrawerOpen] =
@@ -148,17 +163,20 @@ export default function useWallet({
 		refetchBankAccounts();
 	}, [refetchCurrencySummary, refetchBankAccounts]);
 
+	// This page shows its own errors (requester does not toast on /pwa/wallet): say what failed;
+	// the drawer stays open with what was typed.
 	const { submitHandler: createBankAccount, isSending: isCreatingBankAccount } =
 		useMutate<CreateBankAccountApiResponse, CreateBankAccountRequest>({
 			url: WALLET.CREATE_BANK_ACCOUNT,
 			method: "POST",
 			onSuccess: handleAddAccountSuccess,
+			onError: (error) => toast.error(gameErrorMessage(error)),
 		});
 
 	const handleAddAccount = useCallback(
 		(data: { iban: string; bank: string; accountHolder: string }) => {
 			createBankAccount({
-				iban: data.iban,
+				iban: normalizeIban(data.iban),
 				bank: data.bank,
 				account_holder: data.accountHolder,
 			});
@@ -191,6 +209,7 @@ export default function useWallet({
 			url: WALLET.WITHDRAW_CURRENCY,
 			method: "POST",
 			onSuccess: handleWithdrawSuccess,
+			onError: (error) => toast.error(gameErrorMessage(error)),
 		});
 
 	const handleWithdraw = useCallback(
@@ -263,7 +282,7 @@ export default function useWallet({
 			content: (
 				<Box display="flex" flexDirection="column" gap={2}>
 					{pointsTransactionsData.map((transaction, index, array) => (
-						<Fragment key={`${transaction.title}-${index}`}>
+						<Fragment key={transaction.id}>
 							<TransactionsCard
 								title={transaction.title}
 								date={transaction.date}
@@ -273,6 +292,7 @@ export default function useWallet({
 							{index < array.length - 1 && <Divider />}
 						</Fragment>
 					))}
+					<HistoryFooter history={pointsHistory} empty={!pointsTransactionsData.length} />
 				</Box>
 			),
 		},
@@ -331,17 +351,24 @@ export default function useWallet({
 			content: (
 				<Box display="flex" flexDirection="column" gap={2}>
 					{currencyTransactionsData.map((transaction, index, array) => (
-						<Fragment key={`${transaction.id}-${index}`}>
+						<Fragment key={transaction.id}>
 							<CurrencyTransactionCard
-								title="انتقال وجه"
+								title={transaction.title}
 								date={transaction.date}
 								amount={transaction.amount}
+								positive={transaction.positive}
+								statusLabel={transaction.statusLabel ?? undefined}
+								failed={transaction.failed}
 								destination={transaction.destination}
-								identifierNumber={undefined}
+								identifierNumber={transaction.reference}
 							/>
 							{index < array.length - 1 && <Divider />}
 						</Fragment>
 					))}
+					<HistoryFooter
+						history={currencyHistory}
+						empty={!currencyTransactionsData.length}
+					/>
 				</Box>
 			),
 		},
@@ -368,6 +395,8 @@ export default function useWallet({
 		bankAccounts: bankAccountsData?.result?.results || [],
 		concatWallets,
 		isWalletsLoading,
+		walletsFailed,
+		retryWallets,
 		walletTabs,
 		currencyWalletTabs,
 		isDrawerOpen,
@@ -389,4 +418,51 @@ export default function useWallet({
 		handleBuyTicket,
 		handleBack,
 	};
+}
+
+/** Under a history list: loading, its error with a retry, "nothing yet", or "show more". */
+function HistoryFooter({
+	history,
+	empty,
+}: {
+	history: ReturnType<typeof useWalletHistory>;
+	empty: boolean;
+}) {
+	if (history.isLoading) {
+		return (
+			<Typography color="text.secondary" textAlign="center" sx={{ py: 2, fontSize: 13 }}>
+				در حال بارگذاری…
+			</Typography>
+		);
+	}
+	if (history.isError) {
+		return (
+			<Box display="flex" flexDirection="column" alignItems="center" gap={1} sx={{ py: 2 }} role="alert">
+				<Typography color="error" sx={{ fontSize: 13 }}>
+					تراکنش‌ها بارگذاری نشد.
+				</Typography>
+				<Button variant="outlined" size="small" onClick={() => history.refetch()}>
+					دوباره تلاش کن
+				</Button>
+			</Box>
+		);
+	}
+	if (empty) {
+		return (
+			<Typography color="text.secondary" textAlign="center" sx={{ py: 4, fontSize: 14 }}>
+				هنوز تراکنشی ثبت نشده است.
+			</Typography>
+		);
+	}
+	if (!history.hasNextPage) return null;
+	return (
+		<Button
+			variant="outlined"
+			onClick={() => history.fetchNextPage()}
+			disabled={history.isFetchingNextPage}
+			sx={{ alignSelf: "center" }}
+		>
+			{history.isFetchingNextPage ? "در حال بارگذاری…" : "نمایش بیشتر"}
+		</Button>
+	);
 }

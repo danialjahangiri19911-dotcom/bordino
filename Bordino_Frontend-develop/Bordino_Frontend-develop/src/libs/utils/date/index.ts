@@ -57,3 +57,19 @@ export function getRemainingSeconds(isoString: string): number {
 	const diffSec = Math.floor((end - now) / 1000);
 	return diffSec > 0 ? diffSec : 0;
 }
+
+const TEHRAN_DATE_TIME = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+	timeZone: "Asia/Tehran",
+	year: "numeric",
+	month: "2-digit",
+	day: "2-digit",
+	hour: "2-digit",
+	minute: "2-digit",
+	hour12: false,
+});
+
+/** A moment from the API (ISO with its zone) as Tehran time in the Persian calendar, «۱۴۰۵/۰۸/۰۱، ۰۱:۰۰», whatever the device's own time zone. */
+export function formatTehranDateTime(iso: string): string {
+	const date = new Date(iso);
+	return Number.isNaN(date.getTime()) ? "" : TEHRAN_DATE_TIME.format(date);
+}

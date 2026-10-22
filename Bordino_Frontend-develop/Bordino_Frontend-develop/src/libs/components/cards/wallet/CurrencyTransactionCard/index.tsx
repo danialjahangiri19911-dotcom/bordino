@@ -10,6 +10,12 @@ interface Props {
 	amount: string;
 	destination?: string;
 	identifierNumber?: string;
+	/** Money in (prize) or out (withdrawal): shown as + / − and colour. */
+	positive?: boolean;
+	/** A withdrawal's state in Persian («در انتظار واریز», …). */
+	statusLabel?: string;
+	/** Failed or cancelled: the amount went back, so it is shown struck through. */
+	failed?: boolean;
 }
 
 function CurrencyTransactionCard({
@@ -18,6 +24,9 @@ function CurrencyTransactionCard({
 	amount,
 	destination,
 	identifierNumber,
+	positive = false,
+	statusLabel,
+	failed = false,
 }: Readonly<Props>) {
 	const formatAmount = (amountStr: string) => {
 		const num = Number(amountStr);
@@ -32,8 +41,16 @@ function CurrencyTransactionCard({
 					justifyContent="space-between"
 					alignItems="flex-start"
 				>
-					<Typography variant="14-medium" color="text.primary">
-						{formatAmount(amount)} تومان
+					<Typography
+						variant="14-medium"
+						color={failed ? "text.secondary" : positive ? "success.main" : "error.main"}
+						sx={{ textDecoration: failed ? "line-through" : undefined, direction: "ltr" }}
+					>
+						{/* The sign in an isolated run so it stays on the number's side in RTL. */}
+						{"\u2066"}
+						{positive ? "+" : "−"}
+						{formatAmount(amount)}
+						{"\u2069"} تومان
 					</Typography>
 					<Box
 						display="flex"
@@ -49,6 +66,20 @@ function CurrencyTransactionCard({
 						</Typography>
 					</Box>
 				</Box>
+
+				{statusLabel && (
+					<Box display="flex" justifyContent="space-between" alignItems="center">
+						<Typography variant="12-regular" color="text.secondary">
+							وضعیت
+						</Typography>
+						<Typography
+							variant="12-medium"
+							color={failed ? "error.main" : "text.primary"}
+						>
+							{statusLabel}
+						</Typography>
+					</Box>
+				)}
 
 				{destination && (
 					<Box

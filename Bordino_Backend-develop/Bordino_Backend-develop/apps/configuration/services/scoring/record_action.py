@@ -4,9 +4,13 @@ from apps.configuration.repositories.game import GameConfigurationQueryRepositor
 from apps.configuration.services.scoring.dto import AwardScoreDTO
 from apps.configuration.services.scoring.record_action_result import RecordActionResult
 from apps.configuration.services.scoring.service import ScoreService
+from apps.wallet.models import GamePlayCharge
 from apps.wallet.repositories.activity_transaction import ActivityTransactionQueryRepository
 
 User = get_user_model()
+
+# Sections whose rewards come from a game charged per play (GamePlayChargeService game names).
+PAID_GAMES = ("sudoku", "game_2048")
 
 
 class RecordActionService:
@@ -50,6 +54,14 @@ class RecordActionService:
                 already_exists=True,
                 message="Action already recorded",
             )
+
+        # Sudoku and 2048 run in the browser, so the server cannot see a game being won; it can
+        # see that one was paid for. No paid play of that game, no reward for it (each action
+        # pays once per customer, see above).
+        if section in PAID_GAMES and not GamePlayCharge.objects.filter(
+            customer=customer, game_name=section
+        ).exists():
+            raise ValueError("Play the game before its rewards can be recorded")
 
         score_service = ScoreService()
         activity_transaction = score_service.award_score(

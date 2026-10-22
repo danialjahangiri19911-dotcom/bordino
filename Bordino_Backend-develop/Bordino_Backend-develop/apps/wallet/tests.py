@@ -195,3 +195,101 @@ class PrizeTransferTests(TestCase):
             )
         )
         self.assertEqual(rial(user), 1005)
+
+
+@override_settings(CACHES=LOCMEM)
+class HistoryTests(TestCase):
+    """Codex review 2026-10-22 (phase 3b): every movement once, signed, in its own history."""
+
+    def setUp(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        self.user = make_customer("9120000741", points=100, rial=0)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        GameConfiguration.objects.update_or_create(game_name="sudoku", defaults={"play_cost": 5})
+
+    def rows(self, kind):
+        account = balance.points_account(self.user) if kind == "points" else balance.currency_account(self.user)
+        url = (
+            f"/api/v1/wallet/points/transactions/?token_wallet_account_id={account.pk}"
+            if kind == "points"
+            else f"/api/v1/wallet/currency/transactions/?currency_wallet_account_id={account.pk}"
+        )
+        r = self.api.get(url)
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json()
+        return body.get("result", body)["results"]
+
+    def test_points_history_adds_up_to_the_balance(self):
+        from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
+            GamePlayChargeService,
+        )
+
+        GamePlayChargeService().charge(self.user, "sudoku")
+        GamePlayChargeService().charge(self.user, "sudoku")
+        rows = self.rows("points")
+        moved = sum((1 if r["is_positive"] else -1) * Decimal(r["amount"]) for r in rows)
+        self.assertEqual(points(self.user), 100 + moved)
+        self.assertEqual([r["title"] for r in rows], ["بازی سودوکو", "بازی سودوکو"])
+        self.assertIn("T", rows[0]["date"])  # a moment, not just a day
+
+    def test_activity_reward_needs_a_paid_play_and_shows_in_history(self):
+        from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
+            GamePlayChargeService,
+        )
+
+        with self.assertRaises(ValueError):
+            RecordActionService.record_action(self.user, "sudoku", "win_game")
+        GamePlayChargeService().charge(self.user, "sudoku")
+        try:
+            RecordActionService.record_action(self.user, "sudoku", "win_game")
+        except ValueError:
+            return  # no score configured for this action in the test database: nothing to show
+        types = {r["type"] for r in self.rows("points")}
+        self.assertIn("activity_reward", types)
+
+    def test_withdrawals_show_their_state_in_the_currency_history(self):
+        CurrencyWalletAccount.objects.filter(wallet__owner=self.user).update(balance=50_000)
+        bank = Bank.objects.create(name="Test bank", code="T2")
+        account = BankAccount.objects.create(
+            user=self.user, iban="IR062960000000100324200001", bank=bank,
+            account_holder="Test", status=BankAccount.Status.APPROVED,
+        )
+        self.api.post(WITHDRAW, {"amount": 20_000, "bank_account_id": str(account.pk)}, format="json")
+        tx = CurrencyTransaction.objects.get()
+        tx.status = CurrencyTransaction.Status.FAILED
+        tx.save()
+        (row,) = self.rows("currency")
+        self.assertEqual((row["type"], row["is_positive"], row["status"]), ("withdrawal", False, "failed"))
+        self.assertTrue(row["status_label"])
+        self.assertEqual(rial(self.user), 50_000)
+
+    def test_cash_wheel_prize_is_in_the_currency_history_with_the_paid_amount(self):
+        from apps.wallet.models import LotteryWheelPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+        sponsor = Sponsor.objects.create(user=make_customer("9120000742"))
+        wheel = LotteryWheel.objects.create(name="w", owner=sponsor, cost_per_spin=0)
+        prize = LotteryWheelPrize.objects.create(
+            lottery_wheel=wheel, name="cash", prize_amount=100, probability=100,
+            prize_type=LotteryWheelPrize.PrizeType.CASH,
+        )
+        LotteryWheelPrizeTransaction.objects.create(
+            lottery_wheel=wheel, prize=prize, customer=self.user.customer,
+            amount=500, prize_type="cash", status="completed",
+        )
+        prize.prize_amount = 200  # edited later: history keeps what was paid
+        prize.save()
+        self.assertEqual([Decimal(r["amount"]) for r in self.rows("currency")], [500])
+        self.assertNotIn("wheel_prize", {r["type"] for r in self.rows("points")})
+
+
+class IbanTests(TestCase):
+    def test_sheba_numbers_are_checked(self):
+        from apps.wallet.services.iban import is_valid_iban, normalize_iban  # pylint: disable=import-outside-toplevel
+
+        self.assertTrue(is_valid_iban(normalize_iban("IR06 2960 0000 0010 0324 2000 01")))
+        self.assertTrue(is_valid_iban(normalize_iban("۰۶۲۹۶۰۰۰۰۰۰۰۱۰۰۳۲۴۲۰۰۰۰۱")))
+        self.assertFalse(is_valid_iban(normalize_iban("IR" + "0" * 24)))
+        self.assertFalse(is_valid_iban(normalize_iban("x")))

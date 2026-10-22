@@ -31,11 +31,11 @@ class PointsWalletSummaryView(APIView):
             "token", "preset_wallet", "wallet"
         )
 
+        # Points are counted as points (what a ticket, a game or a bet costs), not valued in money:
+        # × token price showed 0 with a price of 0 and 10× with a price of 10.
         active_lottery = Lottery.objects.filter(status=Lottery.Status.ACTIVE).first()
         if active_lottery and active_lottery.token:
-            required_points = Decimal(active_lottery.ticket_price) * Decimal(
-                active_lottery.token.price
-            )
+            required_points = Decimal(active_lottery.ticket_price)
         else:
             required_points = Decimal(100)
 
@@ -46,7 +46,7 @@ class PointsWalletSummaryView(APIView):
         account_summaries = []
         for account in token_accounts:
             if account.token:
-                total_points = Decimal(account.amount) * Decimal(account.token.price)
+                total_points = Decimal(account.amount)
                 if required_points > 0:
                     current_points = total_points % required_points
                     remaining_points = required_points - current_points

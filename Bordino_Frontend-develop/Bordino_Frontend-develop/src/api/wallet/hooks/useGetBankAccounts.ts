@@ -8,7 +8,9 @@ export default function useGetBankAccounts(
 ) {
 	const { data, isLoading, error, refetch } = useQuery<BankAccountsApiResponse>(
 		{
-			url: WALLET.GET_BANK_ACCOUNTS,
+			// All of them (the server's maximum page), not the first 20: the withdrawal picker
+			// would otherwise miss an approved account behind newer pending ones.
+			url: `${WALLET.GET_BANK_ACCOUNTS}?page_size=100`,
 			headers: true,
 			...props,
 		},

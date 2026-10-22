@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from apps.configuration.repositories.game import GameConfigurationQueryRepository
+from apps.wallet.models import GamePlayCharge
 from apps.wallet.services import balance
 
 
@@ -38,6 +39,10 @@ class GamePlayChargeService:
         if cost > 0:
             balance.check_debit(account, cost, _("امتیازِ کافی برای بازی نداری."))
             balance.add_points(account, -cost)
+        # Recorded even when free: it is the play's history row and its proof (activity rewards).
+        GamePlayCharge.objects.create(
+            customer=user.customer, token_account=account, game_name=game_name, cost=cost
+        )
 
         return self.ChargeResult(
             game_name=game_name,

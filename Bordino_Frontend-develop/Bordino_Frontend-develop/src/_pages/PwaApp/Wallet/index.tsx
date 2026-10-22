@@ -36,6 +36,8 @@ export default function Wallet() {
 	const {
 		concatWallets,
 		isWalletsLoading,
+		walletsFailed,
+		retryWallets,
 		handleExchange,
 		isDrawerOpen,
 		handleDrawerClose,
@@ -295,6 +297,18 @@ export default function Wallet() {
 					<LoadingContainer>
 						<CircularProgress color="error" />
 					</LoadingContainer>
+				) : walletsFailed ? (
+					<EmptyStateContainer role="alert">
+						<Typography variant="16-medium" color="text.secondary" textAlign="center">
+							کیف پول بارگذاری نشد
+						</Typography>
+						<Typography variant="12-regular" color="text.disabled" textAlign="center">
+							اتصال را بررسی کنید و دوباره تلاش کنید.
+						</Typography>
+						<Button variant="outlined" size="small" onClick={retryWallets}>
+							دوباره تلاش کن
+						</Button>
+					</EmptyStateContainer>
 				) : concatWallets && concatWallets.length > 0 ? (
 					<Swiper
 						modules={[Navigation]}
@@ -358,7 +372,7 @@ export default function Wallet() {
 						</Typography>
 					</EmptyStateContainer>
 				)
-			) : concatWallets && concatWallets.length === 0 ? null : (
+			) : walletsFailed || (concatWallets && concatWallets.length === 0) ? null : (
 				<EmptyStateContainer>
 					<ImageBox src={QUESTION_ICON} width={64} height={64} />
 

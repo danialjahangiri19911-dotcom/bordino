@@ -5,6 +5,7 @@ from apps.wallet.models.base_wallet_account import BaseWalletAccount
 from apps.wallet.models.currency import Currency
 from apps.wallet.models.currency_preset_wallet import CurrencyPresetWallet
 from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
+from apps.wallet.models.game_play_charge import GamePlayCharge
 from apps.wallet.models.token import Token
 from apps.wallet.models.token_preset_wallet import TokenPresetWallet
 from apps.wallet.models.token_wallet_account import TokenWalletAccount

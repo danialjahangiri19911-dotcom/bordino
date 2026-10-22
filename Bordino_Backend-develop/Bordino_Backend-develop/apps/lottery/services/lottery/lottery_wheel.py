@@ -162,6 +162,7 @@ class LotteryWheelService:
         LotteryWheelSpinLog.objects.create(
             lottery_wheel=dto.lottery_wheel,
             customer=dto.customer,
+            cost=int(dto.lottery_wheel.cost_per_spin),
             multiplier=multiplier,
             prize=selected_prize if selected_prize.pk else None,
         )

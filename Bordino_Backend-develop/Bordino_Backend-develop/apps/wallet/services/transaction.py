@@ -88,6 +88,8 @@ class TransactionService:
             lottery_wheel=dto.lottery_wheel,
             customer=dto.customer,
             prize=dto.prize,
+            amount=dto.prize.prize_amount,  # already × multiplier (lottery_wheel.spin_wheel)
+            prize_type=dto.prize.prize_type,
             description=_("Lottery wheel prize: {}").format(dto.prize.name),
             status=LotteryWheelPrizeTransaction.Status.COMPLETED,
         )

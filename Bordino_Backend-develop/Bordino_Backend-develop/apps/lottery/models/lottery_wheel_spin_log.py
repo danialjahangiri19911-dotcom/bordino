@@ -29,6 +29,8 @@ class LotteryWheelSpinLog(AbstractBaseModel):
         related_name="lottery_wheel_spin_logs",
         verbose_name=_("Customer"),
     )
+    # Points paid for this spin (the wheel's cost at the time).
+    cost = models.PositiveIntegerField(verbose_name=_("Cost"), default=0)
     multiplier = models.PositiveSmallIntegerField(
         verbose_name=_("Multiplier"),
         default=1,
