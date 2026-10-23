@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import React from "react";
 
-// There is no shop yet: send anyone who arrives here (old link, typed address) to the home page.
-export default function ShopPage() {
-	redirect("/pwa/main");
+import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
+
+export default function page() {
+	return <PwaAppPageLayout>shop</PwaAppPageLayout>;
 }
