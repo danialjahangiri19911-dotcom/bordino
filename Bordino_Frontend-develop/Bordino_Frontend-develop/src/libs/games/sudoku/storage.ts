@@ -7,6 +7,8 @@ import {
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { currentUserId } from "@/libs/stores/authStore";
+
 // ----------------------------------------------------------------------
 // Types matching the game state we need to persist
 // ----------------------------------------------------------------------
@@ -137,15 +139,23 @@ export function deserializeGameState(persisted: PersistedGameState): any {
 // ----------------------------------------------------------------------
 // Zustand store interface
 // ----------------------------------------------------------------------
+type Completions = { easy: number; medium: number };
+const NO_COMPLETIONS: Completions = { easy: 0, medium: 0 };
+
 interface SudokuStore {
-	// Persisted game state
+	// Persisted game state (the board in progress)
 	gameState: PersistedGameState | null;
+	// Levels completed: kept apart from the board, so leaving a game keeps the unlocks.
+	completions: Completions | null;
+	// Whose save this is (JWT user id): on a shared phone, another account starts fresh.
+	owner: string | null;
 
 	// Actions
+	ensureOwner: () => void;
 	saveGame: (state: any) => void;
 	clearGame: () => void;
 	recordCompletion: (difficulty: Difficulty) => void;
-	getCompletionCounts: () => { easy: number; medium: number };
+	getCompletionCounts: () => Completions;
 	isMediumUnlocked: () => boolean;
 	isHardUnlocked: () => boolean;
 }
@@ -155,84 +165,58 @@ interface SudokuStore {
 // ----------------------------------------------------------------------
 export const useSudokuStore = create<SudokuStore>()(
 	persist(
-		(set, get) => ({
-			gameState: null,
+		(set, get) => {
+			// Completions of the current user (older saves kept them inside gameState).
+			const owned = (): Completions => {
+				const { owner, completions, gameState } = get();
+				if (owner !== currentUserId()) return NO_COMPLETIONS;
+				return completions ?? gameState?.completions ?? NO_COMPLETIONS;
+			};
+			return {
+				gameState: null,
+				completions: null,
+				owner: null,
 
-			saveGame: (state: any) => {
-				const serialized = serializeGameState(state);
-				set({ gameState: serialized });
-			},
+				ensureOwner: () => {
+					const me = currentUserId();
+					if (get().owner !== me) set({ gameState: null, completions: null, owner: me });
+				},
 
-			clearGame: () => {
-				set({ gameState: null });
-			},
+				saveGame: (state: any) => {
+					const serialized = serializeGameState(state);
+					set({ gameState: serialized, owner: currentUserId() });
+				},
 
-			recordCompletion: (difficulty: Difficulty) => {
-				const current = get().gameState;
-				const completions = current?.completions ?? { easy: 0, medium: 0 };
+				clearGame: () => {
+					set({ gameState: null });
+				},
 
-				if (difficulty === "easy") {
-					completions.easy += 1;
-				} else if (difficulty === "medium") {
-					completions.medium += 1;
-				}
-				// Hard completions aren't tracked for unlocking further
+				recordCompletion: (difficulty: Difficulty) => {
+					const completions = { ...owned() };
+					if (difficulty === "easy") {
+						completions.easy += 1;
+					} else if (difficulty === "medium") {
+						completions.medium += 1;
+					}
+					// Hard completions aren't tracked for unlocking further
+					set({ completions, owner: currentUserId() });
+				},
 
-				set({
-					gameState: current
-						? { ...current, completions }
-						: {
-								solution: [],
-								board: [],
-								selectedCell: null,
-								rowCounts: [],
-								colCounts: [],
-								squareCounts: [],
-								history: [],
-								historyIndex: 0,
-								difficulty: null,
-								status: "menu",
-								mistakes: 0,
-								timeRemaining: 0,
-								maxTime: 0,
-								maxMistakes: 3,
-								maxHints: 0,
-								remainingHints: 0,
-								completions,
-								lastUpdated: Date.now(),
-							},
-				});
-			},
+				getCompletionCounts: () => owned(),
 
-			getCompletionCounts: () => {
-				const completions = get().gameState?.completions ?? {
-					easy: 0,
-					medium: 0,
-				};
-				return completions;
-			},
+				isMediumUnlocked: () => owned().easy >= 1,
 
-			isMediumUnlocked: () => {
-				const completions = get().gameState?.completions ?? {
-					easy: 0,
-					medium: 0,
-				};
-				return completions.easy >= 1;
-			},
-
-			isHardUnlocked: () => {
-				const completions = get().gameState?.completions ?? {
-					easy: 0,
-					medium: 0,
-				};
-				return completions.medium >= 2;
-			},
-		}),
+				isHardUnlocked: () => owned().medium >= 2,
+			};
+		},
 		{
 			name: "sudoku-evolved-storage", // unique name for localStorage
 			storage: createJSONStorage(() => localStorage),
-			// Only persist gameState
-			partialize: (state) => ({ gameState: state.gameState }),
+			partialize: (state) => ({
+				gameState: state.gameState,
+				completions: state.completions,
+				owner: state.owner,
+			}),
 		},
 	),
 );

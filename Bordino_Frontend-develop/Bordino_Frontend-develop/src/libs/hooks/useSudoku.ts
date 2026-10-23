@@ -25,6 +25,7 @@ import type {
 	GameState,
 	Index,
 } from "@/libs/games/sudoku/types";
+import { currentUserId } from "@/libs/stores/authStore";
 
 // new import
 
@@ -35,7 +36,13 @@ export function useSudoku() {
 		saveGame,
 		clearGame,
 		recordCompletion,
+		ensureOwner,
 	} = useSudokuStore();
+
+	// A save left by another account on this device is not resumed (nor its unlocks shown).
+	useEffect(() => {
+		if (hydrated) ensureOwner();
+	}, [hydrated, ensureOwner]);
 
 	const [requestedDifficulty, setRequestedDifficulty] =
 		useState<Difficulty | null>(null);
@@ -77,6 +84,8 @@ export function useSudoku() {
 		if (!hydrated) return;
 		if (!persistedGame) return;
 		if (state.status !== "menu") return;
+		// Only this account's save (ensureOwner clears another's in the same render).
+		if (useSudokuStore.getState().owner !== currentUserId()) return;
 
 		const deserialized = deserializeGameState(persistedGame);
 

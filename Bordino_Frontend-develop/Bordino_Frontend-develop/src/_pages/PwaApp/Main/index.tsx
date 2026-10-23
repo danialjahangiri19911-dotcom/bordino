@@ -4,9 +4,7 @@ import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import DailyTasks from "./DailyTasks";
 import PromoCarousel from "./PromoCarousel";
-import { DAILY_TASKS_MOCK_DATA, SPECIAL_CHALLENGE } from "./mockData";
 import Stack from "@mui/material/Stack";
 import HafezDrawer from "@pages/PwaApp/Hafez/HafezDrawer";
 
@@ -49,15 +47,10 @@ export default function Main() {
 					remainingTime={remainingTime}
 				/>
 
-				<DailyTasks tasks={DAILY_TASKS_MOCK_DATA} />
-
+				{/* The daily tasks and «چالش ویژه» were mock data (the same «done» ticks, points and
+				   «72 ساعت تا اتمام» for everyone, every task opening the lottery): hidden until
+				   real tasks exist. */}
 				<PromoCarousel onHafezClick={() => setHafezOpen(true)} />
-
-				<DailyTasks
-					tasks={SPECIAL_CHALLENGE}
-					extraContent="72 ساعت تا اتمام"
-					title="چالش ویژه 🔥"
-				/>
 			</Stack>
 			<HafezDrawer open={hafezOpen} onClose={() => setHafezOpen(false)} />
 		</PwaAppPageLayout>

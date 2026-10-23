@@ -60,6 +60,12 @@ export function tokenUser(token: string | null): unknown {
 	}
 }
 
+/** The logged-in user's id ("" when nobody is): the owner of per-device game saves. */
+export function currentUserId(): string {
+	const id = tokenUser(useAuthStore.getState().accessToken);
+	return id === null || id === undefined ? "" : String(id);
+}
+
 // Every tab shares one session: when another tab refreshes the tokens (they rotate, so this tab's
 // copy stops working), logs out or logs in as someone else, take its copy. A tab that was logged
 // in and no longer is leaves the app like a logout here would; a tab whose user changed reloads,

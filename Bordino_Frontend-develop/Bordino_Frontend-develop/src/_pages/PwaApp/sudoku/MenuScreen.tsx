@@ -12,6 +12,8 @@ interface MenuScreenProps {
 	mediumUnlocked: boolean;
 	hardUnlocked: boolean;
 	onSelectDifficulty: (difficulty: "easy" | "medium" | "hard") => void;
+	/** A game is being started (and paid for): no second tap. */
+	busy?: boolean;
 }
 
 export function MenuScreen({
@@ -19,6 +21,7 @@ export function MenuScreen({
 	mediumUnlocked,
 	hardUnlocked,
 	onSelectDifficulty,
+	busy = false,
 }: MenuScreenProps) {
 	return (
 		<Container
@@ -51,6 +54,7 @@ export function MenuScreen({
 					variant="contained"
 					size="large"
 					sx={{ mb: 2 }}
+					disabled={busy}
 					onClick={() => onSelectDifficulty("easy")}
 				>
 					آسان
@@ -66,7 +70,7 @@ export function MenuScreen({
 					variant={mediumUnlocked ? "contained" : "outlined"}
 					size="large"
 					sx={{ mb: 2 }}
-					disabled={!mediumUnlocked}
+					disabled={!mediumUnlocked || busy}
 					onClick={() => mediumUnlocked && onSelectDifficulty("medium")}
 				>
 					متوسط
@@ -82,7 +86,7 @@ export function MenuScreen({
 					fullWidth
 					variant={hardUnlocked ? "contained" : "outlined"}
 					size="large"
-					disabled={!hardUnlocked}
+					disabled={!hardUnlocked || busy}
 					onClick={() => hardUnlocked && onSelectDifficulty("hard")}
 				>
 					سخت

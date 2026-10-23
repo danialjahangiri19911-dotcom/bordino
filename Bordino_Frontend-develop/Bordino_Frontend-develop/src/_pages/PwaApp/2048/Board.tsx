@@ -11,34 +11,35 @@ import { GameContext } from "@/libs/context/2048/GameProvider";
 
 import styles from "./board.module.css";
 
+const ARROWS: Record<string, "up" | "down" | "left" | "right"> = {
+	ArrowUp: "up",
+	ArrowDown: "down",
+	ArrowLeft: "left",
+	ArrowRight: "right",
+};
+
 export default function Board() {
 	const game = useContext(GameContext);
 	if (!game) throw new Error("Board must be used within GameProvider");
-	const { move, status, tiles, tilesByIds } = game;
+	const { move, status, tiles, tilesByIds, needsStart } = game;
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
+			// Only the arrows move tiles, and only on a paid game; every other key (Tab, Space,
+			// Enter on a button) keeps working, and keys typed into a control are left alone.
+			const direction = ARROWS[e.code];
+			if (!direction || needsStart) return;
+			const tag = (e.target as HTMLElement | null)?.tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 			e.preventDefault();
-			switch (e.code) {
-				case "ArrowUp":
-					move("up");
-					break;
-				case "ArrowDown":
-					move("down");
-					break;
-				case "ArrowLeft":
-					move("left");
-					break;
-				case "ArrowRight":
-					move("right");
-					break;
-			}
+			move(direction);
 		},
-		[move],
+		[move, needsStart],
 	);
 
 	const handleSwipe = useCallback(
 		({ deltaX, deltaY }: SwipeInput) => {
+			if (needsStart) return;
 			if (Math.abs(deltaX) > Math.abs(deltaY)) {
 				if (deltaX > 0) move("right");
 				else move("left");
@@ -47,7 +48,7 @@ export default function Board() {
 				else move("up");
 			}
 		},
-		[move],
+		[move, needsStart],
 	);
 
 	useEffect(() => {

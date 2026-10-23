@@ -8,6 +8,8 @@ import BaseBottomNavigation, {
 import Paper, { type PaperProps } from "@libs/components/atoms/Paper";
 import styled from "@libs/styles/styled";
 
+import { GAME_NET, MAIN_APP } from "@/constants/routes";
+
 interface BottomNavigationItem {
 	title: string;
 	path: string;
@@ -18,16 +20,26 @@ interface Props {
 	sx?: PaperProps["sx"];
 }
 
+const SECTION_OF: [string, string][] = [
+	...["/pwa/2048", "/pwa/sudoku", "/pwa/crash", "/pwa/chicken"].map(
+		(prefix): [string, string] => [prefix, GAME_NET.path],
+	),
+	...["/pwa/lottery", "/pwa/wheel", "/pwa/tarot", "/pwa/hafez"].map(
+		(prefix): [string, string] => [prefix, MAIN_APP.path],
+	),
+];
+
 export default function BottomNavigation({ items, sx = {} }: Readonly<Props>) {
-	const [value, setValue] = useState(0);
+	const [value, setValue] = useState<number | false>(false);
 	const { push } = useRouter();
 	const pathname = usePathname();
 
+	// The tab of the section a page belongs to: games under گیمنت, lottery/wheel/fal under home;
+	// a page of no section selects no tab (it used to keep whatever was selected before).
 	useEffect(() => {
-		const index = items.findIndex((item) => pathname.includes(item.path));
-		if (index !== -1) {
-			setValue(index);
-		}
+		const section = SECTION_OF.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? pathname;
+		const index = items.findIndex((item) => section.startsWith(item.path));
+		setValue(index === -1 ? false : index);
 	}, [pathname, items]);
 
 	const handleNavigationChange = (

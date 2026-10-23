@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 
 import useGetTarotReading from "@/api/entertainment/hooks/useGetTarotReading";
 import type { TarotSpread } from "@/api/entertainment/types/tarotType";
+import ButtonBase from "@mui/material/ButtonBase";
+
 import Box from "@/libs/components/atoms/Box";
 import Button from "@/libs/components/atoms/Button";
 import CircularProgress from "@/libs/components/atoms/CircularProgress";
@@ -50,7 +52,8 @@ export default function Tarot() {
 						نوعِ فالت را انتخاب کن
 					</Typography>
 					<Box display="flex" gap={2}>
-						<ChoiceCard onClick={() => choose(3)}>
+						{/* Real buttons: Tab reaches them, Enter/Space choose. */}
+						<ChoiceCard type="button" onClick={() => choose(3)}>
 							<ChoiceIcon>🃏</ChoiceIcon>
 							<Typography variant="16-medium" color="text.primary">
 								فال ۳ کارتی
@@ -59,7 +62,7 @@ export default function Tarot() {
 								گذشته، حال، آینده
 							</Typography>
 						</ChoiceCard>
-						<ChoiceCard onClick={() => choose(5)}>
+						<ChoiceCard type="button" onClick={() => choose(5)}>
 							<ChoiceIcon>🪬</ChoiceIcon>
 							<Typography variant="16-medium" color="text.primary">
 								فال ۵ کارتی
@@ -160,7 +163,7 @@ const Center = styled(Box)(({ theme }) => ({
 	minHeight: 200,
 }));
 
-const ChoiceCard = styled(Box)(({ theme }) => ({
+const ChoiceCard = styled(ButtonBase)(({ theme }) => ({
 	flex: 1,
 	display: "flex",
 	flexDirection: "column",

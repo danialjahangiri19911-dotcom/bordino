@@ -95,6 +95,20 @@ function PromoCard({ slide, onActivate }: Readonly<{ slide: SlideSpec; onActivat
 	return (
 		<div
 			onClick={onActivate}
+			// A promo that opens something is a button for the keyboard and screen readers too.
+			{...(onActivate
+				? {
+						role: "button",
+						tabIndex: 0,
+						"aria-label": slide.title,
+						onKeyDown: (event: React.KeyboardEvent) => {
+							if (event.key === "Enter" || event.key === " ") {
+								event.preventDefault();
+								onActivate();
+							}
+						},
+					}
+				: {})}
 			style={{
 				position: "relative",
 				width: "100%",

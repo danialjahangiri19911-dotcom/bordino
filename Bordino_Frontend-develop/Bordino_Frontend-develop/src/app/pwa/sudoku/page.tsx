@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { toast } from "react-toastify";
 
 import Container from "@mui/material/Container";
 
 import useChargeGamePlay from "@/api/games/useChargeGamePlay";
 import useGetPlayCost from "@/api/games/useGetPlayCost";
+import { GAME_URLS } from "@/api/urls";
 import { ActionButtons } from "@/_pages/PwaApp/sudoku/ActionButtons";
 import { ExitConfirmDialog, VictoryMessage } from "@/_pages/PwaApp/sudoku/Dialogs";
 import { GameBoard } from "@/_pages/PwaApp/sudoku/GameBoard";
@@ -14,6 +16,7 @@ import { MenuScreen } from "@/_pages/PwaApp/sudoku/MenuScreen";
 import { NumberPad } from "@/_pages/PwaApp/sudoku/NumberPad";
 import LostDialog from "@/libs/components/games/LostDialog";
 import PageLoading from "@/libs/components/loading/PageLoading";
+import { fetchWithAuth } from "@/libs/http/query";
 import { useSudokuStore } from "@/libs/games/sudoku/storage";
 import type { Difficulty, Index } from "@/libs/games/sudoku/types";
 import { useSudoku } from "@/libs/hooks/useSudoku";
@@ -70,14 +73,34 @@ export default function SudokuPage() {
 		}
 	}, [status]);
 
-	// شروعِ بازیِ جدید با کسرِ امتیاز (هر بار بازی کردنِ سودوکو)
+	// شروعِ بازیِ جدید با کسرِ امتیاز (هر بار بازی کردنِ سودوکو). One start at a time (a double
+	// tap must not charge twice), and the level is checked before paying for it.
+	const startingRef = useRef(false);
+	const [starting, setStarting] = useState(false);
 	const handleSelectDifficulty = async (difficulty: Difficulty) => {
+		if (startingRef.current) return;
+		startingRef.current = true;
+		setStarting(true);
+		try {
+			await fetchWithAuth(
+				`${GAME_URLS.CONFIG}?difficulty_level=${difficulty}&game_name=sudoku`,
+				{},
+			);
+		} catch {
+			toast.error("این سطح در دسترس نیست.");
+			startingRef.current = false;
+			setStarting(false);
+			return;
+		}
 		try {
 			await chargeAsync({ game_name: "sudoku" });
 			void refetchCost();
 			generateGame(difficulty);
 		} catch {
 			// خطا (امتیازِ ناکافی) با toastِ سراسری نمایش داده می‌شود
+		} finally {
+			startingRef.current = false;
+			setStarting(false);
 		}
 	};
 
@@ -94,6 +117,7 @@ export default function SudokuPage() {
 				mediumUnlocked={mediumUnlocked}
 				hardUnlocked={hardUnlocked}
 				onSelectDifficulty={handleSelectDifficulty}
+				busy={starting}
 			/>
 		);
 	}
@@ -130,6 +154,8 @@ export default function SudokuPage() {
 	};
 	// ادامهٔ بازی با کسرِ امتیاز: اشتباه‌ها صفر و همان پازل ادامه می‌یابد
 	const handleGameOverContinue = async () => {
+		if (startingRef.current) return;
+		startingRef.current = true;
 		try {
 			await chargeAsync({ game_name: "sudoku" });
 			void refetchCost();
@@ -137,6 +163,8 @@ export default function SudokuPage() {
 			setGameOverDialogOpen(false);
 		} catch {
 			// خطا (امتیازِ ناکافی) با toastِ سراسری نمایش داده می‌شود
+		} finally {
+			startingRef.current = false;
 		}
 	};
 

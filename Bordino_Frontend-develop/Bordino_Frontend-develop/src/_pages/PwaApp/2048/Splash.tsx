@@ -14,7 +14,7 @@ interface SplashProps {
 export default function Splash({ type = "lost" }: SplashProps) {
 	const game = useContext(GameContext);
 	if (!game) throw new Error("Splash must be used within GameProvider");
-	const { startGame, moveCount } = game;
+	const { startPaidGame, isCharging, moveCount } = game;
 
 	const won = type === "won";
 
@@ -34,7 +34,13 @@ export default function Splash({ type = "lost" }: SplashProps) {
 				) : (
 					<p className={styles.desc}>دوباره تلاش کن و رکوردتو بزن.</p>
 				)}
-				<button type="button" className={styles.button} onClick={startGame}>
+				{/* A new game is a new paid play, like «بازی مجدد» in the header. */}
+				<button
+					type="button"
+					className={styles.button}
+					onClick={() => void startPaidGame()}
+					disabled={isCharging}
+				>
 					بازی مجدد
 				</button>
 			</div>

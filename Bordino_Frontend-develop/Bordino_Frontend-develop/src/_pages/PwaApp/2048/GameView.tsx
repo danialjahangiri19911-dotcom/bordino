@@ -6,49 +6,44 @@ import { useRouter } from "next/navigation";
 
 import Board from "./Board";
 
-import useChargeGamePlay from "@/api/games/useChargeGamePlay";
 import useGetPlayCost from "@/api/games/useGetPlayCost";
 import { GAME_NET } from "@/constants/routes";
 import { GameContext } from "@/libs/context/2048/GameProvider";
 import LostDialog from "@/libs/components/games/LostDialog";
+import { currentUserId } from "@/libs/stores/authStore";
 import { toPersianDigits } from "@/libs/utils/persianNumberConverter";
 
 import styles from "./gameView.module.css";
 
-const BEST_KEY = "2048-best-score";
+// Per account: another user on this phone starts with their own record.
+const bestKey = () => `2048-best-score:${currentUserId()}`;
 
 export default function GameView() {
 	const game = useContext(GameContext);
 	if (!game) throw new Error("GameView must be used within GameProvider");
 
-	const { score, moveCount, tiles, status, startGame, undo, canUndo } = game;
+	const { score, moveCount, tiles, status, undo, canUndo, isCharging, needsStart } = game;
 
 	const { push } = useRouter();
 	const { data: costData, refetch: refetchCost } = useGetPlayCost({
 		gameName: "game_2048",
 	});
-	const { chargeAsync, isCharging } = useChargeGamePlay();
 
 	const playCost = costData?.result?.play_cost ?? 0;
 	const currentPoints = costData?.result?.current_amount ?? 0;
 
-	// شروعِ یک بازیِ جدید با کسرِ امتیاز (هم برای «بازی مجدد» هم «ادامه پس از باخت»)
+	// شروعِ یک بازیِ جدید با کسرِ امتیاز (اولین بازی، «بازی مجدد»، «ادامه پس از باخت»): the
+	// provider charges, then starts the board.
 	const startPaidGame = async () => {
-		try {
-			await chargeAsync({ game_name: "game_2048" });
-			void refetchCost();
-			startGame();
-		} catch {
-			// خطا (مثلِ امتیازِ ناکافی) توسطِ toastِ سراسری نمایش داده می‌شود
-		}
+		if (await game.startPaidGame()) void refetchCost();
 	};
 
 	// رکورد برتر: بیشترین امتیازِ ثبت‌شده (در localStorage)
 	const [best, setBest] = useState(0);
 	useEffect(() => {
-		const stored = Number(localStorage.getItem(BEST_KEY) || 0);
+		const stored = Number(localStorage.getItem(bestKey()) || 0);
 		const next = Math.max(stored, score || 0);
-		if (next !== stored) localStorage.setItem(BEST_KEY, String(next));
+		if (next !== stored) localStorage.setItem(bestKey(), String(next));
 		setBest(next);
 	}, [score]);
 
@@ -58,9 +53,10 @@ export default function GameView() {
 		return values.length ? Math.max(...values) : 0;
 	}, [tiles]);
 
+	// The player's own record (the ticker used to show a made-up «رکورد برتر امیر: ۲۰۵۸»).
 	const tickerText = useMemo(
-		() => Array.from({ length: 6 }, () => "رکورد برتر امیر: ۲۰۵۸"),
-		[],
+		() => Array.from({ length: 6 }, () => `رکورد برتر تو: ${toPersianDigits(best)}`),
+		[best],
 	);
 
 	return (
@@ -117,8 +113,37 @@ export default function GameView() {
 					</div>
 				</div>
 
-				<div className={styles.boardArea}>
+				<div className={styles.boardArea} style={{ position: "relative" }}>
 					<Board />
+					{needsStart && (
+						// No paid game yet: the board is not playable until the play is charged.
+						<div
+							style={{
+								position: "absolute",
+								inset: 0,
+								display: "flex",
+								flexDirection: "column",
+								alignItems: "center",
+								justifyContent: "center",
+								gap: 12,
+								background: "rgba(0,0,0,0.55)",
+								borderRadius: 12,
+								color: "#fff",
+								zIndex: 2,
+							}}
+						>
+							<span>هر بازی {toPersianDigits(playCost)} امتیاز</span>
+							<button
+								type="button"
+								className={styles.actionBtn}
+								onClick={startPaidGame}
+								disabled={isCharging}
+								autoFocus
+							>
+								شروع بازی
+							</button>
+						</div>
+					)}
 				</div>
 
 				<div className={styles.moveCounter}>
