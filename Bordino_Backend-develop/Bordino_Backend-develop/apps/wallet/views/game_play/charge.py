@@ -7,8 +7,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.configuration.repositories.game import GameConfigurationQueryRepository
-from apps.wallet.models import TokenWalletAccount
-from apps.wallet.repositories.wallet.query import WalletQueryRepository
+from apps.wallet.services import balance
 from apps.wallet.services.game_play.charge import GamePlayChargeService
 
 
@@ -47,8 +46,8 @@ class GamePlayChargeView(APIView):
         ).first()
         play_cost = int(game_config.play_cost) if game_config else 0
 
-        wallets = WalletQueryRepository.customer_wallet(request.user)
-        account = TokenWalletAccount.objects.filter(wallet__in=wallets).first()
+        # The account a play is charged to (points, token L) — not "the first account".
+        account = balance.points_account(request.user)
         current_amount = int(account.amount) if account else 0
 
         return Response(

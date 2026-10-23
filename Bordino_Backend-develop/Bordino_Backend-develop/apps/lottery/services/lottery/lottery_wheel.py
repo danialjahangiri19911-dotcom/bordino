@@ -41,6 +41,14 @@ class LotteryWheelService:
         total_probability = sum(prize.probability for prize in prizes)
         if total_probability != 100:
             raise ValidationError(_("Total probability of all prizes must equal 100"))
+        # The multiplier moves chance from the prizes to the empty slice (select_prize), which
+        # keeps the expected payout per spin the same at ×1…×5. Without an empty slice, ×5 would
+        # simply pay five times more for the same cost.
+        if not any(
+            prize.prize_type == LotteryWheelPrize.PrizeType.EMPTY and prize.probability > 0
+            for prize in prizes
+        ):
+            raise ValidationError(_("A wheel needs an empty slice with a chance above 0."))
 
     def select_prize(self, prizes, multiplier: int = 1):
         """
@@ -97,6 +105,8 @@ class LotteryWheelService:
         # same order everywhere): two requests that both passed the serializer's check must not
         # both spin past the limit.
         wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
+        if wheel.status != LotteryWheel.Status.ACTIVE:
+            raise ValidationError(_("This wheel is not active."))
         total = LotteryWheelSpin.objects.filter(lottery_wheel=wheel).aggregate(n=Sum("count"))["n"] or 0
         if total >= wheel.max_spins:
             raise ValidationError(_("Maximum spins for this wheel has been reached"))

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from django.db import transaction
-from django.db.models import F
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
@@ -17,6 +16,7 @@ from apps.users.models.profile_reward import ProfileReward
 from apps.wallet.models import Token
 from apps.wallet.repositories.token_wallet_account.query import TokenWalletAccountQueryRepository
 from apps.wallet.repositories.wallet.query import WalletQueryRepository
+from apps.wallet.services import balance
 
 
 class CustomerUpdateService:  # pylint: disable=too-many-instance-attributes
@@ -241,11 +241,9 @@ class CustomerUpdateService:  # pylint: disable=too-many-instance-attributes
             if not created:
                 logging.info("Profile reward already paid to customer %s", customer.pk)
                 return
-            # One UPDATE with F(): a game settling on the same account meanwhile is not overwritten
-            # (the model's save() compares the amount, so it cannot take an expression).
-            type(token_wallet_account).objects.filter(pk=token_wallet_account.pk).update(
-                amount=F("amount") + reward_points
-            )
+            # Through the balance helper: one UPDATE with F(), so a game settling on the same
+            # account meanwhile is not overwritten.
+            balance.add_points(token_wallet_account, reward_points)
             logging.info(
                 "Awarded %d points to customer %s for completing profile",
                 reward_points,

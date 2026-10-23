@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 
 from apps.configuration.repositories.game import GameConfigurationQueryRepository
 from apps.configuration.services.scoring.dto import AwardScoreDTO
@@ -13,6 +16,7 @@ User = get_user_model()
 
 # Sections whose rewards come from a game charged per play (GamePlayChargeService game names).
 PAID_GAMES = ("sudoku", "game_2048")
+RECENT_PLAY = timedelta(hours=3)
 
 
 class RecordActionService:
@@ -60,8 +64,12 @@ class RecordActionService:
         # Sudoku and 2048 run in the browser, so the server cannot see a game being won; it can
         # see that one was paid for. No paid play of that game, no reward for it (each action
         # pays once per customer, see above).
+        # A paid play of this game in the last few hours (not "ever"): the reward must follow a
+        # game the player actually started.
         if section in PAID_GAMES and not GamePlayCharge.objects.filter(
-            customer=customer, game_name=section
+            customer=customer,
+            game_name=section,
+            create_time__gte=timezone.now() - RECENT_PLAY,
         ).exists():
             raise ValueError("Play the game before its rewards can be recorded")
 

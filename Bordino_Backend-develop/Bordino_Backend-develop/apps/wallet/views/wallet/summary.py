@@ -44,6 +44,8 @@ class PointsWalletSummaryView(APIView):
         ).count()
 
         account_summaries = []
+        # The points account (token L) first: the app shows the first one as "your points".
+        token_accounts = sorted(token_accounts, key=lambda a: a.token.symbol != "L" if a.token else True)
         for account in token_accounts:
             if account.token:
                 total_points = Decimal(account.amount)

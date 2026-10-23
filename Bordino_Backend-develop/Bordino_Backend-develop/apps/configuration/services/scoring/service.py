@@ -5,10 +5,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.utils import timezone
 
+from apps.configuration.enums import DifficultyLevel
 from apps.configuration.models.game import GameConfiguration
 from apps.configuration.repositories.game import GameConfigurationQueryRepository
 from apps.configuration.repositories.scoring import ScoreConfigurationQueryRepository
 from apps.configuration.services.scoring.dto import AwardScoreDTO
+from apps.users.models.customer import Customer
 from apps.wallet.models.transactions.activity import ActivityTransaction
 from apps.wallet.repositories.activity_transaction import (
     ActivityTransactionCommandRepository,
@@ -88,10 +90,20 @@ class ScoreService:
         customer = dto.user.customer
 
         if dto.section in ["sudoku", "game_2048"]:
+            # The difficulty comes from the client: an unknown one must not select "no
+            # configuration" and with it "no daily cap".
+            if difficulty is not None and difficulty not in DifficultyLevel.values:
+                raise ValueError(f"Invalid difficulty '{difficulty}'")
             game_config_query = GameConfigurationQueryRepository.get_by_game_name(
                 game_name=dto.section,
                 difficulty_level=difficulty,
             )
+            if game_config_query is None and difficulty is not None:
+                # A level that is not configured must not mean "no daily cap".
+                raise ValueError(f"No active configuration for {dto.section} '{difficulty}'")
+            # One award at a time per customer: two different actions claimed at once would both
+            # read the same daily total and together pass the cap.
+            Customer.objects.select_for_update(no_key=True).filter(pk=customer.pk).first()
 
             if game_config_query and game_config_query.daily_score_limit > 0:
                 current_daily_score = ScoreService.get_user_daily_score(dto.user, dto.section)

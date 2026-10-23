@@ -5,7 +5,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from apps.django_helper.drf.serializers import BaseModelSerializer
-from apps.lottery.models import LotteryWheelSpin
+from apps.lottery.models import LotteryWheel, LotteryWheelSpin
 from apps.lottery.serializers.lottery_wheel_prize.minimal import LotteryWheelPrizeMinimalSerializer
 from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService
 from apps.wallet.models import TokenWalletAccount
@@ -14,6 +14,10 @@ from apps.wallet.services.utils import get_max_negative_limit, would_deduction_e
 
 
 class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
+    # Only active wheels can be spun (the view's queryset does not limit this field).
+    lottery_wheel = serializers.PrimaryKeyRelatedField(
+        queryset=LotteryWheel.objects.filter(status=LotteryWheel.Status.ACTIVE)
+    )
     # Accepted for old clients and ignored: the spin is always paid from the player's own points
     # account, which the server picks (an id from the client could name anyone's account).
     token_wallet_account = serializers.PrimaryKeyRelatedField(

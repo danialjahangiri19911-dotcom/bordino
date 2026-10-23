@@ -280,20 +280,20 @@ class HistoryTests(TestCase):
         self.assertIn("T", rows[0]["date"])  # a moment, not just a day
 
     def test_activity_reward_needs_a_paid_play_and_shows_in_history(self):
+        from apps.configuration.models import ScoreConfiguration  # pylint: disable=import-outside-toplevel
         from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
         from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
             GamePlayChargeService,
         )
 
+        ScoreConfiguration.objects.create(section="sudoku", action_type="win_game", score_value=7)
         with self.assertRaises(ValueError):
             RecordActionService.record_action(self.user, "sudoku", "win_game")
         GamePlayChargeService().charge(self.user, "sudoku")
-        try:
-            RecordActionService.record_action(self.user, "sudoku", "win_game")
-        except ValueError:
-            return  # no score configured for this action in the test database: nothing to show
-        types = {r["type"] for r in self.rows("points")}
-        self.assertIn("activity_reward", types)
+        before = points(self.user)
+        RecordActionService.record_action(self.user, "sudoku", "win_game")
+        self.assertEqual(points(self.user), before + 7)
+        self.assertIn("activity_reward", {r["type"] for r in self.rows("points")})
 
     def test_withdrawals_show_their_state_in_the_currency_history(self):
         CurrencyWalletAccount.objects.filter(wallet__owner=self.user).update(balance=50_000)
@@ -405,3 +405,86 @@ class HistoryDestinationTests(TestCase):
         )
         (row,) = currency_history(user)
         self.assertEqual((row["status"], row["status_label"]), ("pending", "در انتظار پرداخت"))
+
+
+@override_settings(CACHES=LOCMEM)
+class Phase5Tests(TestCase):
+    """Codex review 2026-10-23 (phase 5): rewards, caps and the wheel."""
+
+    def setUp(self):
+        from apps.configuration.models import GameConfiguration, ScoreConfiguration  # pylint: disable=import-outside-toplevel
+
+        self.user = make_customer("9120000771", points=100)
+        GameConfiguration.objects.update_or_create(game_name="sudoku", defaults={"play_cost": 5})
+        ScoreConfiguration.objects.create(section="sudoku", action_type="win_game", score_value=7)
+
+    def play(self):
+        from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
+            GamePlayChargeService,
+        )
+
+        GamePlayChargeService().charge(self.user, "sudoku")
+
+    def test_an_unknown_difficulty_is_refused(self):
+        from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
+
+        self.play()
+        before = points(self.user)
+        with self.assertRaises(ValueError):
+            RecordActionService.record_action(
+                self.user, "sudoku", "win_game", metadata={"difficulty": "not-a-level"}
+            )
+        self.assertEqual(points(self.user), before)
+
+    def test_an_old_play_does_not_unlock_rewards(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import GamePlayCharge  # pylint: disable=import-outside-toplevel
+
+        self.play()
+        GamePlayCharge.objects.update(create_time=timezone.now() - timedelta(hours=4))
+        with self.assertRaises(ValueError):
+            RecordActionService.record_action(self.user, "sudoku", "win_game")
+
+    def make_wheel(self, prizes, status="active"):
+        sponsor = Sponsor.objects.create(user=make_customer("9120000772"))
+        wheel = LotteryWheel.objects.create(
+            name="w", owner=sponsor, cost_per_spin=10, max_spins=100, max_spins_per_customer=10, status=status
+        )
+        for i, (kind, amount, chance) in enumerate(prizes):
+            LotteryWheelPrize.objects.create(
+                lottery_wheel=wheel, name=f"p{i}", prize_type=kind, prize_amount=amount, probability=chance
+            )
+        return wheel
+
+    def spin(self, wheel):
+        from apps.lottery.services.lottery.lottery_wheel import (  # pylint: disable=import-outside-toplevel
+            LotteryWheelService,
+        )
+
+        service = LotteryWheelService()
+        return service.spin_wheel(
+            service.SpinWheelDTO(
+                customer=self.user.customer, lottery_wheel=wheel,
+                token_wallet_account=balance.points_account(self.user), multiplier=5,
+            )
+        )
+
+    def test_an_inactive_wheel_cannot_be_spun(self):
+        wheel = self.make_wheel([("empty", 0, 100)], status="inactive")
+        with self.assertRaises(ValidationError):
+            self.spin(wheel)
+        self.assertEqual(points(self.user), 100)
+        api = APIClient()
+        api.force_authenticate(self.user)
+        r = api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(wheel.pk)}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_a_wheel_without_an_empty_slice_is_refused(self):
+        wheel = self.make_wheel([("recharge", 20, 100)])
+        with self.assertRaises(ValidationError):
+            self.spin(wheel)
+        self.assertEqual(points(self.user), 100)
