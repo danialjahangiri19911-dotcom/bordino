@@ -2,7 +2,12 @@ import os
 import uuid
 from io import BytesIO
 
-from PIL import Image
+from django.core.exceptions import ValidationError
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+# An avatar is shown at most ~128 px: keep 512 (sharp on 3× screens) and refuse absurd sources.
+AVATAR_MAX_SIDE = 512
+MAX_SOURCE_PIXELS = 25_000_000
 
 
 class ImageProcessorService:
@@ -18,23 +23,35 @@ class ImageProcessorService:
         Returns:
             BytesIO: The converted image in WebP format
         """
-        # Open the image
-        img = Image.open(image_file)
+        try:
+            img = Image.open(image_file)
+            # Size is known from the header, before any pixel is decoded: refuse decompression
+            # bombs and 20000×1 "images" (WebP is limited to 16383 px per side) up front.
+            if img.width * img.height > MAX_SOURCE_PIXELS:
+                raise ValidationError("Image dimensions are too large")
+            img.load()
+            # Phone photos carry their rotation in EXIF: apply it, or the saved avatar is sideways.
+            img = ImageOps.exif_transpose(img)
+            img.thumbnail((AVATAR_MAX_SIDE, AVATAR_MAX_SIDE))
 
-        # Convert to RGB if necessary (for PNG with transparency)
-        if img.mode in ("RGBA", "LA"):
-            background = Image.new("RGB", img.size, (255, 255, 255))
-            background.paste(img, mask=img.split()[-1])
-            img = background
+            # Convert to RGB if necessary (for PNG with transparency)
+            if img.mode in ("RGBA", "LA", "P"):
+                img = img.convert("RGBA")
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
 
-        # Create BytesIO object
-        webp_io = BytesIO()
-
-        # Save as WebP
-        img.save(webp_io, "WEBP", quality=quality)
-        webp_io.seek(0)
-
-        return webp_io
+            webp_io = BytesIO()
+            img.save(webp_io, "WEBP", quality=quality)
+            webp_io.seek(0)
+            return webp_io
+        except ValidationError:
+            raise
+        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+            # Not a usable image: a 400 for the player, not a 500.
+            raise ValidationError("The file is not a valid image") from exc
 
     @staticmethod
     def get_webp_filename(original_filename):

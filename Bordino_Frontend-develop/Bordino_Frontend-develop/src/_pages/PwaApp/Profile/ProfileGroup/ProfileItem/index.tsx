@@ -4,7 +4,8 @@ import Box from "@libs/components/atoms/Box";
 import Typography from "@libs/components/atoms/Typography";
 import styled from "@libs/styles/styled";
 
-import IconButton from "@/libs/components/atoms/IconButton";
+import ButtonBase from "@mui/material/ButtonBase";
+
 import BackIcon from "@/libs/components/icons/components/Back";
 
 export interface ProfileItemProps {
@@ -20,25 +21,41 @@ function ProfileItem({
 	title,
 	handleGoTask,
 }: Readonly<ProfileItemProps>) {
-	return (
-		<Wrapper>
+	const content = (
+		<>
 			<Box display="flex" gap={1} alignItems="center">
 				{icon}
 				<Typography variant="14-medium">{title}</Typography>
 			</Box>
-			{ActionComponent ?? (
-				<IconButton onClick={handleGoTask}>
-					<BackIcon />
-				</IconButton>
-			)}
-		</Wrapper>
+			{ActionComponent ?? <BackIcon />}
+		</>
 	);
+
+	// A row with an action is ONE button (the whole row is tappable, 48 px high, named by its title).
+	if (handleGoTask && !ActionComponent) {
+		return (
+			<RowButton onClick={handleGoTask} aria-label={title}>
+				{content}
+			</RowButton>
+		);
+	}
+	return <Wrapper>{content}</Wrapper>;
 }
 
 export default memo(ProfileItem);
 
-const Wrapper = styled(Box)(() => ({
+const rowSx = {
 	display: "flex",
 	justifyContent: "space-between",
 	alignItems: "center",
+	width: "100%",
+};
+
+const Wrapper = styled(Box)(() => rowSx);
+
+const RowButton = styled(ButtonBase)(() => ({
+	...rowSx,
+	minHeight: 48,
+	borderRadius: 8,
+	textAlign: "start",
 }));

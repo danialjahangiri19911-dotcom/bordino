@@ -1,4 +1,4 @@
-import os
+import logging
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -36,11 +36,15 @@ class CustomerProfileService:
             old_image: the customer's previous File, or None
         """
         if old_image:
-            # Delete the file from storage
-            if old_image.file and os.path.isfile(old_image.file.path):
-                os.remove(old_image.file.path)
-            # Delete the database record
-            old_image.delete()
+            # Through the storage API (works with local disk and S3/MinIO alike; `.path` exists only
+            # on disk), and never failing the upload that already succeeded: the old picture is
+            # garbage, not part of the answer.
+            try:
+                if old_image.file:
+                    old_image.file.delete(save=False)
+                old_image.delete()
+            except Exception:  # pylint: disable=broad-except
+                logging.warning("Could not remove the old profile image %s", old_image.pk)
 
     def update_profile_image(self, customer: Customer, image_file) -> Customer:
         """

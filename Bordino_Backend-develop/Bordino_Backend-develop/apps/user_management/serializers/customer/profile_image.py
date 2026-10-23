@@ -42,6 +42,10 @@ class CustomerProfileImageSerializer(BaseModelSerializer):
         return value
 
     def update(self, instance, validated_data):
-        return self.profile_service.update_profile_image(
-            customer=instance, image_file=validated_data["image"]
-        )
+        try:
+            return self.profile_service.update_profile_image(
+                customer=instance, image_file=validated_data["image"]
+            )
+        except ValidationError as exc:
+            # An unusable image is the player's 400, not a server error.
+            raise serializers.ValidationError({"image": exc.messages}) from exc

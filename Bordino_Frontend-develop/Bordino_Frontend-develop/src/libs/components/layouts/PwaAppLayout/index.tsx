@@ -95,6 +95,9 @@ function PwaAppPageLayout({
 									height={32}
 									alt="profile"
 									src={avatarSrc}
+									// Uploaded avatars come from the API host (an absolute URL): not run through
+									// the image optimizer, whose allowlist rejects it.
+									unoptimized
 								/>
 							</Link>
 						</Box>

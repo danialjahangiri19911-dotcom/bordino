@@ -232,3 +232,93 @@ class OtpClaimTests(TestCase):
         _, token = OTPCommandRepository.read_for_claim("9120000642")
         self.assertTrue(OTPCommandRepository.claim("9120000642", token))
         self.assertFalse(OTPCommandRepository.claim("9120000642", token))
+
+
+@override_settings(CACHES=LOCMEM)
+class AvatarTests(TestCase):
+    """Codex review 2026-10-23 (phase 6): avatar uploads."""
+
+    def setUp(self):
+        import shutil  # pylint: disable=import-outside-toplevel
+        import tempfile  # pylint: disable=import-outside-toplevel
+
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        from django.conf import settings  # pylint: disable=import-outside-toplevel
+
+        storages = {
+            **settings.STORAGES,
+            "default": {
+                "BACKEND": "django.core.files.storage.FileSystemStorage",
+                "OPTIONS": {"location": media, "base_url": "/media/"},
+            },
+        }
+        override = override_settings(MEDIA_ROOT=media, STORAGES=storages)
+        override.enable()
+        self.addCleanup(override.disable)
+        cache.clear()
+        self.user = make_customer("9120000651")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def upload(self, data, name="a.png", ctype="image/png"):
+        from django.core.files.uploadedfile import SimpleUploadedFile  # pylint: disable=import-outside-toplevel
+
+        return self.api.patch(
+            "/api/v1/customer/profile-image/me/",
+            {"image": SimpleUploadedFile(name, data, content_type=ctype)},
+            format="multipart",
+        )
+
+    @staticmethod
+    def png(size, mode="RGB", **kw):
+        from io import BytesIO  # pylint: disable=import-outside-toplevel
+
+        from PIL import Image  # pylint: disable=import-outside-toplevel
+
+        buf = BytesIO()
+        Image.new(mode, size, (200, 30, 30)).save(buf, "PNG", **kw)
+        return buf.getvalue()
+
+    def test_a_normal_image_is_stored_resized(self):
+        from PIL import Image  # pylint: disable=import-outside-toplevel
+
+        r = self.upload(self.png((1600, 1200)))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.user.customer.refresh_from_db()
+        with Image.open(self.user.customer.image.file.path) as stored:
+            self.assertLessEqual(max(stored.size), 512)
+
+    def test_a_very_wide_image_is_converted_not_a_500(self):
+        # 20000×1 is a valid PNG that WebP itself cannot encode at that width: it is shrunk first.
+        r = self.upload(self.png((20000, 1)))
+        self.assertEqual(r.status_code, 200, r.content)
+
+    def test_an_image_with_absurd_pixel_count_is_a_400(self):
+        r = self.upload(self.png((6000, 6000)))  # 36 million pixels, a few KB compressed
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_a_non_image_is_a_400(self):
+        self.assertEqual(self.upload(b"<html><script>1</script></html>", "x.png").status_code, 400)
+
+    def test_exif_orientation_is_applied(self):
+        from io import BytesIO  # pylint: disable=import-outside-toplevel
+
+        from PIL import Image  # pylint: disable=import-outside-toplevel
+
+        buf = BytesIO()
+        img = Image.new("RGB", (80, 40), (10, 200, 10))
+        exif = Image.Exif()
+        exif[0x0112] = 6  # rotate 90° for display
+        img.save(buf, "JPEG", exif=exif)
+        r = self.upload(buf.getvalue(), "p.jpg", "image/jpeg")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.user.customer.refresh_from_db()
+        with Image.open(self.user.customer.image.file.path) as stored:
+            self.assertEqual(stored.size, (40, 80))
+
+    def test_replacing_keeps_the_new_avatar_even_if_cleanup_fails(self):
+        self.assertEqual(self.upload(self.png((100, 100))).status_code, 200)
+        with mock.patch("django.db.models.fields.files.FieldFile.delete", side_effect=OSError("s3")):
+            r = self.upload(self.png((120, 120)))
+        self.assertEqual(r.status_code, 200, r.content)
