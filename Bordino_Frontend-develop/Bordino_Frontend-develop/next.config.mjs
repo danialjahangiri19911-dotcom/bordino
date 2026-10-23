@@ -9,6 +9,12 @@ const pwaConfig = {
 	skipWaiting: true,
 	scope: "/pwa",
 	sw: "sw.js",
+	// No precache: next-pwa lists every build file (176 files, ~18 MB on first visit, plus ~70 source
+	// maps / manifests that do not exist on the server, which made the worker's install fail and
+	// kept it from ever activating). Only the runtime rules below apply: fonts and images are cached
+	// as they are used; pages and API answers are never cached.
+	buildExcludes: [/.*/],
+	publicExcludes: ["!**/*"],
 	runtimeCaching: [
 		{
 			urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
