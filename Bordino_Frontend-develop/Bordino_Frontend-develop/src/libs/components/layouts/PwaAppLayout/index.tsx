@@ -75,12 +75,17 @@ function PwaAppPageLayout({
 						{rightAction}
 
 						<Box display="flex" alignItems="center" gap={1.5}>
-							<Link href={WHEEL.path}>
+							{/* 44×44 touch target around the 28 px icon. */}
+							<Link
+								href={WHEEL.path}
+								aria-label="چرخونه شانسی"
+								style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44 }}
+							>
 								<Image
-									width={24}
-									height={24}
-									alt="wheel"
-									src="/media/App/fairy-wheel.svg"
+									width={28}
+									height={28}
+									alt=""
+									src="/media/App/wheel-icon.svg"
 								/>
 							</Link>
 

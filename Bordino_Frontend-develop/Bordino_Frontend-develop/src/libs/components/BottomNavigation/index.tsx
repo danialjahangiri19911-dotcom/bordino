@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+"use client";
+
+import {
+	type ReactNode,
+	type SyntheticEvent,
+	useEffect,
+	useState,
+} from "react";
 
 import { usePathname, useRouter } from "next/navigation";
 
@@ -15,6 +22,7 @@ interface BottomNavigationItem {
 	path: string;
 	icon: ReactNode;
 }
+
 interface Props {
 	items: BottomNavigationItem[];
 	sx?: PaperProps["sx"];
@@ -43,54 +51,183 @@ export default function BottomNavigation({ items, sx = {} }: Readonly<Props>) {
 	}, [pathname, items]);
 
 	const handleNavigationChange = (
-		_: React.ChangeEvent<{}>,
+		_: SyntheticEvent,
 		newValue: number,
 	) => {
 		setValue(newValue);
 		push(items[newValue].path);
 	};
 
-	const renderBottomNavigationItems = useMemo(() => {
-		return items.map((item, index) => (
-			<BottomNavigationAction
-				key={`${item.title}${index}`}
-				label={item.title}
-				icon={item.icon}
-				sx={{
-					color: value === index ? "success.light" : "text.secondary",
-					paddingInline: 0,
-					minWidth: "auto",
-				}}
-			/>
-		));
-	}, [items, value]);
-
 	return (
-		<BottomNavigationWrapper sx={sx}>
+		<BottomNavigationWrapper
+			role="navigation"
+			aria-label="ناوبری اصلی"
+			dir="rtl"
+			elevation={0}
+			sx={sx}
+		>
 			<BaseBottomNavigation
-				showLabels
 				value={value}
 				onChange={handleNavigationChange}
-				sx={{ width: "100%" }}
+				// Custom styles control label visibility and horizontal expansion.
+				showLabels
+				sx={{
+					inlineSize: "100%",
+					minInlineSize: 0,
+					height: 44,
+					gap: "4px",
+					backgroundColor: "transparent",
+				}}
 			>
-				{renderBottomNavigationItems}
+				{items.map((item, index) => (
+					<NavigationAction
+						key={`${item.title}${index}`}
+						value={index}
+						type="button"
+						disableRipple
+						aria-label={item.title}
+						aria-current={value === index ? "page" : undefined}
+						label={<span aria-hidden="true">{item.title}</span>}
+						icon={
+							<span className="navigation-icon" aria-hidden="true">
+								{item.icon}
+							</span>
+						}
+					/>
+				))}
 			</BaseBottomNavigation>
 		</BottomNavigationWrapper>
 	);
 }
 
-export const BottomNavigationWrapper = styled(Paper)(({ theme }) => ({
-	boxShadow: theme.shadows[4],
-	borderRadius: theme.shape.borderRadius * 2,
-	paddingBlock: theme.spacing(2),
-	margin: theme.spacing(1, 0),
-	backgroundColor: theme.palette.background.paper,
+const NavigationAction = styled(BottomNavigationAction)({
+	// Override MUI's vertical layout and selected-label sizing.
+	"&&": {
+		boxSizing: "border-box",
+		flex: "1 1 0%",
+		minWidth: 44,
+		maxWidth: "none",
+		minInlineSize: 44,
+		minBlockSize: 44,
+		blockSize: 44,
+		paddingBlock: 0,
+		paddingInline: 8,
+		flexDirection: "row",
+		justifyContent: "center",
+		alignItems: "center",
+		borderRadius: 16,
+		color: "#231F20",
+		backgroundColor: "transparent",
+		fontFamily: "inherit",
+		textTransform: "none",
+		WebkitTapHighlightColor: "transparent",
+		transition:
+			"flex-grow 180ms ease, background-color 180ms ease, color 180ms ease",
+
+		"& .navigation-icon": {
+			display: "inline-flex",
+			alignItems: "center",
+			justifyContent: "center",
+			flex: "0 0 24px",
+			inlineSize: 24,
+			blockSize: 24,
+			color: "inherit",
+			"& svg": {
+				display: "block",
+				inlineSize: 24,
+				blockSize: 24,
+			},
+		},
+
+		"& .MuiBottomNavigationAction-label": {
+			display: "block",
+			flex: "0 1 auto",
+			minInlineSize: 0,
+			maxInlineSize: 0,
+			marginInlineStart: 0,
+			overflow: "hidden",
+			whiteSpace: "nowrap",
+			textOverflow: "ellipsis",
+			fontFamily: "inherit",
+			fontSize: "0.75rem",
+			fontWeight: 700,
+			lineHeight: 1.75,
+			letterSpacing: 0,
+			opacity: 0,
+			visibility: "hidden",
+			transform: "none",
+			transition:
+				"max-inline-size 180ms ease, margin-inline-start 180ms ease, opacity 180ms ease",
+		},
+
+		"&.Mui-selected": {
+			flexGrow: 1.8,
+			color: "#E64056",
+			backgroundColor: "#FFF1F3",
+
+			"& .MuiBottomNavigationAction-label": {
+				maxInlineSize: "6em",
+				marginInlineStart: 6,
+				opacity: 1,
+				visibility: "visible",
+				// A deeper brand red keeps the small label readable.
+				color: "#AD3041",
+			},
+		},
+
+		"@media (hover: hover)": {
+			"&:hover": {
+				backgroundColor: "#E9EEF3",
+			},
+			"&.Mui-selected:hover": {
+				color: "#D13A4E",
+				backgroundColor: "#FBE2E6",
+			},
+		},
+
+		"&:active": {
+			backgroundColor: "#E9EEF3",
+		},
+		"&.Mui-selected:active": {
+			color: "#D13A4E",
+			backgroundColor: "#FBE2E6",
+		},
+
+		"&:focus-visible, &.Mui-focusVisible": {
+			outline: "2px solid #D13A4E",
+			outlineOffset: 2,
+		},
+
+		"@media (prefers-reduced-motion: reduce)": {
+			transition: "none",
+			"& .MuiBottomNavigationAction-label": {
+				transition: "none",
+			},
+		},
+	},
+});
+
+export const BottomNavigationWrapper = styled(Paper)({
 	position: "fixed",
 	zIndex: 6,
-	bottom: 0,
-	width: "90%",
-	minWidth: 320,
-	maxWidth: 600,
-	left: "50%",
-	transform: "translateX(-50%)",
-}));
+	insetBlockEnd: 0,
+	insetInline: 0,
+	marginInline: "auto",
+	boxSizing: "border-box",
+	inlineSize: "100%",
+	maxInlineSize: 600,
+	minInlineSize: 0,
+
+	// 7 + 44 + 7 = 58px, plus the device's bottom safe area.
+	paddingBlockStart: 7,
+	paddingBlockEnd: "calc(7px + env(safe-area-inset-bottom, 0px))",
+	paddingInline: 8,
+
+	borderRadius: 0,
+	borderStartStartRadius: 18,
+	borderStartEndRadius: 18,
+	backgroundColor: "#FFFFFF",
+	backgroundImage: "none",
+	boxShadow:
+		"0 -4px 20px rgba(35, 31, 32, 0.06), inset 0 1px 0 #E9EEF3",
+});

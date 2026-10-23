@@ -72,7 +72,12 @@ function PwaLayout({ children }: Readonly<Props>) {
 		<Wrapper>
 			<PageWrapper>
 				<Box
-					height={checkValidation && !isLotteryDetail ? "85vh" : "100vh"}
+					// The content area ends where the (58 px + safe area) bottom bar begins.
+					height={
+						checkValidation && !isLotteryDetail
+							? "calc(100dvh - 58px - env(safe-area-inset-bottom, 0px))"
+							: "100vh"
+					}
 					overflow="hidden"
 					sx={{
 						overflow: "scroll",

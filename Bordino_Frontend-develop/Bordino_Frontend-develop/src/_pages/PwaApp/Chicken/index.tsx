@@ -163,7 +163,7 @@ export default function ChickenGame() {
 
 	return (
 		// Bottom margin clears the app's fixed bottom navigation bar.
-		<Box sx={{ bgcolor: CRASH_COLORS.panel, borderRadius: 3, p: 1.25, mb: 14, color: CRASH_COLORS.text }}>
+		<Box sx={{ bgcolor: CRASH_COLORS.panel, borderRadius: 3, p: 1.25, mb: 9, color: CRASH_COLORS.text }}>
 			{/* One row: back + title, recent results (newest first), fairness. */}
 			<Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
 				<ButtonBase
