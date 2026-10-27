@@ -110,7 +110,12 @@ class LotteryWinnerService:
         draws again (which would favour the draws whose winners happen to be payable).
         """
         self.draw()
-        return self._settle()
+        results = self._settle()
+        # Ticket holders hear the result (once each: the notification log is keyed per lottery).
+        from apps.notifications.signals import lottery_drawn  # pylint: disable=import-outside-toplevel
+
+        lottery_drawn(self.lottery)
+        return results
 
     def draw(self):
         """Fix the winning numbers: drawn by the server, after sales closed, under the lottery

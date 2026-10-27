@@ -48,6 +48,7 @@ LOCAL_APPS = [
     "apps.entertainment.apps.EntertainmentConfig",
     "apps.configuration.apps.ConfigurationConfig",
     "apps.crash.apps.CrashConfig",
+    "apps.notifications.apps.NotificationsConfig",
 ]
 
 THIRD_PARTY_APPS = [
@@ -319,6 +320,12 @@ if ENVIRONMENT == "prod":
     # https://docs.djangoproject.com/en/dev/ref/middleware/#x-content-type-options-nosniff
     SECURE_CONTENT_TYPE_NOSNIFF = get_env_value("SECURE_CONTENT_TYPE_NOSNIFF", default_value=True)
 
+
+# Web Push («مدیریت اعلان‌ها»). Without the key pair the preferences still save, but nothing is sent.
+# Generate once: python manage.py generate_vapid_keys (prints the two env lines).
+VAPID_PUBLIC_KEY = get_env_value("VAPID_PUBLIC_KEY", default_value="")
+VAPID_PRIVATE_KEY = get_env_value("VAPID_PRIVATE_KEY", default_value="")
+VAPID_SUBJECT = get_env_value("VAPID_SUBJECT", default_value="mailto:support@bordino.co")
 
 KAVENEGAR_API_KEY = get_env_value("KAVENEGAR_API_KEY")
 KAVENEGAR_OTP_TEMPLATE = get_env_value("KAVENEGAR_OTP_TEMPLATE", default_value="otp")

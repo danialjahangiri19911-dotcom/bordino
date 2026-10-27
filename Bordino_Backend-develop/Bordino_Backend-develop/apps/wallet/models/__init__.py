@@ -1,3 +1,4 @@
+from apps.wallet.models.ad_reward_session import AdRewardSession
 from apps.wallet.models.bank import Bank
 from apps.wallet.models.bank_account import BankAccount
 from apps.wallet.models.base_preset_wallet import BasePresetWallet

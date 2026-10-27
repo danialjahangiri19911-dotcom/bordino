@@ -184,7 +184,7 @@ class UserRegistrationService:
         )
         self.token_wallet_account_service.create_token_wallet_account_by_system(
             self.token_wallet_account_service.CreateTokenWalletAccountDTO(
-                wallet=wallet, name="کیف پول امتیاز بوردینو", symbol="L"
+                wallet=wallet, name="کیف پول امتیاز بردینو", symbol="L"
             )
         )
 

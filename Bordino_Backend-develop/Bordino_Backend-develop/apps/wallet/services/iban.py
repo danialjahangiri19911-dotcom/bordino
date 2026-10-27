@@ -19,3 +19,8 @@ def is_valid_iban(iban: str) -> bool:
     rearranged = iban[4:] + iban[:4]
     numeric = "".join(str(int(ch, 36)) for ch in rearranged)
     return int(numeric) % 97 == 1
+
+
+def bank_code_of(iban: str) -> str | None:
+    """The three-digit bank code of a valid Iranian Sheba number (IRkk BBB…), else None."""
+    return iban[4:7] if is_valid_iban(iban) else None

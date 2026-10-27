@@ -488,3 +488,151 @@ class Phase5Tests(TestCase):
         with self.assertRaises(ValidationError):
             self.spin(wheel)
         self.assertEqual(points(self.user), 100)
+
+
+MELLAT_IBAN = "IR700120000000000000000000"  # valid check digits, bank code 012
+MELLI_IBAN = "IR060170000000000000000000"  # bank code 017
+
+
+@override_settings(CACHES=LOCMEM)
+class BankListTests(TestCase):
+    """The withdrawal form's bank list was empty: the banks are seeded with their Sheba codes."""
+
+    def setUp(self):
+        self.user = make_customer("9120000801")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_iranian_banks_are_listed_on_one_page(self):
+        response = self.api.get("/api/v1/wallet/banks/?page_size=100")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        rows = (body.get("result") or body)["results"]
+        names = {r["name"]: r["code"] for r in rows}
+        self.assertGreaterEqual(len(rows), 25)
+        self.assertEqual(names["بانک ملت"], "012")
+        self.assertEqual(names["بانک ملی ایران"], "017")
+        self.assertTrue(all(r["id"] for r in rows))
+
+    def test_a_sheba_number_of_another_bank_is_refused(self):
+        mellat = Bank.objects.get(code="012")
+        melli = Bank.objects.get(code="017")
+        url = "/api/v1/wallet/bank-accounts/"
+        wrong = self.api.post(url, {"iban": MELLAT_IBAN, "bank": str(melli.pk), "account_holder": "علی رضایی"}, format="json")
+        self.assertEqual(wrong.status_code, 400)
+        self.assertIn("بانک ملت", str(wrong.json()))
+        right = self.api.post(url, {"iban": MELLAT_IBAN, "bank": str(mellat.pk), "account_holder": "علی رضایی"}, format="json")
+        self.assertEqual(right.status_code, 201, right.content)
+        self.assertEqual(BankAccount.objects.get(user=self.user).bank, mellat)
+
+    def test_profile_counts_every_ticket_ever_held(self):
+        response = self.api.get("/api/v1/customer/profile/me/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual((body.get("result") or body)["tickets_total"], 0)
+
+    def test_the_points_wallet_carries_the_new_brand_name(self):
+        account = balance.points_account(self.user)
+        self.assertNotIn("بوردینو", account.name)
+
+
+@override_settings(CACHES=LOCMEM)
+class AdRewardTests(TestCase):
+    """A rewarded video before a game: paid by the server, once, after the whole video."""
+
+    OFFER = "/api/v1/wallet/ad-reward/offer/"
+    START = "/api/v1/wallet/ad-reward/sessions/"
+
+    def setUp(self):
+        from django.core.cache import cache  # pylint: disable=import-outside-toplevel
+
+        cache.clear()
+        self.user = make_customer("9120000901", points=100)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def body(self, response):
+        data = response.json()
+        return data.get("result", data) if isinstance(data, dict) else data
+
+    def start(self):
+        response = self.api.post(self.START, {"placement": "sudoku"}, format="json")
+        self.assertEqual(response.status_code, 201, response.content)
+        return self.body(response)
+
+    def watched(self, session_id, seconds=20):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models import AdRewardSession  # pylint: disable=import-outside-toplevel
+
+        AdRewardSession.objects.filter(pk=session_id).update(create_time=timezone.now() - timedelta(seconds=seconds))
+
+    def complete(self, session_id):
+        return self.api.post(f"{self.START}{session_id}/complete/", {}, format="json")
+
+    def test_the_offer_says_how_many_points_and_what_to_play(self):
+        offer = self.body(self.api.get(self.OFFER))
+        self.assertTrue(offer["available"])
+        self.assertEqual(offer["reward_points"], 5)
+        self.assertEqual(offer["provider"], "demo")
+        self.assertTrue(offer["creative"]["video_url"])
+
+    def test_no_points_before_the_video_has_had_time_to_play(self):
+        session = self.start()
+        response = self.complete(session["session_id"])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(points(self.user), 100)
+
+    def test_a_watched_video_pays_once(self):
+        session = self.start()
+        self.watched(session["session_id"])
+        first = self.complete(session["session_id"])
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertFalse(self.body(first)["already_rewarded"])
+        self.assertEqual(self.body(first)["points_balance"], 105)
+        again = self.complete(session["session_id"])
+        self.assertEqual(again.status_code, 200)
+        self.assertTrue(self.body(again)["already_rewarded"])
+        self.assertEqual(points(self.user), 105)
+
+    def test_another_players_session_pays_nothing(self):
+        session = self.start()
+        self.watched(session["session_id"])
+        other = APIClient()
+        other.force_authenticate(make_customer("9120000902"))
+        self.assertEqual(other.post(f"{self.START}{session['session_id']}/complete/", {}, format="json").status_code, 409)
+        self.assertEqual(points(self.user), 100)
+
+    def test_an_old_session_cannot_be_claimed(self):
+        session = self.start()
+        self.watched(session["session_id"], seconds=60 * 60)
+        self.assertEqual(self.complete(session["session_id"]).status_code, 409)
+
+    def test_the_daily_limit_and_the_amount_come_from_the_configuration(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.filter(key="AD_REWARD_DAILY_LIMIT").update(value="1")
+        SystemConfiguration.objects.filter(key="AD_REWARD_POINTS").update(value="8")
+        session = self.start()
+        self.assertEqual(session["reward_points"], 8)
+        self.watched(session["session_id"])
+        self.assertEqual(self.complete(session["session_id"]).status_code, 200)
+        self.assertEqual(points(self.user), 108)
+        offer = self.body(self.api.get(self.OFFER))
+        self.assertFalse(offer["available"])
+        self.assertEqual(self.api.post(self.START, {}, format="json").status_code, 409)
+
+    def test_the_reward_is_in_the_points_history_and_not_claimable_by_record_action(self):
+        from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
+
+        session = self.start()
+        self.watched(session["session_id"])
+        self.complete(session["session_id"])
+        rows = self.body(self.api.get("/api/v1/wallet/points/transactions/"))
+        rows = rows.get("results", rows) if isinstance(rows, dict) else rows
+        self.assertIn("جایزهٔ تماشای ویدیو", {r["title"] for r in rows})
+        with self.assertRaises(ValueError):
+            RecordActionService.record_action(self.user, "rewarded_ad", "ad:forged")
+        self.assertEqual(points(self.user), 105)

@@ -24,7 +24,7 @@ from apps.wallet.models import (
 from apps.wallet.services.balance import POINTS_SYMBOL
 
 GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸"}
-ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸"}
+ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو"}
 WITHDRAWAL_STATUS = {
     CurrencyTransaction.Status.PENDING: "در انتظار واریز",
     CurrencyTransaction.Status.COMPLETED: "واریز شد",

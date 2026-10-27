@@ -17,6 +17,9 @@ class CustomerProfileSerializer(BaseModelSerializer):
     max_consecutive_days = serializers.CharField(read_only=True)
     referral_code = serializers.CharField(read_only=True)
     referral_count = serializers.IntegerField(read_only=True)
+    # Every ticket the player has ever held (all lotteries): the ticket badges stay earned when a
+    # new lottery starts.
+    tickets_total = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Customer
@@ -35,7 +38,13 @@ class CustomerProfileSerializer(BaseModelSerializer):
             "image_url",
             "referral_code",
             "referral_count",
+            "tickets_total",
         )
+
+    def get_tickets_total(self, obj) -> int:
+        from apps.lottery.models.ticket import Ticket
+
+        return Ticket.objects.filter(customer=obj).count()
 
     def get_image_url(self, obj):
         if obj.image and obj.image.file:
