@@ -1,13 +1,6 @@
 import React from "react";
 
-import EngineShell from "@/bd/EngineShell";
-import theme from "@/libs/games/sudoku/theme";
-import ThemeProvider from "@/libs/styles/ThemeProvider";
-
+// The sudoku design draws its own full-page frame (header, help, exit).
 export default function SudokuLayout({ children }: { children: React.ReactNode }) {
-	return (
-		<EngineShell game="sudoku" title="سودوکو">
-			<ThemeProvider theme={theme}>{children}</ThemeProvider>
-		</EngineShell>
-	);
+	return children;
 }

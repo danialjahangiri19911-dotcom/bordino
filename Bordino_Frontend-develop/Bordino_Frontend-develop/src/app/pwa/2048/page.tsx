@@ -1,12 +1,5 @@
-"use client";
+import Game2048 from "@/bd/games/Game2048";
 
-import GameView from "@/_pages/PwaApp/2048/GameView";
-import PersistedGameProvider from "@/libs/context/2048/PersistedGameProvider";
-
-export default function Home() {
-	return (
-		<PersistedGameProvider>
-			<GameView />
-		</PersistedGameProvider>
-	);
+export default function Page() {
+	return <Game2048 />;
 }

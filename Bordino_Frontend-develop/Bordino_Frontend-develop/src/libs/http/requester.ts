@@ -38,6 +38,8 @@ const DISABLE_SHOW_ERROR_CLIENT_PATHS = [
 	"/pwa/gameNet",
 	"/pwa/rules",
 	"/pwa/wheel",
+	"/pwa/sudoku",
+	"/pwa/2048",
 ];
 
 const DISABLE_401_ERRORS = ["/pwa/register"];
