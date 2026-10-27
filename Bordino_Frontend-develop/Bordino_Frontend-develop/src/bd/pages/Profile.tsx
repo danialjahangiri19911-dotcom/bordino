@@ -4,6 +4,7 @@ import { type ChangeEvent, useState } from "react";
 
 import Link from "next/link";
 
+import AvatarCropper from "../AvatarCropper";
 import Icon from "../Icon";
 import { AppShell, LoadState, Notice, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,14 +18,17 @@ import useUserStore from "@/libs/stores/userStore";
 
 type ImageAnswer = ResponseApiData<{ image_url: string | null }>;
 
-const MAX_IMAGE = 5 * 1024 * 1024;
+// A phone photo can be large: it is reduced to a 512 px square in the browser before upload.
+const MAX_IMAGE = 25 * 1024 * 1024;
 
 function AvatarPicker({ image }: { image?: string | null }) {
 	const queryClient = useQueryClient();
 	const setUser = useUserStore((s) => s.setUser);
 	const [preview, setPreview] = useState<string | null>(null);
+	const [chosen, setChosen] = useState<File | null>(null);
+	const [confirmRemove, setConfirmRemove] = useState(false);
 	const [problem, setProblem] = useState<string | null>(null);
-	const { submitHandler, isSending } = useMutate<ImageAnswer, FormData>({
+	const upload = useMutate<ImageAnswer, FormData>({
 		url: CUSTOMER_URLS.PROFILE_IMAGE,
 		method: "PATCH",
 		onSuccess: (data) => {
@@ -37,29 +41,65 @@ function AvatarPicker({ image }: { image?: string | null }) {
 			setProblem(gameErrorMessage(e));
 		},
 	});
+	const remove = useMutate<ImageAnswer, undefined>({
+		url: CUSTOMER_URLS.PROFILE_IMAGE,
+		method: "DELETE",
+		onSuccess: () => {
+			setUser({ image_url: "" });
+			setConfirmRemove(false);
+			queryClient.invalidateQueries();
+		},
+		onError: (e) => setProblem(gameErrorMessage(e)),
+	});
+	const busy = upload.isSending || remove.isSending;
 	const choose = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		event.target.value = "";
 		if (!file) return;
 		setProblem(null);
+		setConfirmRemove(false);
 		if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return setProblem("فقط عکس PNG، JPG یا WebP.");
-		if (file.size > MAX_IMAGE) return setProblem("حجم عکس باید کمتر از ۵ مگابایت باشد.");
-		setPreview(URL.createObjectURL(file));
+		if (file.size > MAX_IMAGE) return setProblem("حجم عکس باید کمتر از ۲۵ مگابایت باشد.");
+		setChosen(file);
+	};
+	const framed = (picture: Blob) => {
+		setChosen(null);
+		setPreview(URL.createObjectURL(picture));
 		const form = new FormData();
-		form.append("image", file);
-		submitHandler(form);
+		form.append("image", picture, "avatar.jpg");
+		upload.submitHandler(form);
 	};
 	const src = preview ?? image;
 	return (
 		<>
-			<label className="rt-profile-avatar bd-avatar-picker" aria-label="تغییر عکس پروفایل" aria-busy={isSending}>
-				{src ? <img src={src} alt="" /> : <Icon name="user-round" />}
-				<span className="bd-avatar-badge" aria-hidden="true">
-					<Icon name="camera" />
-				</span>
-				<input type="file" className="bd-visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={choose} disabled={isSending} />
-			</label>
+			<div className="bd-avatar-block">
+				<label className="rt-profile-avatar bd-avatar-picker" aria-label="تغییر عکس پروفایل" aria-busy={busy}>
+					{src ? <img src={src} alt="" /> : <Icon name="user-round" />}
+					<span className="bd-avatar-badge" aria-hidden="true">
+						<Icon name="camera" />
+					</span>
+					<input type="file" className="bd-visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={choose} disabled={busy} />
+				</label>
+				{image && !preview ? (
+					confirmRemove ? (
+						<span className="bd-avatar-remove" role="group" aria-label="حذف عکس پروفایل">
+							<span>حذف شود؟</span>
+							<button type="button" className="bd-text-btn" disabled={busy} onClick={() => remove.mutateWithoutPayload()}>
+								{remove.isSending ? "در حال حذف…" : "بله، حذف کن"}
+							</button>
+							<button type="button" className="bd-text-btn" disabled={busy} onClick={() => setConfirmRemove(false)}>
+								نه
+							</button>
+						</span>
+					) : (
+						<button type="button" className="bd-text-btn bd-avatar-remove" disabled={busy} onClick={() => setConfirmRemove(true)}>
+							<Icon name="trash-2" /> حذف عکس
+						</button>
+					)
+				) : null}
+			</div>
 			{problem ? <Notice>{problem}</Notice> : null}
+			{chosen ? <AvatarCropper file={chosen} onCancel={() => setChosen(null)} onDone={framed} /> : null}
 		</>
 	);
 }

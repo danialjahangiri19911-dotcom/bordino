@@ -7,7 +7,7 @@ import Link from "next/link";
 import Icon from "../Icon";
 import { fa } from "../format";
 import { type Entry, HistoryRow, rowsOf } from "../history";
-import { AppShell, EmptyState, Facts, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
+import { AppShell, CopyButton, EmptyState, Facts, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
 import { useCashAccount } from "./Wallet";
 
 import useWalletHistory from "@/api/wallet/hooks/useWalletHistory";
@@ -211,8 +211,11 @@ export function Achievements() {
 							</div>
 							<p>{fa(profile.referral_count ?? 0)} نفر با کد تو آمده‌اند</p>
 							{profile.referral_code ? (
-								<span className="bd-tag">
-									کد تو: <bdi dir="ltr">{profile.referral_code}</bdi>
+								<span className="bd-code">
+									<span className="bd-tag">
+										کد تو: <bdi dir="ltr">{profile.referral_code}</bdi>
+									</span>
+									<CopyButton text={profile.referral_code} label="کپی کد معرف" />
 								</span>
 							) : null}
 						</Panel>

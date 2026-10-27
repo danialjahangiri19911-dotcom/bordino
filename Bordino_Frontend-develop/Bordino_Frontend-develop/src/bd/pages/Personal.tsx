@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import JalaliDateField from "../JalaliDateField";
-import { AppShell, Facts, LoadState, Notice, Panel, useProfileSync } from "../ui";
+import { AppShell, CopyButton, Facts, LoadState, Notice, Panel, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -130,7 +130,15 @@ export default function Personal() {
 							items={[
 								["شمارهٔ موبایل", <bdi key="p" dir="ltr">0{profile.phone_number}</bdi>],
 								...(profile.referral_code
-									? ([["کد معرف تو", <bdi key="r" dir="ltr">{profile.referral_code}</bdi>]] as [string, JSX.Element][])
+									? ([
+											[
+												"کد معرف تو",
+												<span key="r" className="bd-code">
+													<bdi dir="ltr">{profile.referral_code}</bdi>
+													<CopyButton text={profile.referral_code} label="کپی کد معرف" />
+												</span>,
+											],
+										] as [string, JSX.Element][])
 									: []),
 							]}
 						/>

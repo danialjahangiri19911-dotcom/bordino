@@ -46,6 +46,16 @@ class CustomerProfileService:
             except Exception:  # pylint: disable=broad-except
                 logging.warning("Could not remove the old profile image %s", old_image.pk)
 
+    def remove_profile_image(self, customer: Customer) -> Customer:
+        """Take the player's picture away (they get the default avatar again); nothing else changes."""
+        old_image = customer.image
+        if old_image is None:
+            return customer
+        customer.image = None
+        customer.save(update_fields=["image", "update_time"])
+        self._delete_old_image(old_image)
+        return customer
+
     def update_profile_image(self, customer: Customer, image_file) -> Customer:
         """
         Update customer's profile image

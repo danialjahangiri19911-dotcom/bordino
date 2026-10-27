@@ -289,6 +289,27 @@ class AvatarTests(TestCase):
         with Image.open(self.user.customer.image.file.path) as stored:
             self.assertLessEqual(max(stored.size), 512)
 
+    def test_removing_the_picture_keeps_the_account(self):
+        self.assertEqual(self.upload(self.png((64, 64))).status_code, 200)
+        self.user.customer.refresh_from_db()
+        stored = self.user.customer.image
+        path = stored.file.path
+        r = self.api.delete("/api/v1/customer/profile-image/me/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNone(result(r)["image_url"])
+        self.user.customer.refresh_from_db()
+        self.assertIsNone(self.user.customer.image)
+        self.assertTrue(Customer.objects.filter(user=self.user).exists())
+        import os  # pylint: disable=import-outside-toplevel
+
+        self.assertFalse(os.path.exists(path))
+        # Again (nothing to remove) is fine; another customer's picture is never reachable.
+        self.assertEqual(self.api.delete("/api/v1/customer/profile-image/me/").status_code, 200)
+        other = make_customer("9120000652")
+        other_id = Customer.objects.get(user=other).pk
+        self.assertEqual(self.api.delete(f"/api/v1/customer/profile-image/{other_id}/").status_code, 404)
+        self.assertEqual(APIClient().delete("/api/v1/customer/profile-image/me/").status_code, 401)
+
     def test_a_very_wide_image_is_converted_not_a_500(self):
         # 20000×1 is a valid PNG that WebP itself cannot encode at that width: it is shrunk first.
         r = self.upload(self.png((20000, 1)))

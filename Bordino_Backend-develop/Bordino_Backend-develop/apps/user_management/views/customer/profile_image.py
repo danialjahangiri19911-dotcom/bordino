@@ -1,11 +1,13 @@
-from rest_framework import mixins
+from rest_framework import mixins, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.user_management.serializers.customer.profile_image import CustomerProfileImageSerializer
+from apps.user_management.services.customer.profile import CustomerProfileService
 from apps.user_management.views.customer.utils.current_customer import CurrentCustomerMixin
 from apps.users.models import Customer
 
@@ -48,3 +50,15 @@ class CustomerProfileImageView(
     )
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={200: CustomerProfileImageSerializer},
+        description="Remove my profile picture (the account and everything else stay).",
+        operation_id="remove_profile_image",
+    )
+    def destroy(self, request, *args, **kwargs):
+        # Only one's own picture ("me"). This removes the picture, never the customer.
+        if kwargs.get(self.lookup_url_kwarg) != "me":
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        customer = CustomerProfileService().remove_profile_image(self.get_object())
+        return Response(self.get_serializer(customer).data)

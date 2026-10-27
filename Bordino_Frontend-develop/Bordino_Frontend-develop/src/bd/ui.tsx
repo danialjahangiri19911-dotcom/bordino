@@ -503,3 +503,42 @@ export function useNavFromPath(): NavKey {
 	if (path.startsWith(R.games)) return "games";
 	return "home";
 }
+
+/** Copies `text` (the Clipboard API on https, the old select-and-copy way elsewhere) and says so. */
+export function CopyButton({ text, label }: { text: string; label: string }) {
+	const [state, setState] = useState<"idle" | "done" | "failed">("idle");
+	const copy = async () => {
+		let ok = false;
+		try {
+			if (navigator.clipboard && window.isSecureContext) {
+				await navigator.clipboard.writeText(text);
+				ok = true;
+			}
+		} catch {
+			ok = false;
+		}
+		if (!ok) {
+			const area = document.createElement("textarea");
+			area.value = text;
+			area.setAttribute("readonly", "");
+			area.style.position = "fixed";
+			area.style.opacity = "0";
+			document.body.appendChild(area);
+			area.select();
+			try {
+				ok = document.execCommand("copy");
+			} catch {
+				ok = false;
+			}
+			area.remove();
+		}
+		setState(ok ? "done" : "failed");
+		window.setTimeout(() => setState("idle"), 2000);
+	};
+	return (
+		<button type="button" className="bd-copy" onClick={copy} aria-label={label} title={label}>
+			<Icon name={state === "done" ? "check" : "copy"} />
+			<span aria-live="polite">{state === "done" ? "کپی شد" : state === "failed" ? "کپی نشد" : ""}</span>
+		</button>
+	);
+}
