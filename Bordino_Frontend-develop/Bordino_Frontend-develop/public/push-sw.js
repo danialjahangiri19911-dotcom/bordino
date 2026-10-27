@@ -1,4 +1,4 @@
-// Bundled into /sw.js by next-pwa (customWorkerDir "worker"): shows Web Push notifications sent by
+// Loaded by /sw.js (next.config.mjs importScripts): shows Web Push notifications sent by
 // the server (apps/notifications) and opens the app on a tap.
 self.addEventListener("push", (event) => {
 	let data = {};

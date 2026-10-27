@@ -9,6 +9,8 @@ const pwaConfig = {
 	skipWaiting: true,
 	scope: "/pwa",
 	sw: "sw.js",
+	// Web Push (apps/notifications): the push and notification-click handlers.
+	importScripts: ["/push-sw.js"],
 	// No precache: next-pwa lists every build file (176 files, ~18 MB on first visit, plus ~70 source
 	// maps / manifests that do not exist on the server, which made the worker's install fail and
 	// kept it from ever activating). Only the runtime rules below apply: fonts and images are cached
