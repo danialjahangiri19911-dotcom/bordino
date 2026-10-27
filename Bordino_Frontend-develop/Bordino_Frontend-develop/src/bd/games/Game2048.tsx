@@ -152,14 +152,13 @@ function View() {
 		return { ...t, pop: before !== undefined && before !== t.value, spawn: before === undefined && previous.size > 0 };
 	});
 	const maxTile = tiles.length ? Math.max(...tiles.map((t) => t.value)) : 0;
-	const time = Math.max(0, game.timeRemaining);
 
 	const dialog: Record<string, [string, string]> = {
 		ready: ["عددها را به هم برسان", playCost !== undefined ? `هر بازی ${fa(playCost)} امتیاز${points !== undefined ? ` · موجودی تو ${fa(points)} امتیاز` : ""}` : "هزینهٔ بازی در حال دریافت است…"],
 		win: ["۲۰۴۸ را ساختی!", `امتیاز این بازی: ${fa(game.score)}. یک رکورد بزرگ‌تر؟`],
-		lost: ["این دور تمام شد", `${time <= 0 ? "زمان تمام شد" : "حرکتی باقی نمانده"}؛ امتیاز نهایی ${fa(game.score)}.`],
+		lost: ["این دور تمام شد", `حرکتی باقی نمانده؛ امتیاز نهایی ${fa(game.score)}.`],
 		reset: ["از نو شروع کنیم؟", `صفحهٔ فعلی پاک می‌شود و بازی تازه${playCost !== undefined ? ` ${fa(playCost)} امتیاز` : ""} هزینه دارد؛ رکوردت می‌ماند.`],
-		exit: ["از بازی خارج شوی؟", "بازی روی همین دستگاه نگه داشته می‌شود؛ زمان فقط وقتی صفحه باز است کم می‌شود."],
+		exit: ["از بازی خارج شوی؟", "بازی روی همین دستگاه نگه داشته می‌شود و هر وقت برگردی ادامه دارد."],
 	};
 
 	return (
@@ -192,7 +191,7 @@ function View() {
 				</header>
 				<section className="g48-help" hidden={!help}>
 					<b>یک حرکت، یک ترکیب</b>
-					<p>عددهای یکسان را با کشیدن روی صفحه یا کلیدهای جهت‌نما به هم برسان. هر ترکیب به امتیاز بازی اضافه می‌شود. هدف، ساختن کاشی ۲۰۴۸ قبل از تمام شدن زمان است.</p>
+					<p>عددهای یکسان را با کشیدن روی صفحه یا کلیدهای جهت‌نما به هم برسان. هر ترکیب به امتیاز بازی اضافه می‌شود. هدف، ساختن کاشی ۲۰۴۸ است؛ زمان محدودی ندارد.</p>
 					<small>هر بازی امتیاز کیف‌پول می‌گیرد؛ امتیاز و رکورد خود بازی به کیف‌پول اضافه نمی‌شوند.</small>
 				</section>
 				<div className="g48-layout">
@@ -208,12 +207,6 @@ function View() {
 							<div>
 								<span>رکورد این دستگاه</span>
 								<strong>{fa(best)}</strong>
-							</div>
-							<div>
-								<span>زمان</span>
-								<strong>
-									{fa(Math.floor(time / 60)).padStart(2, "۰")}:{fa(time % 60).padStart(2, "۰")}
-								</strong>
 							</div>
 						</div>
 						<div className="g48-board-frame">
@@ -279,7 +272,7 @@ function View() {
 														<button type="button" className="g48-secondary" onClick={() => setConfirm("")}>
 															ادامهٔ همین بازی
 														</button>
-													) : modal === "lost" && game.canUndo && time > 0 ? (
+													) : modal === "lost" && game.canUndo ? (
 														<button type="button" className="g48-secondary" onClick={game.undo}>
 															برگشت یک حرکت
 														</button>

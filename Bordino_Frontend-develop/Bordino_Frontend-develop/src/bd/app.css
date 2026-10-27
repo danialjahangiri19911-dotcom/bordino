@@ -172,5 +172,3 @@ body { margin: 0; }
 #bordino-directions .sd-level-choice [aria-checked="true"] { background: var(--s-accent); color: var(--s-on); }
 #bordino-directions .sd-problem, #bordino-directions .g48-problem { color: var(--s-error, #a82f45); font-weight: 500; }
 #bordino-directions .bd-game-page { overflow-x: clip; }
-/* The 2048 score bar also shows the engine's time limit (a third box). */
-#bordino-directions .g48 .g48-scorebar { grid-template-columns: repeat(3, minmax(0, 1fr)); }

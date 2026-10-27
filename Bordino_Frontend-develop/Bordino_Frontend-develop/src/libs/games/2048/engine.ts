@@ -103,16 +103,11 @@ export class GameEngine {
 			const newTiles = { ...snapshot.tiles };
 			const newTilesByIds = [...snapshot.tilesByIds];
 
-			// Compute elapsed time
-			const now = Date.now();
-			const elapsedSeconds = Math.floor((now - lastSaved) / 1000);
-			let newTimeRemaining = snapshot.timeRemaining - elapsedSeconds;
-			if (newTimeRemaining < 0) newTimeRemaining = 0;
-
-			let newStatus = snapshot.status;
-			if (newStatus === "ongoing" && newTimeRemaining <= 0) {
-				newStatus = "lost";
-			}
+			// 2048 has no time limit (product decision 2026-10-27): a saved game is resumed as it was,
+			// however long ago it was saved.
+			void lastSaved;
+			const newTimeRemaining = snapshot.timeRemaining;
+			const newStatus = snapshot.status;
 
 			this.state = {
 				board: newBoard,
@@ -262,19 +257,9 @@ export class GameEngine {
 		}
 	}
 
+	/** No time limit any more: a game ends only when no move is left (or 2048 is made). */
 	public tick() {
-		if (this.state.status !== "ongoing") return;
-		if (this.state.timeRemaining <= 0) return;
-
-		const newTime = this.state.timeRemaining - 1;
-		const newStatus = newTime <= 0 ? "lost" : this.state.status;
-
-		this.state = {
-			...this.state,
-			timeRemaining: newTime,
-			status: newStatus,
-		};
-		this.notify();
+		// intentionally nothing
 	}
 
 	// Undo: go to previous snapshot
