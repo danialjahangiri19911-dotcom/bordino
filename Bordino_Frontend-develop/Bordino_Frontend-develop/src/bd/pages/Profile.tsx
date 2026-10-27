@@ -1,12 +1,13 @@
 "use client";
 
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 
-import AvatarCropper from "../AvatarCropper";
+import AvatarEditor from "../AvatarEditor";
 import Icon from "../Icon";
-import { AppShell, LoadState, Notice, ProfileRow, R, useProfileSync } from "../ui";
+import { openPhoto, PhotoError } from "../photo";
+import { AppShell, LoadState, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -18,27 +19,35 @@ import useUserStore from "@/libs/stores/userStore";
 
 type ImageAnswer = ResponseApiData<{ image_url: string | null }>;
 
-// A phone photo can be large: it is reduced to a 512 px square in the browser before upload.
-const MAX_IMAGE = 25 * 1024 * 1024;
-
+/**
+ * The profile photo, as in Telegram: a tap opens a menu (gallery, camera, remove), a chosen photo
+ * opens full screen to frame it, and the avatar shows the new photo at once while it uploads.
+ */
 function AvatarPicker({ image }: { image?: string | null }) {
 	const queryClient = useQueryClient();
 	const setUser = useUserStore((s) => s.setUser);
-	const [preview, setPreview] = useState<string | null>(null);
-	const [chosen, setChosen] = useState<File | null>(null);
+	const [menu, setMenu] = useState(false);
 	const [confirmRemove, setConfirmRemove] = useState(false);
+	const [opening, setOpening] = useState(false);
+	const [photo, setPhoto] = useState<HTMLCanvasElement | null>(null);
+	const [preview, setPreview] = useState<string | null>(null);
+	// The last framed picture, kept so a failed upload can be sent again without framing it again.
+	const [lastPicture, setLastPicture] = useState<Blob | null>(null);
+	const imageWhenSent = useRef<string | null | undefined>(undefined);
 	const [problem, setProblem] = useState<string | null>(null);
+	const gallery = useRef<HTMLInputElement>(null);
+	const camera = useRef<HTMLInputElement>(null);
 	const upload = useMutate<ImageAnswer, FormData>({
 		url: CUSTOMER_URLS.PROFILE_IMAGE,
 		method: "PATCH",
 		onSuccess: (data) => {
 			if (data?.result?.image_url) setUser({ image_url: data.result.image_url });
-			setPreview(null);
+			setLastPicture(null);
 			queryClient.invalidateQueries();
 		},
 		onError: (e) => {
 			setPreview(null);
-			setProblem(gameErrorMessage(e));
+			setProblem(`عکس ذخیره نشد: ${gameErrorMessage(e)}`);
 		},
 	});
 	const remove = useMutate<ImageAnswer, undefined>({
@@ -46,60 +55,159 @@ function AvatarPicker({ image }: { image?: string | null }) {
 		method: "DELETE",
 		onSuccess: () => {
 			setUser({ image_url: "" });
+			setPreview(null);
+			setMenu(false);
 			setConfirmRemove(false);
 			queryClient.invalidateQueries();
 		},
-		onError: (e) => setProblem(gameErrorMessage(e)),
+		onError: (e) => {
+			setMenu(false);
+			setConfirmRemove(false);
+			setProblem(`عکس حذف نشد: ${gameErrorMessage(e)}`);
+		},
 	});
-	const busy = upload.isSending || remove.isSending;
-	const choose = (event: ChangeEvent<HTMLInputElement>) => {
-		const file = event.target.files?.[0];
-		event.target.value = "";
-		if (!file) return;
+	const busy = upload.isSending || remove.isSending || opening;
+
+	// The preview stays until the server's address for the new photo has loaded (no flash of the old one).
+	useEffect(() => {
+		if (!preview || upload.isSending || lastPicture) return;
+		if (!image || image === imageWhenSent.current) return;
+		const shown = new Image();
+		shown.onload = () => setPreview(null);
+		shown.src = image;
+	}, [image, preview, upload.isSending, lastPicture]);
+	useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+
+	useEffect(() => {
+		if (!menu) return;
+		const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [menu]);
+
+	const send = (picture: Blob) => {
 		setProblem(null);
-		setConfirmRemove(false);
-		if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) return setProblem("فقط عکس PNG، JPG یا WebP.");
-		if (file.size > MAX_IMAGE) return setProblem("حجم عکس باید کمتر از ۲۵ مگابایت باشد.");
-		setChosen(file);
-	};
-	const framed = (picture: Blob) => {
-		setChosen(null);
+		setLastPicture(picture);
+		imageWhenSent.current = image;
 		setPreview(URL.createObjectURL(picture));
 		const form = new FormData();
 		form.append("image", picture, "avatar.jpg");
 		upload.submitHandler(form);
 	};
+
+	const choose = async (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		event.target.value = "";
+		setMenu(false);
+		if (!file) return;
+		setProblem(null);
+		setOpening(true);
+		try {
+			setPhoto(await openPhoto(file));
+		} catch (e) {
+			setProblem(e instanceof PhotoError ? e.message : "این فایل باز نشد؛ یک عکس دیگر انتخاب کن.");
+		} finally {
+			setOpening(false);
+		}
+	};
+
 	const src = preview ?? image;
 	return (
 		<>
 			<div className="bd-avatar-block">
-				<label className="rt-profile-avatar bd-avatar-picker" aria-label="تغییر عکس پروفایل" aria-busy={busy}>
+				<button
+					type="button"
+					className="rt-profile-avatar bd-avatar-picker"
+					aria-label={src ? "عکس پروفایل؛ تغییر یا حذف" : "گذاشتن عکس پروفایل"}
+					aria-haspopup="menu"
+					aria-expanded={menu}
+					aria-busy={busy}
+					onClick={() => {
+						setConfirmRemove(false);
+						setMenu(true);
+					}}
+				>
 					{src ? <img src={src} alt="" /> : <Icon name="user-round" />}
+					{busy ? (
+						<span className="bd-avatar-progress" aria-hidden="true">
+							<Icon name="loader-circle" className="bd-spin" />
+						</span>
+					) : null}
 					<span className="bd-avatar-badge" aria-hidden="true">
 						<Icon name="camera" />
 					</span>
-					<input type="file" className="bd-visually-hidden" accept="image/png,image/jpeg,image/webp" onChange={choose} disabled={busy} />
-				</label>
-				{image && !preview ? (
-					confirmRemove ? (
-						<span className="bd-avatar-remove" role="group" aria-label="حذف عکس پروفایل">
-							<span>حذف شود؟</span>
-							<button type="button" className="bd-text-btn" disabled={busy} onClick={() => remove.mutateWithoutPayload()}>
-								{remove.isSending ? "در حال حذف…" : "بله، حذف کن"}
-							</button>
-							<button type="button" className="bd-text-btn" disabled={busy} onClick={() => setConfirmRemove(false)}>
-								نه
-							</button>
-						</span>
-					) : (
-						<button type="button" className="bd-text-btn bd-avatar-remove" disabled={busy} onClick={() => setConfirmRemove(true)}>
-							<Icon name="trash-2" /> حذف عکس
-						</button>
-					)
-				) : null}
+				</button>
+				<span className="bd-avatar-status" role="status">
+					{opening ? "در حال باز کردن عکس…" : upload.isSending ? "در حال ذخیرهٔ عکس…" : remove.isSending ? "در حال حذف عکس…" : ""}
+				</span>
+				{/* Any image type: some phones send photos with no type at all; openPhoto decides. */}
+				<input ref={gallery} type="file" accept="image/*" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
+				<input ref={camera} type="file" accept="image/*" capture="user" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
 			</div>
-			{problem ? <Notice>{problem}</Notice> : null}
-			{chosen ? <AvatarCropper file={chosen} onCancel={() => setChosen(null)} onDone={framed} /> : null}
+			{problem ? (
+				<div className="bd-toast" role="alert">
+					<span>{problem}</span>
+					{lastPicture && !upload.isSending ? (
+						<button type="button" className="bd-toast-action" onClick={() => send(lastPicture)}>
+							تلاش دوباره
+						</button>
+					) : null}
+					<button type="button" className="bd-toast-close" aria-label="بستن پیام" onClick={() => setProblem(null)}>
+						<Icon name="x" />
+					</button>
+				</div>
+			) : null}
+			{menu ? (
+				<div className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && setMenu(false)}>
+					<div className="bd-sheet" role="menu" aria-label="عکس پروفایل">
+						{confirmRemove ? (
+							<>
+								<p className="bd-sheet-title">عکس پروفایل حذف شود؟</p>
+								<button type="button" role="menuitem" className="bd-sheet-item bd-sheet-danger" disabled={remove.isSending} onClick={() => remove.mutateWithoutPayload()}>
+									<Icon name="trash-2" /> {remove.isSending ? "در حال حذف…" : "بله، حذف کن"}
+								</button>
+								<button type="button" role="menuitem" className="bd-sheet-item" autoFocus onClick={() => setConfirmRemove(false)}>
+									<Icon name="arrow-right" /> نه، برگرد
+								</button>
+							</>
+						) : (
+							<>
+								<p className="bd-sheet-title">عکس پروفایل</p>
+								<button type="button" role="menuitem" className="bd-sheet-item" autoFocus onClick={() => {
+										gallery.current?.click();
+										setMenu(false);
+									}}>
+									<Icon name="image" /> انتخاب از گالری
+								</button>
+								<button type="button" role="menuitem" className="bd-sheet-item" onClick={() => {
+										camera.current?.click();
+										setMenu(false);
+									}}>
+									<Icon name="camera" /> گرفتن عکس
+								</button>
+								{image ? (
+									<button type="button" role="menuitem" className="bd-sheet-item bd-sheet-danger" onClick={() => setConfirmRemove(true)}>
+										<Icon name="trash-2" /> حذف عکس
+									</button>
+								) : null}
+							</>
+						)}
+						<button type="button" role="menuitem" className="bd-sheet-item bd-sheet-cancel" onClick={() => setMenu(false)}>
+							انصراف
+						</button>
+					</div>
+				</div>
+			) : null}
+			{photo ? (
+				<AvatarEditor
+					photo={photo}
+					onCancel={() => setPhoto(null)}
+					onDone={(picture) => {
+						setPhoto(null);
+						send(picture);
+					}}
+				/>
+			) : null}
 		</>
 	);
 }
