@@ -1,7 +1,5 @@
-import React from "react";
+import Otp from "@/bd/pages/Otp";
 
-import SendOtp from "@/_pages/PwaApp/Otp";
-
-export default function page() {
-	return <SendOtp />;
+export default function Page() {
+	return <Otp />;
 }

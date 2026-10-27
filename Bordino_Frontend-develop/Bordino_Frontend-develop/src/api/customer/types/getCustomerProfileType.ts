@@ -23,6 +23,8 @@ interface CustomerProfileResponse {
 	favorite_categories: string[];
 	phone_number: string;
 	image_url: string;
+	referral_code?: string;
+	referral_count?: number;
 }
 
 export type CustomerProfileApiData = ResponseApiData<CustomerProfileResponse>;

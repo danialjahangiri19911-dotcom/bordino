@@ -1,38 +1,31 @@
 "use client";
 
 import type { ReactNode } from "react";
-import React, { memo, useCallback, useEffect, useMemo } from "react";
+import React, { memo, useCallback, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 
-import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 
 import useHydrated from "./useHydrated";
-import LandingLayout from "@libs/components/layouts/LandingLayout";
-import PwaLayout from "@libs/components/layouts/PwaLayout";
 import showToastEmitter from "@libs/components/toasts/ToastEmitter/showToastEmitter";
 import { AppRouterCacheProvider } from "@libs/http/AppRouterCacheProvider";
 import { GlobalStyles } from "@libs/styles/GlobalStyles";
 
+import { useApplyScheme } from "@/bd/appearance";
+import InstallPrompt from "@/bd/InstallPrompt";
 import { APP_HOME } from "@/constants/routes";
 import { useErrorListeners } from "@/libs/http/useErrorListeners";
 import ThemeProvider from "@/libs/styles/ThemeProvider";
-
-const PageLoading = dynamic(
-	() => import("@/libs/components/loading/PageLoading"),
-	{ ssr: false },
-);
 
 interface Props {
 	children: ReactNode;
 }
 
+/** Every page renders inside #bordino-directions, the scope of the neobrutalism stylesheet. */
 function Layout({ children }: Readonly<Props>) {
 	const pathname = usePathname();
-	const checkIsPwaApp = useMemo(
-		() => pathname.includes(APP_HOME.path),
-		[pathname],
-	);
+	const isPwa = pathname.startsWith(APP_HOME.path);
+	const scheme = useApplyScheme();
 
 	const { subscribe } = useErrorListeners();
 
@@ -46,23 +39,28 @@ function Layout({ children }: Readonly<Props>) {
 		return unsubscribe;
 	}, [handleError, subscribe]);
 
+	// The stores (session, user) live in localStorage: render once they are read, so a signed-in
+	// player is never sent to the phone page for a frame.
 	const hydrated = useHydrated();
-
-	if (!hydrated) {
-		return <PageLoading />;
-	}
 
 	return (
 		<AppRouterCacheProvider>
 			<ThemeProvider>
 				<GlobalStyles />
-				{checkIsPwaApp ? (
-					<PwaLayout>{children}</PwaLayout>
-				) : (
-					<LandingLayout>{children}</LandingLayout>
-				)}
+				<div id="bordino-directions" dir="rtl">
+					{hydrated ? (
+						children
+					) : (
+						<div className="bd-boot" role="status" aria-label="در حال بارگذاری">
+							<span className="bd-logomark" aria-hidden="true">
+								ب
+							</span>
+						</div>
+					)}
+					{hydrated && isPwa ? <InstallPrompt /> : null}
+				</div>
 			</ThemeProvider>
-			<ToastContainer />
+			<ToastContainer rtl position="top-center" theme={scheme === "dark" ? "dark" : "light"} />
 		</AppRouterCacheProvider>
 	);
 }

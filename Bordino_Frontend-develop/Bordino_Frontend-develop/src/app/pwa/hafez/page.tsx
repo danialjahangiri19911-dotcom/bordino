@@ -1,5 +1,5 @@
-import HafezPage from "@pages/PwaApp/Hafez";
+import { Hafez } from "@/bd/pages/Fortunes";
 
-export default function Hafez() {
-	return <HafezPage />;
+export default function Page() {
+	return <Hafez />;
 }

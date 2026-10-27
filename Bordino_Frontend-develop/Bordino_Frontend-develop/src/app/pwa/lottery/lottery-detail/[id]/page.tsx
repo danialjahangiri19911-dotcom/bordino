@@ -1,7 +1,5 @@
-import React from "react";
+import LotteryDetail from "@/bd/pages/LotteryDetail";
 
-import LotteryDetail from "@pages/PwaApp/Lottery/LotteryDetail";
-
-export default function LotteryDetailPage() {
+export default function Page() {
 	return <LotteryDetail />;
 }

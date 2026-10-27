@@ -1,5 +1,6 @@
-import HafezResultPage from "@pages/PwaApp/Hafez/Result";
+import { redirect } from "next/navigation";
 
-export default function HafezResult() {
-	return <HafezResultPage />;
+// The result now shows on the Hafez page itself.
+export default function Page() {
+	redirect("/pwa/hafez");
 }

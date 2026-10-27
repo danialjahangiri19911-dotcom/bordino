@@ -1,7 +1,5 @@
-import React from "react";
+import Wallet from "@/bd/pages/Wallet";
 
-import Wallet from "@/_pages/PwaApp/Wallet";
-
-export default function page() {
+export default function Page() {
 	return <Wallet />;
 }

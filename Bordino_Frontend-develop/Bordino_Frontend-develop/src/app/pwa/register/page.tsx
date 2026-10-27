@@ -1,7 +1,5 @@
-import React from "react";
+import Login from "@/bd/pages/Login";
 
-import Register from "@/_pages/PwaApp/Register";
-
-export default function page() {
-	return <Register />;
+export default function Page() {
+	return <Login />;
 }

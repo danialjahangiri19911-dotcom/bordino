@@ -118,6 +118,8 @@ export default function SudokuPage() {
 				hardUnlocked={hardUnlocked}
 				onSelectDifficulty={handleSelectDifficulty}
 				busy={starting}
+				cost={costData ? playCost : undefined}
+				points={costData ? currentPoints : undefined}
 			/>
 		);
 	}

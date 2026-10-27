@@ -1,5 +1,5 @@
-import LotteryGuide from "@pages/PwaApp/Lottery/LotteryGuide";
+import Guide from "@/bd/pages/Guide";
 
-export default function LotteryGuidePage() {
-	return <LotteryGuide />;
+export default function Page() {
+	return <Guide />;
 }

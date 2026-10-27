@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import { BDN_PALETTE } from "./colorPalette";
 import useFontVariants from "./fontVariants";
 import { type Theme } from "@libs/styles/styled";
-import useThemeModeStore from "@libs/uiHooks/useThemeModeStore";
 import { createTheme } from "@mui/material/styles";
 
 interface Props {
@@ -12,7 +11,9 @@ interface Props {
 }
 
 const useDynamicTheme = ({ direction = "rtl" }: Props = {}) => {
-	const { mode } = useThemeModeStore();
+	// The remaining MUI pieces (toasts, the sudoku/2048/crash internals) stay light; the app's own
+	// light/dark appearance is the neobrutalism stylesheet (src/bd).
+	const mode = "light" as const;
 	const defaultTheme = createTheme();
 	const { typographyVariants } = useFontVariants();
 

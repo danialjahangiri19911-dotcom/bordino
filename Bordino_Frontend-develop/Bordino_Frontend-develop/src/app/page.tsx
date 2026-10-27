@@ -1,5 +1,5 @@
-import HomePage from "@/_pages/Home";
+import Landing from "@/bd/pages/Landing";
 
-export default function Home() {
-	return <HomePage />;
+export default function Page() {
+	return <Landing />;
 }

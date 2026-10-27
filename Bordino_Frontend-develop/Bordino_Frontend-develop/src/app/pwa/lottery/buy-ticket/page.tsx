@@ -1,8 +1,8 @@
-import React, { Suspense } from "react";
+import { Suspense } from "react";
 
-import BuyTicket from "@/_pages/PwaApp/Lottery/BuyTicket";
+import BuyTicket from "@/bd/pages/BuyTicket";
 
-export default function page() {
+export default function Page() {
 	return (
 		<Suspense>
 			<BuyTicket />

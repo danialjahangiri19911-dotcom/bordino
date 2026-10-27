@@ -1,12 +1,12 @@
 "use client";
 
 import CrashGame from "@/_pages/PwaApp/Crash";
-import PwaAppPageLayout from "@/libs/components/layouts/PwaAppLayout";
+import EngineShell from "@/bd/EngineShell";
 
 export default function CrashPage() {
 	return (
-		<PwaAppPageLayout>
+		<EngineShell game="crash" title="انفجار">
 			<CrashGame />
-		</PwaAppPageLayout>
+		</EngineShell>
 	);
 }

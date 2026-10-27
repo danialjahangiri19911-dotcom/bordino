@@ -48,9 +48,6 @@ export function Fonts() {
 					font-weight: normal;
 					src: url(/fonts/IranNastaliq.ttf) format('truetype');
 				}
-				* {
-					font-family: "shabnam", sans-serif;
-				}
 			`}
 		/>
 	);

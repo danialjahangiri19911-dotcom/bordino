@@ -1,0 +1,148 @@
+/* Production frame for the neobrutalism (brutal-a «پوستر قرمز») design. bd.css is the handoff's
+   reference stylesheet; this file only turns its preview card into full-screen app pages and adds
+   the states the reference has no selector for. */
+
+html { background: #fff8eb; }
+html[data-bd-scheme="dark"] { background: #24211e; }
+body { margin: 0; }
+
+/* brutal-a palette (reference ui.js palette(): --bd-* as light-dark pairs on the article) */
+#bordino-directions .bd-product.st-brutal {
+	--bd-accent: #d64142; --bd-tint: #f4c8bd; --bd-bg: #fff8eb; --bd-surface: #fffdf5;
+	--bd-on: #ffffff; --bd-hi: #ffffff; --bd-lo: #d5d7de;
+}
+:root[data-bd-scheme="dark"] #bordino-directions .bd-product.st-brutal {
+	--bd-accent: #ff9995; --bd-tint: #59322d; --bd-bg: #24211e; --bd-surface: #34302a;
+	--bd-on: #221d29; --bd-hi: #55556b; --bd-lo: #12131b;
+}
+
+/* The reference draws each screen as a framed card; in the app a page is the whole viewport. */
+#bordino-directions .bd-product.bd-page {
+	border: 0; border-radius: 0; min-height: 100dvh; max-width: 1440px; margin: 0 auto;
+	/* Nothing inside may scroll the page sideways (clip keeps the sticky navigation working). */
+	overflow-x: clip;
+}
+@media (min-width: 1441px) {
+	#bordino-directions .bd-product.bd-page { border-inline: 2px solid var(--bd-outline); }
+}
+/* The navigation stays reachable while a page scrolls (on phones it is the row under the header). */
+@media (max-width: 750px) {
+	#bordino-directions .bd-page .bd-sidebar { position: sticky; top: 0; z-index: 19; background: var(--bd-bg); flex-wrap: nowrap; }
+	#bordino-directions .bd-page .bd-nav-item { flex: 1; justify-content: center; }
+}
+
+/* Links styled as the reference's buttons. */
+#bordino-directions .bd-product a { color: inherit; text-decoration: none; }
+#bordino-directions .bd-product a.bd-action,
+#bordino-directions .bd-product a.bd-secondary,
+#bordino-directions .bd-product a.bd-text-btn { cursor: pointer; }
+#bordino-directions .bd-nav-item[aria-current="page"] { color: var(--bd-accent) !important; background: var(--bd-tint) !important; }
+#bordino-directions .bd-text-btn { cursor: pointer; }
+#bordino-directions .bd-product :is(button, a, input, select, summary, [tabindex]):focus-visible {
+	outline: 3px solid var(--bd-accent); outline-offset: 2px;
+}
+#bordino-directions .bd-product button:disabled,
+#bordino-directions .bd-product .bd-action[aria-disabled="true"] { opacity: .55; cursor: not-allowed; box-shadow: none !important; }
+#bordino-directions .bd-product button { cursor: pointer; }
+
+#bordino-directions .bd-wheel-link img { width: 22px; height: 22px; }
+#bordino-directions .bd-avatar { overflow: hidden; flex: none; }
+#bordino-directions .bd-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Notices: the reference has one tone (warn); success and info reuse its block. */
+#bordino-directions .rt-notice.bd-notice-ok { background: color-mix(in srgb, #2f8f5b 18%, var(--bd-surface)); color: var(--bd-fg); }
+#bordino-directions .rt-notice.bd-notice-info { background: var(--bd-surface); color: var(--bd-fg); border: 2px solid var(--bd-outline); }
+
+/* Field errors and selects (the reference fields are inputs only). */
+#bordino-directions .rt-field .bd-field-error,
+#bordino-directions .bd-field-error { color: var(--bd-accent); font-size: 12px; margin: 4px 0 0; }
+#bordino-directions .bd-date-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr; gap: 8px; }
+
+/* Lists of real rows (transactions, tickets, prizes, bank accounts). */
+#bordino-directions .bd-rows { display: flex; flex-direction: column; }
+#bordino-directions .bd-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--bd-border); min-width: 0; }
+#bordino-directions .bd-row:last-child { border-bottom: 0; }
+#bordino-directions .bd-row > span:nth-child(2) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#bordino-directions .bd-row b { font-weight: 500; overflow-wrap: anywhere; }
+#bordino-directions .bd-row small { color: var(--bd-muted); }
+#bordino-directions .bd-row .bd-amount { white-space: nowrap; font-weight: 500; }
+#bordino-directions .bd-amount.is-plus { color: #2f8f5b; }
+:root[data-bd-scheme="dark"] #bordino-directions .bd-amount.is-plus { color: #7fd6a3; }
+#bordino-directions .bd-amount.is-minus { color: var(--bd-accent); }
+#bordino-directions .bd-more { align-self: center; margin-top: 12px; }
+
+/* Ball picker and lottery numbers. */
+#bordino-directions .bd-balls { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; direction: ltr; }
+#bordino-directions .bd-ball { min-height: 44px; border: 2px solid var(--bd-outline); background: var(--bd-surface); font: inherit; font-weight: 500; color: var(--bd-fg); }
+#bordino-directions .bd-ball[aria-pressed="true"] { background: var(--bd-accent); color: var(--bd-on); box-shadow: 3px 3px 0 var(--bd-hard-shadow); }
+#bordino-directions .bd-ball.is-hit { background: #2f8f5b; color: #fff; }
+#bordino-directions .bd-numbers { display: flex; flex-wrap: wrap; gap: 6px; direction: ltr; justify-content: flex-end; }
+#bordino-directions .bd-numbers span { min-width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid var(--bd-outline); background: var(--bd-surface); font-weight: 500; }
+#bordino-directions .bd-numbers span.is-hit { background: var(--bd-accent); color: var(--bd-on); }
+
+/* Engines kept from the previous app (sudoku, 2048, crash) render inside the game shell. */
+#bordino-directions .gf-product .bd-engine { max-width: 600px; margin: 0 auto; width: 100%; }
+#bordino-directions .gf-product.bd-page { display: flex; flex-direction: column; }
+#bordino-directions .gf-product .gf-main { flex: 1; }
+
+/* Toasts follow the scheme. */
+:root[data-bd-scheme="dark"] .Toastify__toast { background: #34302a; color: #f5f7fb; }
+.Toastify__toast { font-family: Tahoma, Arial, sans-serif; border-radius: 0 !important; border: 2px solid #25252b; box-shadow: 4px 4px 0 #25252b; }
+
+@media (prefers-reduced-motion: reduce) {
+	#bordino-directions *, #bordino-directions *::before, #bordino-directions *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* Boot (stores loading) and the install offer. */
+#bordino-directions .bd-boot { min-height: 100dvh; display: grid; place-items: center; }
+#bordino-directions .bd-boot .bd-logomark { width: 48px; height: 48px; display: grid; place-items: center; background: #d64142; color: #fff; font: 28px Tahoma, Arial, sans-serif; border: 2px solid #25252b; box-shadow: 4px 4px 0 #25252b; }
+#bordino-directions .bd-install { position: fixed; inset-inline: 12px; bottom: 12px; z-index: 50; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 0; background: var(--bd-surface); box-shadow: 5px 5px 0 var(--bd-hard-shadow); max-width: 520px; margin-inline: auto; }
+#bordino-directions .bd-install > span { flex: 1; }
+#bordino-directions .bd-install-close { width: 44px; height: 44px; display: grid; place-items: center; }
+
+/* Profile picture with its «change» badge. */
+#bordino-directions .bd-avatar-picker { position: relative; cursor: pointer; overflow: visible; }
+#bordino-directions .bd-avatar-picker > img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+#bordino-directions .bd-avatar-badge { position: absolute; inset-inline-start: -4px; bottom: -4px; width: 26px; height: 26px; display: grid; place-items: center; background: var(--bd-surface); color: var(--bd-fg); border: 2px solid var(--bd-outline); border-radius: 50%; }
+#bordino-directions .bd-avatar-badge svg { width: 14px; height: 14px; }
+#bordino-directions .bd-avatar-picker:focus-within { outline: 3px solid var(--bd-accent); outline-offset: 2px; }
+#bordino-directions .bd-phone { font-size: 12px; color: var(--bd-muted); text-align: right; }
+
+/* The real wheel: slices sized by the odds, labels along each slice, turned to the server's prize. */
+#bordino-directions .bd-spin-wheel { will-change: transform; overflow: hidden; border: 2px solid var(--bd-outline); }
+/* Each label sits upright near the rim of its slice (the whole label box turns with the slice). */
+#bordino-directions .bd-slice-label { position: absolute; inset: 0; display: flex; justify-content: center; pointer-events: none; }
+#bordino-directions .bd-slice-label b { margin-top: 9%; font-size: 15px; font-weight: 500; color: var(--bd-fg); white-space: nowrap; }
+#bordino-directions .bd-slice-label.is-on-accent b { color: var(--bd-on); }
+#bordino-directions .bd-wheel-result { min-height: 28px; text-align: center; font-weight: 500; }
+
+/* Hafez poem (two half-lines per bayt) and tarot faces. */
+#bordino-directions .bd-poem p { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin: 6px 0; color: var(--bd-fg); }
+#bordino-directions .bd-poem span { flex: 1 1 200px; }
+#bordino-directions .bd-audio { width: 100%; margin-top: 12px; }
+#bordino-directions .bd-tarot-symbol { font-size: 34px; line-height: 1; }
+#bordino-directions .rt-tarot-stage .ng-chips { justify-content: center; }
+
+/* Chicken road: the design package's game fills the page (it has its own header, info and exit). */
+#bordino-directions .bd-chicken-page { min-height: 100dvh; background: #fff8eb; }
+:root[data-bd-scheme="dark"] #bordino-directions .bd-chicken-page { background: #24211e; }
+#bordino-directions .bd-chicken-page .ck-game { min-height: 100dvh; border-radius: 0; max-width: 1440px; margin: 0 auto; }
+#bordino-directions .ck-game .ck-hash { font-family: monospace; font-size: 11px; overflow-wrap: anywhere; }
+#bordino-directions .ck-game .ck-history-lost { opacity: .6; }
+
+/* The design's type everywhere, including the MUI parts of the kept game engines (their theme
+   still names the old Shabnam font, which also draws Latin digits as Persian ones). */
+#bordino-directions .bd-engine, #bordino-directions .bd-engine * { font-family: Tahoma, Arial, sans-serif !important; }
+#bordino-directions :is(input, select, textarea, button) { font-family: inherit; }
+#bordino-directions .gf-product .gf-main, #bordino-directions .gf-product .rt-page-body { min-width: 0; }
+#bordino-directions .gf-product .bd-engine { overflow-x: clip; }
+
+/* Headings focused on arrival (so screen readers start there) need no visible ring. */
+#bordino-directions .bd-product [tabindex="-1"]:is(:focus, :focus-visible) { outline: none; }
+
+/* The birthdate is a fieldset of three selects: stacked like a field, not the radio row. */
+#bordino-directions fieldset.rt-field.bd-date-field { flex-direction: column; align-items: stretch; gap: 7px; }
+#bordino-directions .bd-add-account .bd-actions { margin-top: 8px; }
+
+/* Hidden from sight but still reachable with the keyboard (the photo picker's file input). */
+#bordino-directions .bd-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

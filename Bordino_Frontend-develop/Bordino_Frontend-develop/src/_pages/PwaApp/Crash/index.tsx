@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useRouter } from "next/navigation";
 
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
-import Typography from "@mui/material/Typography";
 
 import CrashControls, {
 	type AutoAdjust,
@@ -25,7 +23,6 @@ import {
 	profitOnWin,
 	verifyCrashPoint,
 } from "./utils";
-import { GAME_NET } from "@/constants/routes";
 
 const DEFAULT_AUTO: AutoSettings = {
 	count: "0",
@@ -82,7 +79,6 @@ function useFrameClock(active: boolean, reduced: boolean) {
 const RECONNECT_GRACE_MS = 3000;
 
 export default function CrashGame() {
-	const { push } = useRouter();
 	const game = useCrashGame();
 	const { config, balance, round, history, busy } = game;
 
@@ -264,18 +260,10 @@ export default function CrashGame() {
 		: "";
 
 	return (
-		// Bottom margin clears the app's fixed bottom navigation bar.
-		<Box sx={{ bgcolor: CRASH_COLORS.panel, borderRadius: 3, p: 1.25, mb: 9, color: CRASH_COLORS.text }}>
-			{/* One row: back + title, recent results (newest first), fairness. */}
+		<Box sx={{ bgcolor: CRASH_COLORS.panel, borderRadius: 3, p: 1.25, color: CRASH_COLORS.text }}>
+			{/* One row: recent results (newest first), fairness. The game shell (src/bd) has the
+			    title, info and exit. */}
 			<Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-				<ButtonBase
-					onClick={() => push(GAME_NET.path)}
-					aria-label="بازگشت به گیمنت"
-					sx={{ color: CRASH_COLORS.muted, fontSize: 18, width: 28, height: 28, borderRadius: 1, flexShrink: 0 }}
-				>
-					→
-				</ButtonBase>
-				<Typography sx={{ fontWeight: 800, fontSize: 16, flexShrink: 0 }}>انفجار</Typography>
 				<Box
 					aria-label="نتایج اخیر"
 					sx={{

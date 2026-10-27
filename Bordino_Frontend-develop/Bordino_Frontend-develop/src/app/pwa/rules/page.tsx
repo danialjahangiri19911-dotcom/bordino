@@ -1,5 +1,5 @@
-import React from "react";
+import Rules from "@/bd/pages/Rules";
 
-export default function page() {
-	return <div>rules</div>;
+export default function Page() {
+	return <Rules />;
 }

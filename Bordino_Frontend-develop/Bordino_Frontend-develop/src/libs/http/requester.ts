@@ -30,6 +30,14 @@ const DISABLE_SHOW_ERROR_CLIENT_PATHS = [
 	// The points games show their own errors next to the bet button.
 	"/pwa/crash",
 	"/pwa/chicken",
+	// The neobrutalism pages (src/bd) show a failed request in place (LoadState / Notice).
+	"/pwa/register",
+	"/pwa/onboarding",
+	"/pwa/profile",
+	"/pwa/lottery",
+	"/pwa/gameNet",
+	"/pwa/rules",
+	"/pwa/wheel",
 ];
 
 const DISABLE_401_ERRORS = ["/pwa/register"];

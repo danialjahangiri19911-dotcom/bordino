@@ -1,7 +1,5 @@
-import React from "react";
+import Profile from "@/bd/pages/Profile";
 
-import Profile from "@/_pages/PwaApp/Profile";
-
-export default function page() {
+export default function Page() {
 	return <Profile />;
 }

@@ -1,7 +1,5 @@
-import React from "react";
+import Onboarding from "@/bd/pages/Onboarding";
 
-import Onboarding from "@/_pages/PwaApp/Onboarding";
-
-export default function page() {
+export default function Page() {
 	return <Onboarding />;
 }

@@ -322,3 +322,68 @@ class AvatarTests(TestCase):
         with mock.patch("django.db.models.fields.files.FieldFile.delete", side_effect=OSError("s3")):
             r = self.upload(self.png((120, 120)))
         self.assertEqual(r.status_code, 200, r.content)
+
+
+class ProfileEditTests(TestCase):
+    """«اطلاعات شخصی» (2026-10-27): PATCH customer/profile/me edits name, birthdate and gender."""
+
+    URL = "/api/v1/customer/profile/me/"
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_customer("9120000771")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_edits_name_birthdate_gender_and_answers_with_profile(self):
+        r = self.api.patch(
+            self.URL, {"username": "Player_1", "birthdate": "1990-03-21", "gender": "F"}, format="json"
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        body = result(r)
+        self.assertEqual(body["username"], "Player_1")
+        self.assertEqual(body["gender"], "F")
+        self.assertEqual(str(body["birthdate"]), "1990-03-21")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "Player_1")
+
+    def test_works_after_onboarding_is_complete_and_keeps_the_step(self):
+        customer = Customer.objects.get(user=self.user)
+        customer.registration_step = Customer.Step.COMPLETED
+        customer.save()
+        r = self.api.patch(self.URL, {"username": "Later_Name"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        customer.refresh_from_db()
+        self.assertEqual(customer.registration_step, Customer.Step.COMPLETED)
+
+    def test_refuses_a_taken_name(self):
+        other = make_customer("9120000772")
+        other.username = "Taken"
+        other.save()
+        r = self.api.patch(self.URL, {"username": "Taken"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.user.refresh_from_db()
+        self.assertNotEqual(self.user.username, "Taken")
+
+    def test_refuses_bad_values(self):
+        for payload in (
+            {"username": "ab"},
+            {"username": "نام فارسی"},
+            {"birthdate": "2999-01-01"},
+            {"gender": "MF"},
+        ):
+            r = self.api.patch(self.URL, payload, format="json")
+            self.assertEqual(r.status_code, 400, (payload, r.content))
+
+    def test_no_put_and_no_other_customer(self):
+        self.assertEqual(self.api.put(self.URL, {"username": "Whole"}, format="json").status_code, 405)
+        other = make_customer("9120000773")
+        other_id = Customer.objects.get(user=other).pk
+        r = self.api.patch(f"/api/v1/customer/profile/{other_id}/", {"username": "Hijack"}, format="json")
+        self.assertEqual(r.status_code, 404)
+        other.refresh_from_db()
+        self.assertNotEqual(other.username, "Hijack")
+
+    def test_needs_a_session(self):
+        r = APIClient().patch(self.URL, {"username": "Anon"}, format="json")
+        self.assertEqual(r.status_code, 401)

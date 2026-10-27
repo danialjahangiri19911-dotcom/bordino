@@ -1,5 +1,5 @@
-import Main from "@/_pages/PwaApp/Main";
+import Home from "@/bd/pages/Home";
 
-export default function page() {
-	return <Main />;
+export default function Page() {
+	return <Home />;
 }

@@ -1,7 +1,5 @@
-import React from "react";
+import { Tarot } from "@/bd/pages/Fortunes";
 
-import Tarot from "@pages/PwaApp/Tarot";
-
-export default function TarotPage() {
+export default function Page() {
 	return <Tarot />;
 }
