@@ -1,0 +1,19 @@
+{
+  "appId": "co.bordino.lottery",
+  "appName": "بوردینو",
+  "webDir": "www",
+  "server": {
+    "url": "https://lottery.bordino.co/pwa",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "lottery.bordino.co"
+    ],
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "backgroundColor": "#fff8eb",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
+    "appendUserAgent": "BordinoApp/1"
+  }
+}

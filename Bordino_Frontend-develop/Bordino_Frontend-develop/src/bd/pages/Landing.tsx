@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
@@ -9,7 +9,24 @@ import { Art, Brand, R } from "../ui";
 
 import useAuthStore from "@/libs/stores/authStore";
 
+/** The Android app (Bordino_Mobile) only wraps this site, so website changes reach it without an update. */
+const APK_HREF = "/download/bordino.apk";
+
+/** Inside the Android app or an installed PWA there is nothing left to install. */
+function useInstalled() {
+	const [installed, setInstalled] = useState(false);
+	useEffect(() => {
+		setInstalled(
+			/BordinoApp\//.test(navigator.userAgent) ||
+				window.matchMedia("(display-mode: standalone)").matches ||
+				(navigator as Navigator & { standalone?: boolean }).standalone === true,
+		);
+	}, []);
+	return installed;
+}
+
 export default function Landing() {
+	const installed = useInstalled();
 	const { isLoggedIn } = useAuthStore();
 	const appHref = isLoggedIn ? R.home : R.login;
 	useEffect(() => {
@@ -22,6 +39,7 @@ export default function Landing() {
 				<nav className="bd-header-links" aria-label="بخش‌های صفحه">
 					<a href="#how">چطور کار می‌کند؟</a>
 					<a href="#games">بازی‌ها</a>
+					{!installed && <a href="#app">نصب برنامه</a>}
 					<Link href={R.rules}>راهنما</Link>
 				</nav>
 				<Link className="bd-action" href={appHref}>
@@ -78,6 +96,40 @@ export default function Landing() {
 						</div>
 					</div>
 				</section>
+				{!installed && (
+					<section className="bd-how bd-get-app" id="app" aria-labelledby="get-app-title">
+						<div className="bd-section-head">
+							<h2 id="get-app-title">بوردینو روی گوشی</h2>
+						</div>
+						<div className="bd-steps">
+							<div className="bd-step bd-get-app-card">
+								<span className="bd-step-num">
+									<Icon name="smartphone" />
+								</span>
+								<h3>اندروید</h3>
+								<p>برنامهٔ بوردینو را دانلود و نصب کن. اگر گوشی پرسید، نصب از این منبع را اجازه بده.</p>
+								<a className="bd-action" href={APK_HREF} download="bordino.apk">
+									دانلود برنامه <Icon name="download" />
+								</a>
+							</div>
+							<div className="bd-step bd-get-app-card">
+								<span className="bd-step-num">
+									<Icon name="smartphone" />
+								</span>
+								<h3>آیفون</h3>
+								<ol className="bd-get-app-steps">
+									<li>این صفحه را در Safari باز کن.</li>
+									<li>
+										دکمهٔ اشتراک‌گذاری <Icon name="share" size={14} label="اشتراک‌گذاری" /> را بزن.
+									</li>
+									<li>
+										«Add to Home Screen» <Icon name="plus" size={14} /> و بعد «Add» را بزن.
+									</li>
+								</ol>
+							</div>
+						</div>
+					</section>
+				)}
 				<section className="bd-feature-band">
 					<Art name="rewards" />
 					<div>

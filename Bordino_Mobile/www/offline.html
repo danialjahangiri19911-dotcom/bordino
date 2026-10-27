@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>بوردینو · بدون اتصال</title>
+<style>
+	:root { color-scheme: light dark; --bg: #fff8eb; --fg: #25252b; --panel: #fffdf5; --accent: #d64142; --on: #fff; --line: #25252b; }
+	@media (prefers-color-scheme: dark) { :root { --bg: #24211e; --fg: #f5f7fb; --panel: #34302a; --accent: #ff9995; --on: #221d29; --line: #b6bdc9; } }
+	* { box-sizing: border-box; }
+	body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--bg); color: var(--fg); font: 14px/1.9 Tahoma, Arial, sans-serif; }
+	main { width: min(100%, 360px); background: var(--panel); border: 2px solid var(--line); box-shadow: 5px 5px 0 var(--line); padding: 24px; text-align: center; }
+	.mark { display: inline-grid; place-items: center; width: 56px; height: 56px; background: var(--accent); color: var(--on); font-size: 32px; border: 2px solid var(--line); box-shadow: 4px 4px 0 var(--line); margin-bottom: 16px; }
+	h1 { font-size: 20px; font-weight: 500; margin: 0 0 8px; }
+	p { margin: 0 0 18px; }
+	button { font: inherit; background: var(--accent); color: var(--on); border: 2px solid var(--line); box-shadow: 4px 4px 0 var(--line); padding: 9px 22px; min-height: 44px; cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+	<span class="mark" aria-hidden="true">ب</span>
+	<h1>اتصال برقرار نیست</h1>
+	<p>بوردینو برای بازی‌ها، کیف‌پول و قرعه‌کشی به اینترنت نیاز دارد. اتصال را بررسی کن و دوباره تلاش کن.</p>
+	<button type="button" onclick="location.replace('https://lottery.bordino.co/pwa')">تلاش دوباره</button>
+</main>
+<script>
+	// Back online: open the app again by itself.
+	window.addEventListener('online', function () { location.replace('https://lottery.bordino.co/pwa'); });
+</script>
+</body>
+</html>

@@ -1,47 +1,44 @@
 {
-	"name": "Lottery",
-	"short_name": "Lottery",
+	"name": "بوردینو",
+	"short_name": "بوردینو",
+	"description": "بازی کن، امتیاز بگیر، در قرعه‌کشی شرکت کن",
+	"lang": "fa",
+	"dir": "rtl",
+	"id": "/pwa",
 	"start_url": "/pwa",
+	"scope": "/",
 	"display": "standalone",
-	"background_color": "#ffffff",
-	"theme_color": "#0070f3",
 	"orientation": "portrait",
-	"description": "Lottery Platform PWA",
+	"background_color": "#fff8eb",
+	"theme_color": "#fff8eb",
 	"icons": [
 		{
-			"src": "/media/logo.svg",
+			"src": "/bd/icons/icon-192.png",
 			"sizes": "192x192",
 			"type": "image/png",
-			"purpose": "any maskable"
+			"purpose": "any"
 		},
 		{
-			"src": "/media/logo.svg",
-			"sizes": "384x384",
-			"type": "image/png",
-			"purpose": "any maskable"
-		},
-		{
-			"src": "/media/logo.svg",
+			"src": "/bd/icons/icon-512.png",
 			"sizes": "512x512",
 			"type": "image/png",
-			"purpose": "any maskable"
+			"purpose": "any"
+		},
+		{
+			"src": "/bd/icons/maskable-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "maskable"
+		},
+		{
+			"src": "/bd/icons/maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
 		}
 	],
-	"screenshots": [
-		{
-			"src": "/media/screenshot1.png",
-			"sizes": "1280x720",
-			"type": "image/png"
-		}
-	],
-	"categories": ["entertainment", "games", "lottery"],
-	"shortcuts": [
-		{
-			"name": "Play Lottery",
-			"short_name": "Play",
-			"description": "Start playing lottery",
-			"url": "/pwa",
-			"icons": [{ "src": "/media/logo.svg", "sizes": "96x96" }]
-		}
+	"categories": [
+		"entertainment",
+		"games"
 	]
 }

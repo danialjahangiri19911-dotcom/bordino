@@ -15,7 +15,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
 	title: "بوردینو",
-	icons: LOGO_ADDRESS,
+	icons: { icon: LOGO_ADDRESS, apple: "/bd/icons/apple-touch-icon.png" },
+	// iPhone «Add to Home Screen» opens full-screen with the Persian name.
+	appleWebApp: { capable: true, title: "بوردینو", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
