@@ -172,3 +172,5 @@ body { margin: 0; }
 #bordino-directions .sd-level-choice [aria-checked="true"] { background: var(--s-accent); color: var(--s-on); }
 #bordino-directions .sd-problem, #bordino-directions .g48-problem { color: var(--s-error, #a82f45); font-weight: 500; }
 #bordino-directions .bd-game-page { overflow-x: clip; }
+/* Paused sudoku: the numbers are hidden until the game resumes (no thinking time off the clock). */
+#bordino-directions .sd.sd-paused .sd-board .sd-cell > * { visibility: hidden; }

@@ -89,8 +89,9 @@ export function useSudoku() {
 
 		const deserialized = deserializeGameState(persistedGame);
 
-		// Adjust time only if the original game had a positive time limit
-		if (persistedGame.maxTime > 0) {
+		// Adjust time only if the original game had a positive time limit and was not paused
+		// (a paused game's clock was stopped while the player was away).
+		if (persistedGame.maxTime > 0 && !persistedGame.paused) {
 			const timeElapsed = Math.floor(
 				(Date.now() - persistedGame.lastUpdated) / 1000,
 			);
@@ -307,6 +308,14 @@ export function useSudoku() {
 		clearGame();
 	}, [dispatch, clearGame]);
 
+	const pause = useCallback(() => {
+		dispatch({ type: "PAUSE" });
+	}, [dispatch]);
+
+	const resume = useCallback(() => {
+		dispatch({ type: "RESUME" });
+	}, [dispatch]);
+
 	const continueAfterLoss = useCallback(() => {
 		dispatch({ type: "CONTINUE_AFTER_LOSS" });
 	}, [dispatch]);
@@ -319,6 +328,7 @@ export function useSudoku() {
 		numberProgress: state.numberProgress,
 		difficulty: state.difficulty,
 		status: state.status,
+		paused: !!state.paused,
 		mistakes: state.mistakes,
 		timeRemaining: state.timeRemaining,
 		maxTime: state.maxTime,
@@ -338,5 +348,7 @@ export function useSudoku() {
 		redo,
 		exitToMenu,
 		continueAfterLoss,
+		pause,
+		resume,
 	};
 }

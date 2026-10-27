@@ -34,6 +34,8 @@ export interface PersistedGameState {
 	// Progress features
 	difficulty: Difficulty | null;
 	status: "menu" | "playing" | "won" | "lost";
+	/** Paused when saved: reopening does not count the time away. */
+	paused?: boolean;
 	mistakes: number;
 	timeRemaining: number;
 	maxTime: number;
@@ -89,6 +91,7 @@ export function serializeGameState(state: any): PersistedGameState {
 		historyIndex: state.historyIndex,
 		difficulty: state.difficulty,
 		status: state.status,
+		paused: !!state.paused,
 		mistakes: state.mistakes,
 		timeRemaining: state.timeRemaining,
 		maxTime: state.maxTime,
@@ -126,6 +129,7 @@ export function deserializeGameState(persisted: PersistedGameState): any {
 		historyIndex: persisted.historyIndex,
 		difficulty: persisted.difficulty,
 		status: persisted.status,
+		paused: !!persisted.paused,
 		mistakes: persisted.mistakes,
 		timeRemaining: persisted.timeRemaining,
 		maxTime: persisted.maxTime,

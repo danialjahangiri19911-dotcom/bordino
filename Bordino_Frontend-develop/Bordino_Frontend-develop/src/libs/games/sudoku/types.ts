@@ -44,6 +44,8 @@ export interface GameState {
 	timeRemaining: number; // seconds
 	maxMistakes: number;
 	maxTime: number; // initial time limit for current difficulty
+	/** «مکث»: the clock stops and the board takes no input until resumed (kept in the save). */
+	paused?: boolean;
 
 	// New: hint limits from config
 	maxHints: number;
@@ -72,6 +74,8 @@ export type GameAction =
 	| { type: "UNDO" }
 	| { type: "REDO" }
 	| { type: "TICK" } // timer decrement
+	| { type: "PAUSE" }
+	| { type: "RESUME" }
 	| { type: "EXIT_TO_MENU" }
 	| { type: "CONTINUE_AFTER_LOSS" } // ادامهٔ بازی پس از باخت (با کسرِ امتیاز)
 	| { type: "RESTORE_GAME"; payload: { savedState: GameState } }

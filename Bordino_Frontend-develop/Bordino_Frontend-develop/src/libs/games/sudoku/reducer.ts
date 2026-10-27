@@ -6,8 +6,22 @@ import {
 } from "./helpers";
 import type { Board, CellValue, GameAction, GameState } from "./types";
 
+// While paused nothing on the board changes and the clock does not run.
+const BLOCKED_WHILE_PAUSED = new Set<GameAction["type"]>(["FILL_CELL", "ERASE_CELL", "TOGGLE_NOTE", "HINT", "UNDO", "REDO", "TICK"]);
+
 export function gameReducer(draft: GameState, action: GameAction): void {
+	if (draft.paused && BLOCKED_WHILE_PAUSED.has(action.type)) return;
 	switch (action.type) {
+		case "PAUSE": {
+			if (draft.status === "playing") draft.paused = true;
+			break;
+		}
+
+		case "RESUME": {
+			draft.paused = false;
+			break;
+		}
+
 		case "START_GAME": {
 			const { puzzle, solution, difficulty, config } = action.payload;
 			const { board, rowCounts, colCounts, squareCounts } =
@@ -22,6 +36,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			draft.historyIndex = 0;
 			draft.difficulty = difficulty;
 			draft.status = "playing";
+			draft.paused = false;
 			draft.mistakes = 0;
 			draft.maxTime = config.timer; // may be 0 or positive
 			draft.timeRemaining = config.timer; // same as maxTime
@@ -326,6 +341,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 
 		case "EXIT_TO_MENU": {
 			draft.status = "menu";
+			draft.paused = false;
 			draft.difficulty = null;
 			draft.board = [];
 			draft.selectedCell = null;
@@ -340,6 +356,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			if (draft.status !== "lost") break;
 			draft.mistakes = 0;
 			draft.status = "playing";
+			draft.paused = false;
 			if (draft.maxTime > 0 && draft.timeRemaining <= 0) {
 				draft.timeRemaining = draft.maxTime;
 			}
@@ -358,6 +375,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			draft.historyIndex = savedState.historyIndex;
 			draft.difficulty = savedState.difficulty;
 			draft.status = savedState.status;
+			draft.paused = !!savedState.paused;
 			draft.mistakes = savedState.mistakes;
 			draft.timeRemaining = savedState.timeRemaining;
 			draft.maxTime = savedState.maxTime;

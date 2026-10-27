@@ -35,6 +35,7 @@ const DIGITS = "۱۲۳۴۵۶۷۸۹";
 export const inertIf = (on: boolean) => (on ? ({ inert: true } as Record<string, boolean>) : {});
 
 type Confirm = "" | "new" | "exit" | "level";
+type Modal = "" | "ready" | "won" | "lost" | "pause" | Confirm;
 
 /**
  * «سودوکو» in the Bordino-Sudoku-Game-Design look, on the app's own sudoku engine: every game is
@@ -71,18 +72,26 @@ export default function SudokuGame() {
 	const completions = getCompletionCounts();
 	const { board, status, selectedCell, conflicts, numberProgress } = game;
 	const playing = status === "playing" && board.length > 0;
-	const modal: "" | "ready" | "won" | "lost" | Confirm = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : "");
+	const modal: Modal = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : game.paused ? "pause" : "");
 
 	// ── music: one switch for music and effects; never in a hidden tab or behind a dialog ──
 	useEffect(() => {
 		music.current = createSoundtrack();
 		const onVisible = () => setHidden(document.hidden);
+		// Leaving the tab pauses the game (the clock and the music stop, as in the design).
+		const pauseOnHide = () => document.hidden && pauseRef.current();
+		document.addEventListener("visibilitychange", pauseOnHide);
 		document.addEventListener("visibilitychange", onVisible);
 		return () => {
 			document.removeEventListener("visibilitychange", onVisible);
+			document.removeEventListener("visibilitychange", pauseOnHide);
 			music.current?.destroy();
 		};
 	}, []);
+	const pauseRef = useRef(() => undefined as void);
+	pauseRef.current = () => {
+		if (game.status === "playing" && !game.paused) game.pause();
+	};
 	useEffect(() => {
 		if (sound && playing && !modal && !hidden && interacted.current) music.current?.start();
 		else music.current?.stop();
@@ -251,13 +260,14 @@ export default function SudokuGame() {
 		],
 		new: ["یک جدول تازه؟", "پیشرفت این جدول از بین می‌رود و بازی تازه دوباره امتیاز می‌گیرد."],
 		level: ["سطح را عوض کنیم؟", `این جدول کنار گذاشته می‌شود و در سطح ${label(pendingLevel)} بازی تازه شروع می‌کنی.`],
-		exit: ["از بازی خارج شوی؟", "جدول روی همین دستگاه نگه داشته می‌شود، ولی زمان بازی ادامه دارد."],
+		exit: ["از بازی خارج شوی؟", "بازی متوقف و روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی ادامه می‌دهی."],
+		pause: ["کمی استراحت", "زمان و موسیقی متوقف شده‌اند؛ جدول تا ادامهٔ بازی پنهان است."],
 	};
 
 	return (
 		<div className="bd-game-page">
-			<article className={`sd sd-brutal ${scheme === "dark" ? "sd-dark" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
-				<header className="sd-header" {...inertIf(!!modal)}>
+			<article className={`sd sd-brutal ${scheme === "dark" ? "sd-dark" : ""} ${game.paused ? "sd-paused" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
+				<header className="sd-header" {...inertIf(!!modal && modal !== "pause")}>
 					<div className="sd-brand">
 						<span className="sd-mark" aria-hidden="true">
 							{[1, 0, 3, 0, 5, 0, 7, 0, 9].map((n, i) => (
@@ -295,6 +305,9 @@ export default function SudokuGame() {
 						<div className="sd-time-box">
 							<span>زمان باقی‌مانده</span>
 							<strong>{game.maxTime > 0 ? clock(Math.max(0, game.timeRemaining)) : "—"}</strong>
+							<button type="button" className="sd-icon" aria-label="مکث بازی" disabled={!playing || game.paused} onClick={() => game.pause()}>
+								<Icon name="pause" />
+							</button>
 						</div>
 						<div>
 							<span>فرصت باقی‌مانده</span>
@@ -377,6 +390,10 @@ export default function SudokuGame() {
 													{isCharging || game.isLoadingConfig ? "در حال شروع…" : `شروع بازی · ${label(level)}`}
 												</button>
 											</>
+										) : modal === "pause" ? (
+											<button type="button" className="sd-primary" onClick={() => { interacted.current = true; game.resume(); }}>
+												ادامهٔ بازی
+											</button>
 										) : modal === "won" ? (
 											<button type="button" className="sd-primary" onClick={toMenu}>
 												جدول بعدی
@@ -398,6 +415,8 @@ export default function SudokuGame() {
 													onClick={() => {
 														if (modal === "exit") {
 															music.current?.stop();
+															setConfirm("");
+															game.pause();
 															push(R.games);
 														} else {
 															if (modal === "level" && pendingLevel) setLevel(pendingLevel);
