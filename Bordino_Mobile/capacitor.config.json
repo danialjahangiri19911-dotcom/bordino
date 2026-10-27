@@ -1,6 +1,6 @@
 {
   "appId": "co.bordino.lottery",
-  "appName": "بوردینو",
+  "appName": "بردینو",
   "webDir": "www",
   "server": {
     "url": "https://lottery.bordino.co/pwa",
