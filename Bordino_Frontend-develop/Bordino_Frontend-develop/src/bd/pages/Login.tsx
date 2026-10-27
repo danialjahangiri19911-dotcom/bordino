@@ -81,7 +81,7 @@ export default function Login() {
 						<Icon name="smartphone" />
 					</span>
 					<span className="au-eyebrow">شروع از همین‌جا</span>
-					<h2>ورود به بوردینو</h2>
+					<h2>ورود به بردینو</h2>
 					<p className="au-form-description">شماره موبایلت را وارد کن تا کد ورود برایت ارسال شود.</p>
 					<form
 						noValidate

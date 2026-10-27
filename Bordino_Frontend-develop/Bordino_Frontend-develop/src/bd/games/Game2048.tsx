@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { useBackHandler } from "../back";
 import { R, useRequireLogin } from "../ui";
 import { inertIf } from "./SudokuGame";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -49,6 +50,9 @@ function View() {
 	const playCost = costData?.result?.play_cost;
 	const points = costData?.result?.current_amount;
 	const playing = !game.needsStart && game.status === "ongoing";
+	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
+	// header's exit button does).
+	useBackHandler(true, () => (confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 
 	useEffect(() => {

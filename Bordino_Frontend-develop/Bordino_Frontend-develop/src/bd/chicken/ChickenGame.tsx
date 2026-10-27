@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { useBackHandler } from "../back";
 import { R, useRequireLogin } from "../ui";
 import "./chicken.css";
 import { type ChickenMesh, createChickenMesh } from "./mesh";
@@ -266,6 +267,11 @@ export default function ChickenGame() {
 		stopAudio();
 		push(R.games);
 	};
+
+	// Android Back: closes the open panel, asks before leaving a round in play, else leaves (as the
+	// header's exit button does).
+	const inRound = (round?.status === "active" && round.id !== acknowledged.current) || view.phase === "jumping" || view.phase === "colliding" || game.busy;
+	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? setDialog("exit") : leave()));
 
 	if (!allowed) return null;
 

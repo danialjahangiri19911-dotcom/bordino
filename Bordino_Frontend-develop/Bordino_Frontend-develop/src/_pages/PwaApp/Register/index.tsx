@@ -173,7 +173,7 @@ export default function Register() {
 						ورود
 					</LoadingButton>
 					<Typography variant="12-regular">
-						با ثبت‌نام در بوردینو،
+						با ثبت‌نام در بردینو،
 						<Link href={RULES.path}>شرایط و قوانین</Link> را قبول میکنم!
 					</Typography>
 				</Box>

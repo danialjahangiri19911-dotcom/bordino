@@ -3,8 +3,11 @@
 import { useState } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
+import RewardOffer from "../ads/RewardOffer";
+import { useAdOffer } from "../ads/api";
 import { GAMES, type GameEntry } from "../games";
 import { AppShell, Balance, Chips } from "../ui";
 
@@ -32,6 +35,11 @@ function Cover({ game }: { game: GameEntry }) {
 export default function Games() {
 	const [query, setQuery] = useState("");
 	const [group, setGroup] = useState<"all" | GameEntry["group"]>("all");
+	const router = useRouter();
+	// The rewarded-video offer (server decides if one is available today, and for how much).
+	const { data: offerData } = useAdOffer();
+	const offer = offerData?.result;
+	const [picked, setPicked] = useState<GameEntry | null>(null);
 	const shown = GAMES.filter(
 		(game) => (group === "all" || game.group === group) && (!query.trim() || game.name.includes(query.trim())),
 	);
@@ -40,7 +48,7 @@ export default function Games() {
 			<section className="ng-catalog">
 				<div className="ng-filterbar">
 					<h3>
-						<Icon name="gamepad-2" /> گیمنت بوردینو
+						<Icon name="gamepad-2" /> گیمنت بردینو
 					</h3>
 					<label className="ng-search">
 						<Icon name="search" />
@@ -65,7 +73,19 @@ export default function Games() {
 				/>
 				<div className="ng-games">
 					{shown.map((game) => (
-						<Link key={game.id} href={game.href} className="ng-game" data-game={game.id} aria-label={`بازی ${game.name}`}>
+						<Link
+							key={game.id}
+							href={game.href}
+							className="ng-game"
+							data-game={game.id}
+							aria-label={`بازی ${game.name}`}
+							onClick={(event) => {
+								// A plain tap with an offer available: the offer first, then the game.
+								if (!offer?.available || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+								event.preventDefault();
+								setPicked(game);
+							}}
+						>
 							<div className="ng-cover">
 								<Cover game={game} />
 							</div>
@@ -80,6 +100,18 @@ export default function Games() {
 					بازی‌ای با این نام پیدا نشد.
 				</p>
 			</section>
+			{picked && offer ? (
+				<RewardOffer
+					offer={offer}
+					gameName={picked.name}
+					placement={picked.id}
+					onCancel={() => setPicked(null)}
+					onPlay={() => {
+						setPicked(null);
+						router.push(picked.href);
+					}}
+				/>
+			) : null}
 			<div className="ng-status">
 				<Icon name="info" />
 				<div>

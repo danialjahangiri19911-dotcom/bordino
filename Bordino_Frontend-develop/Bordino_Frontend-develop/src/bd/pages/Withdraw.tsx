@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
+import BankPicker from "../BankPicker";
 import Icon from "../Icon";
+import { bankOfIban } from "../banks";
 import { fa } from "../format";
 import { AppShell, Facts, LoadState, Notice, Panel, R } from "../ui";
 import { useCashAccount } from "./Wallet";
@@ -47,13 +49,22 @@ function AddAccount({ onAdded }: { onAdded: () => void }) {
 		onError: (e) => setServerError(gameErrorMessage(e)),
 	});
 	const normalized = normalizeIban(iban);
+	const list = banks?.result?.results ?? [];
+	const ibanBank = isValidIban(normalized) ? bankOfIban(list, normalized) : null;
+	const chosen = list.find((b) => b.id === bank);
+	// A complete Sheba number names its bank: pick it for the player when nothing else is chosen.
+	useEffect(() => {
+		if (ibanBank && !bank) setBank(ibanBank.id);
+	}, [ibanBank, bank]);
 	const ibanError = !iban.trim()
 		? "شماره شبا را وارد کن."
 		: !/^IR\d{24}$/.test(normalized)
 			? "شماره شبا باید IR و ۲۴ رقم باشد."
 			: !isValidIban(normalized)
 				? "شماره شبا معتبر نیست؛ دوباره بررسی کن."
-				: null;
+				: ibanBank && chosen?.code && ibanBank.id !== chosen.id
+					? `این شماره شبا مال «${ibanBank.name}» است، نه «${chosen.name}».`
+					: null;
 	const error1 = !bank ? "بانک را انتخاب کن." : ibanError ?? (holder.trim().length < 2 ? "نام صاحب حساب را کامل بنویس." : null);
 	return (
 		<form
@@ -72,22 +83,23 @@ function AddAccount({ onAdded }: { onAdded: () => void }) {
 				<LoadState error={error} onRetry={refetch} errorText="فهرست بانک‌ها بارگذاری نشد." />
 			) : (
 				<>
-					<label className="rt-field">
-						<span>بانک</span>
-						<select value={bank} onChange={(event) => setBank(event.target.value)} disabled={isLoading}>
-							<option value="">{isLoading ? "در حال بارگذاری…" : "انتخاب بانک"}</option>
-							{banks?.result?.results
-								?.filter((b) => b.is_active)
-								.map((b) => (
-									<option key={b.id} value={b.id}>
-										{b.name}
-									</option>
-								))}
-						</select>
-					</label>
+					<BankPicker banks={list} value={bank} onChange={setBank} loading={isLoading} />
 					<label className="rt-field">
 						<span>شماره شبا</span>
 						<input type="text" dir="ltr" inputMode="text" autoComplete="off" placeholder="IR …" value={iban} onChange={(event) => setIban(event.target.value)} />
+						{ibanBank ? (
+							<small className="bd-muted">
+								<Icon name="landmark" size={13} /> این شبا مال «{ibanBank.name}» است.
+								{chosen && chosen.id !== ibanBank.id ? (
+									<>
+										{" "}
+										<button type="button" className="bd-text-btn" onClick={() => setBank(ibanBank.id)}>
+											انتخاب همین بانک
+										</button>
+									</>
+								) : null}
+							</small>
+						) : null}
 					</label>
 					<label className="rt-field">
 						<span>نام صاحب حساب</span>

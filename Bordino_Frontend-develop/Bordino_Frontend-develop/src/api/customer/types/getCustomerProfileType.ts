@@ -25,6 +25,8 @@ interface CustomerProfileResponse {
 	image_url: string;
 	referral_code?: string;
 	referral_count?: number;
+	/** Every ticket ever held, all lotteries (achievement badges). */
+	tickets_total?: number;
 }
 
 export type CustomerProfileApiData = ResponseApiData<CustomerProfileResponse>;

@@ -57,11 +57,11 @@ const NAV: { key: NavKey; icon: IconName; label: string; href: string }[] = [
 
 export function Brand({ href = R.home }: { href?: string }) {
 	return (
-		<Link href={href} className="bd-brand" aria-label="بوردینو، صفحهٔ اصلی">
+		<Link href={href} className="bd-brand" aria-label="بردینو، صفحهٔ اصلی">
 			<span className="bd-logomark" aria-hidden="true">
 				ب
 			</span>
-			بوردینو
+			بردینو
 		</Link>
 	);
 }
@@ -165,7 +165,7 @@ export function AppShell({ nav, title, heading, headingExtra, allowGuest = false
 	const loggedIn = useRequireLogin(allowGuest);
 	const { user } = useUserStore();
 	useEffect(() => {
-		document.title = `${title} | بوردینو`;
+		document.title = `${title} | بردینو`;
 	}, [title]);
 	if (!loggedIn) {
 		if (!allowGuest) return null;
@@ -174,14 +174,14 @@ export function AppShell({ nav, title, heading, headingExtra, allowGuest = false
 				<header className="bd-app-top">
 					<Brand href={R.landing} />
 					<Link href={R.login} className="bd-action">
-						ورود به بوردینو
+						ورود به بردینو
 					</Link>
 				</header>
 				<div className="rt-auth-shell">
 					<main className="bd-dash rt-content" id="main">
 						<div className="rt-page-heading">
 							<div>
-								<p className="bd-muted">بوردینو / {title}</p>
+								<p className="bd-muted">بردینو / {title}</p>
 								<h2>{title}</h2>
 							</div>
 						</div>
@@ -233,7 +233,7 @@ function SignedInShell({
 					{heading ?? (
 						<div className="rt-page-heading">
 							<div>
-								<p className="bd-muted">بوردینو / {title}</p>
+								<p className="bd-muted">بردینو / {title}</p>
 								<h2>{title}</h2>
 							</div>
 							{headingExtra}
@@ -249,7 +249,7 @@ function SignedInShell({
 /** Phone, code, profile and onboarding: brand and a home link only, never a balance. */
 export function AuthShell({ title, children }: { title: string; children: ReactNode }) {
 	useEffect(() => {
-		document.title = `${title} | بوردینو`;
+		document.title = `${title} | بردینو`;
 	}, [title]);
 	return (
 		<article className="bd-product bd-app rt-product st-brutal lay-1 au-product bd-page" aria-label={title}>
@@ -263,7 +263,7 @@ export function AuthShell({ title, children }: { title: string; children: ReactN
 				<main className="bd-dash rt-content" id="main">
 					<div className="rt-page-heading">
 						<div>
-							<p className="bd-muted">بوردینو / {title}</p>
+							<p className="bd-muted">بردینو / {title}</p>
 							<h2>{title}</h2>
 						</div>
 					</div>
@@ -294,7 +294,7 @@ export function GameShell({
 	const helpId = useId();
 	const { push } = useRouter();
 	useEffect(() => {
-		document.title = `${title} | بوردینو`;
+		document.title = `${title} | بردینو`;
 		document.getElementById("game-title")?.focus();
 	}, [title]);
 	if (!allowed) return null;

@@ -8,7 +8,7 @@ import axios from "axios";
  * a session can outlast a 1-hour access token mid-game. Returns the `result` of the response.
  */
 export async function call<T>(
-	method: "get" | "post",
+	method: "get" | "post" | "patch",
 	url: string,
 	body?: unknown,
 ): Promise<T> {

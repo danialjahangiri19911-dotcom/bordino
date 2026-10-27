@@ -11,6 +11,7 @@ import showToastEmitter from "@libs/components/toasts/ToastEmitter/showToastEmit
 import { AppRouterCacheProvider } from "@libs/http/AppRouterCacheProvider";
 import { GlobalStyles } from "@libs/styles/GlobalStyles";
 
+import BackButton from "@/bd/BackButton";
 import { useApplyScheme } from "@/bd/appearance";
 import InstallPrompt from "@/bd/InstallPrompt";
 import { APP_HOME } from "@/constants/routes";
@@ -58,6 +59,8 @@ function Layout({ children }: Readonly<Props>) {
 						</div>
 					)}
 					{hydrated && isPwa ? <InstallPrompt /> : null}
+					{/* The Android app's Back button (does nothing in a browser). */}
+					{hydrated ? <BackButton /> : null}
 				</div>
 			</ThemeProvider>
 			<ToastContainer rtl position="top-center" theme={scheme === "dark" ? "dark" : "light"} />

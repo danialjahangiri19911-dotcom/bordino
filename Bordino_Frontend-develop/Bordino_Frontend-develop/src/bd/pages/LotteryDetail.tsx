@@ -152,7 +152,7 @@ export default function LotteryDetail() {
 											<div className="bd-row" key={winner.customer_id}>
 												<span className="bd-mission-icon">★</span>
 												<span>
-													<b>{winner.username || "کاربر بوردینو"}</b>
+													<b>{winner.username || "کاربر بردینو"}</b>
 													<small>{fa(winner.tickets_count)} بلیت</small>
 												</span>
 												<span className="bd-amount is-plus">{fa(winner.prize_amount)} تومان</span>

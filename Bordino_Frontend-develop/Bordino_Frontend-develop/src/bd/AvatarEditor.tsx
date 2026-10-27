@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import Icon from "./Icon";
+import { useBackHandler } from "./back";
 import { type Frame, clampFrame, coverScale, cutSquare, PhotoError, rotateQuarter, zoomAround } from "./photo";
 
 interface Props {
@@ -88,6 +89,9 @@ export default function AvatarEditor({ photo: chosen, onCancel, onDone }: Readon
 		photo.className = "bd-photo-img";
 		el.replaceChildren(photo);
 	}, [photo]);
+
+	// Android Back = «انصراف» (not while the picture is being cut).
+	useBackHandler(true, () => !saving && onCancel());
 
 	useEffect(() => {
 		const prev = document.body.style.overflow;

@@ -286,7 +286,7 @@ export default function BaseStep1({
 					>
 						<CloseIcon />
 					</IconButton>
-					<Typography variant="14-bold">بوردینو</Typography>
+					<Typography variant="14-bold">بردینو</Typography>
 
 					<Box
 						display="flex"

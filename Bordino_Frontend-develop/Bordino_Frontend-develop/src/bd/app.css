@@ -168,7 +168,7 @@ body { margin: 0; }
 /* Paused sudoku: the numbers are hidden until the game resumes (no thinking time off the clock). */
 #bordino-directions .sd.sd-paused .sd-board .sd-cell > * { visibility: hidden; }
 
-/* Landing: «بوردینو روی گوشی» (Android APK + iPhone home-screen steps). */
+/* Landing: «بردینو روی گوشی» (Android APK + iPhone home-screen steps). */
 #bordino-directions .bd-get-app { padding-top: 0; }
 #bordino-directions .bd-get-app .bd-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 #bordino-directions .bd-get-app-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
@@ -224,3 +224,74 @@ body { margin: 0; }
 #bordino-directions .bd-toast button.bd-toast-action { flex: none; min-height: 36px; padding: 0 8px; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
 #bordino-directions .bd-toast button.bd-toast-close { flex: none; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; color: inherit; }
 #bordino-directions .bd-toast button svg { width: 18px; height: 18px; }
+
+/* Withdrawal: searchable bank picker (BankPicker). */
+#bordino-directions .bd-bank-picker { position: relative; }
+#bordino-directions .bd-bank-input { position: relative; display: flex; align-items: center; }
+#bordino-directions .bd-bank-input > svg:first-child, #bordino-directions .bd-bank-input > .bd-bank-mark:first-child { position: absolute; inset-inline-start: 10px; width: 22px; height: 22px; font-size: 12px; pointer-events: none; color: var(--bd-muted); }
+#bordino-directions .bd-bank-picker .bd-bank-input input { padding-inline: 42px 34px; }
+#bordino-directions .bd-bank-caret { position: absolute; inset-inline-end: 10px; width: 16px; height: 16px; transform: rotate(-90deg); color: var(--bd-muted); pointer-events: none; }
+#bordino-directions .bd-bank-list { position: absolute; z-index: 20; inset-inline: 0; top: 100%; max-height: 280px; overflow-y: auto; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--bd-bg); border: 2px solid var(--bd-outline); box-shadow: 4px 4px 0 var(--bd-hard-shadow); }
+#bordino-directions .bd-bank-list li { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; cursor: pointer; }
+#bordino-directions .bd-bank-list li > span:not(.bd-bank-mark) { flex: 1; }
+#bordino-directions .bd-bank-list li.is-active { background: var(--bd-tint); }
+#bordino-directions .bd-bank-list li[aria-selected="true"] { font-weight: 700; }
+#bordino-directions .bd-bank-list li > svg { width: 16px; height: 16px; color: var(--bd-accent); }
+#bordino-directions .bd-bank-list li.bd-bank-empty { cursor: default; color: var(--bd-muted); font-size: 13px; }
+#bordino-directions .bd-bank-mark { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bd-tint); color: var(--bd-accent); font-size: 13px; font-weight: 700; object-fit: contain; }
+
+/* Achievements: badge grid (achievements.tsx). */
+#bordino-directions .bd-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+#bordino-directions .bd-badge { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px 12px; text-align: center; background: var(--bd-surface); border: 2px solid var(--bd-outline); box-shadow: 3px 3px 0 var(--bd-hard-shadow); }
+#bordino-directions .bd-badge b { font-size: 14px; }
+#bordino-directions .bd-badge > small { font-size: 11px; line-height: 1.7; color: var(--bd-muted); min-height: 3.4em; }
+#bordino-directions .bd-badge-art { position: relative; display: inline-block; width: 72px; height: 72px; }
+#bordino-directions .bd-badge-art > svg:first-child { display: block; width: 72px; height: 72px; }
+#bordino-directions .bd-badge-art.is-locked > svg:first-child { filter: grayscale(1); opacity: .45; }
+#bordino-directions .bd-badge-lock { position: absolute; inset-inline-end: -2px; bottom: -2px; width: 26px; height: 26px; padding: 2px; background: var(--bd-bg); border: 2px solid var(--bd-outline); border-radius: 50%; color: var(--bd-fg); }
+#bordino-directions .bd-badge-keyhole { fill: var(--bd-bg); }
+#bordino-directions .bd-badge-done { display: inline-flex; align-items: center; gap: 4px; }
+#bordino-directions .bd-badge-done svg { width: 13px; height: 13px; }
+#bordino-directions .bd-badge-progress { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; }
+#bordino-directions .bd-badge-progress small { font-size: 11px; color: var(--bd-muted); }
+#bordino-directions .bd-progress { display: block; height: 8px; background: var(--bd-bg); border: 1.5px solid var(--bd-outline); overflow: hidden; }
+#bordino-directions .bd-progress > i { display: block; height: 100%; background: var(--bd-accent); }
+@media (max-width: 400px) { #bordino-directions .bd-badges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+
+/* Rewarded video before a game (ads/RewardOffer.tsx, ads/DemoVideoAd.tsx). */
+#bordino-directions .bd-reward { display: flex; flex-direction: column; align-items: stretch; text-align: center; padding-top: 18px; }
+#bordino-directions .bd-reward-coin { align-self: center; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #ffc94a; color: #25252b; border: 2px solid var(--bd-outline); box-shadow: 3px 3px 0 var(--bd-hard-shadow); }
+#bordino-directions .bd-reward-coin svg { width: 32px; height: 32px; }
+#bordino-directions .bd-sheet p.bd-reward-heading { margin: 12px 0 2px; font-size: 18px; font-weight: 700; color: var(--bd-fg); }
+#bordino-directions .bd-sheet p.bd-reward-text { margin: 0 0 12px; font-size: 13px; color: var(--bd-muted); }
+#bordino-directions .bd-sheet .bd-sheet-item.bd-reward-main { justify-content: center; background: var(--bd-accent); color: var(--bd-on); border: 2px solid var(--bd-outline); box-shadow: 3px 3px 0 var(--bd-hard-shadow); font-weight: 700; }
+#bordino-directions .bd-sheet .bd-sheet-item:disabled { opacity: .6; cursor: default; }
+#bordino-directions .bd-reward-left { margin-top: 10px; font-size: 11px; color: var(--bd-muted); }
+#bordino-directions .bd-reward-done { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 14px; }
+#bordino-directions .bd-reward-done b { font-size: 22px; color: var(--bd-accent); }
+#bordino-directions .bd-reward-done p { margin: 0; font-size: 13px; color: var(--bd-muted); }
+
+#bordino-directions .bd-ad { position: fixed; inset: 0; z-index: 85; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: #000; color: #fff; padding-top: env(safe-area-inset-top); }
+#bordino-directions .bd-ad-top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+#bordino-directions .bd-ad-pill { padding: 6px 12px; border-radius: 999px; background: rgb(255 255 255 / .14); font-size: 13px; }
+#bordino-directions .bd-ad-demo { margin-inline-start: auto; font-size: 11px; color: #ffc94a; }
+#bordino-directions .bd-ad-top button.bd-ad-icon { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; background: rgb(255 255 255 / .14); color: #fff; }
+#bordino-directions .bd-ad-top .bd-ad-pill + .bd-ad-icon { margin-inline-start: auto; }
+#bordino-directions .bd-ad-icon svg { width: 20px; height: 20px; }
+#bordino-directions .bd-ad-video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#bordino-directions .bd-ad-bar { height: 4px; margin-bottom: env(safe-area-inset-bottom); background: rgb(255 255 255 / .2); }
+#bordino-directions .bd-ad-bar > i { display: block; height: 100%; background: #ffc94a; transition: width .25s linear; }
+#bordino-directions .bd-ad-sheet { position: absolute; inset-inline: 12px; bottom: calc(24px + env(safe-area-inset-bottom)); max-width: 440px; margin-inline: auto; padding: 16px; background: var(--bd-bg); color: var(--bd-fg); border: 2px solid var(--bd-outline); box-shadow: 4px 4px 0 var(--bd-accent); text-align: center; }
+#bordino-directions .bd-ad-sheet p { margin: 6px 0 12px; font-size: 13px; color: var(--bd-muted); }
+#bordino-directions .bd-ad-sheet .bd-actions { justify-content: center; }
+
+/* Android Back: «از بردینو خارج می‌شوی؟» and the games' leave question (BackButton.tsx). */
+#bordino-directions .bd-sheet.bd-leave { border-radius: 0; text-align: center; }
+#bordino-directions .bd-leave p.bd-leave-title { margin: 12px 0 2px; font-size: 17px; font-weight: 700; color: var(--bd-fg); }
+#bordino-directions .bd-leave p.bd-leave-text { margin: 0 0 10px; font-size: 13px; color: var(--bd-muted); }
+#bordino-directions .bd-leave .bd-sheet-item { justify-content: center; }
+
+/* Notifications: this device's push state (Settings.tsx DevicePanel). */
+#bordino-directions .bd-device-push { align-items: center; gap: 12px; }
+#bordino-directions .bd-device-push > span:first-child { display: flex; flex-direction: column; }
+#bordino-directions .bd-device-actions { display: flex; gap: 12px; flex: none; }

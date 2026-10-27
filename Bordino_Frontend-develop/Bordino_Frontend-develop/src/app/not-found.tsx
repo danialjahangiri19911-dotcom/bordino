@@ -8,7 +8,7 @@ export default function NotFound() {
 					<span className="bd-logomark" aria-hidden="true">
 						ب
 					</span>
-					بوردینو
+					بردینو
 				</Link>
 			</header>
 			<div className="rt-auth-shell">

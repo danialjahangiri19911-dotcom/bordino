@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { useBackHandler } from "../back";
 import { R, useRequireLogin } from "../ui";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
 import "./sudoku.css";
@@ -73,6 +74,9 @@ export default function SudokuGame() {
 	const { board, status, selectedCell, conflicts, numberProgress } = game;
 	const playing = status === "playing" && board.length > 0;
 	const modal: Modal = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : game.paused ? "pause" : "");
+	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
+	// header's exit button does).
+	useBackHandler(true, () => (confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 
 	// ── music: one switch for music and effects; never in a hidden tab or behind a dialog ──
 	useEffect(() => {

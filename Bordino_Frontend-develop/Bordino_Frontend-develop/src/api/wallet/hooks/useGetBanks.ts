@@ -7,7 +7,8 @@ export default function useGetBanks(
 	props: ExtendableOptions<BanksApiResponse> = {},
 ) {
 	const { data, isLoading, error, refetch } = useQuery<BanksApiResponse>({
-		url: WALLET.GET_BANKS,
+		// Every bank on one page (the default page is 20; there are about 30 banks).
+		url: `${WALLET.GET_BANKS}?page_size=100`,
 		headers: true,
 		...props,
 	});

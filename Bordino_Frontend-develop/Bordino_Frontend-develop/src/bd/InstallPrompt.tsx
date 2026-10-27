@@ -27,7 +27,7 @@ export default function InstallPrompt() {
 	if (!show) return null;
 	return (
 		<div className="bd-product st-brutal bd-install" role="dialog" aria-label="نصب اپلیکیشن">
-			<span>بوردینو را روی گوشی نصب کن.</span>
+			<span>بردینو را روی گوشی نصب کن.</span>
 			<button
 				type="button"
 				className="bd-action"

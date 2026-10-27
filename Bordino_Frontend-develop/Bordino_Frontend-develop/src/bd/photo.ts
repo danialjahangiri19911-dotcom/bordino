@@ -45,19 +45,39 @@ function canvasOf(width: number, height: number) {
 	return { canvas, ctx };
 }
 
+/** HEIF brands (iPhone and many Android cameras save HEIC): the box after «ftyp» at byte 4. */
+const HEIF_BRANDS = ["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"];
+
+/** HEIC/HEIF by content, not by name or type (phones often send neither). */
+export async function looksLikeHeif(file: Blob): Promise<boolean> {
+	const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+	if (head.length < 12) return false;
+	const text = String.fromCharCode(...head.slice(4, 12));
+	return text.startsWith("ftyp") && HEIF_BRANDS.includes(text.slice(4, 8));
+}
+
+/** Chrome and Android cannot show HEIC: a libheif decoder, downloaded only for such a photo. */
+async function decodeHeif(file: Blob) {
+	const { heicTo } = await import("heic-to/next");
+	const bitmap = await heicTo({ blob: file, type: "bitmap", options: { imageOrientation: "from-image" } });
+	return bitmap as ImageBitmap & { width: number; height: number };
+}
+
 /** The chosen file as a canvas of at most WORK_SIDE px, or a PhotoError with a message for the player. */
 export async function openPhoto(file: File): Promise<HTMLCanvasElement> {
 	if (file.size > 60 * 1024 * 1024) throw new PhotoError("حجم این عکس خیلی زیاد است؛ عکس دیگری انتخاب کن.");
 	let source: Awaited<ReturnType<typeof decode>>;
 	try {
+		// Whatever the browser shows itself first: JPEG, PNG, WebP, GIF, BMP, AVIF, and HEIC on Safari.
 		source = await decode(file);
 	} catch {
-		const heic = /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
-		throw new PhotoError(
-			heic
-				? "این گوشی عکس HEIC را باز نمی‌کند؛ یک عکس JPG یا PNG انتخاب کن (یا از «گرفتن عکس» استفاده کن)."
-				: "این فایل باز نشد؛ یک عکس دیگر انتخاب کن.",
-		);
+		const heif = (await looksLikeHeif(file).catch(() => false)) || /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+		if (!heif) throw new PhotoError("این فایل عکس نیست یا باز نشد؛ یک عکس دیگر انتخاب کن (JPG، PNG، WebP، HEIC، AVIF، GIF یا BMP).");
+		try {
+			source = await decodeHeif(file);
+		} catch {
+			throw new PhotoError("این عکس HEIC باز نشد؛ یک عکس JPG یا PNG انتخاب کن (یا از «گرفتن عکس» استفاده کن).");
+		}
 	}
 	if (!source.width || !source.height) throw new PhotoError("این فایل باز نشد؛ یک عکس دیگر انتخاب کن.");
 	const k = Math.min(1, WORK_SIDE / Math.max(source.width, source.height));

@@ -121,7 +121,7 @@ function WheelGame() {
 					{result ? <span className={result.won ? "bd-amount is-plus" : ""}>{result.text}</span> : <small className="bd-muted">نتیجه را سرور انتخاب می‌کند.</small>}
 				</p>
 			</div>
-			<Panel title={wheel?.name || "گردونهٔ بوردینو"}>
+			<Panel title={wheel?.name || "گردونهٔ بردینو"}>
 				<p>
 					موجودی تو: <b>{points.points === null ? "…" : `${fa(balance)} امتیاز`}</b>
 				</p>

@@ -30,10 +30,10 @@ export default function Landing() {
 	const { isLoggedIn } = useAuthStore();
 	const appHref = isLoggedIn ? R.home : R.login;
 	useEffect(() => {
-		document.title = "بوردینو | بازی کن، امتیاز بگیر، در قرعه‌کشی شرکت کن";
+		document.title = "بردینو | بازی کن، امتیاز بگیر، در قرعه‌کشی شرکت کن";
 	}, []);
 	return (
-		<article className="bd-product bd-landing st-brutal lay-1 bd-page" aria-label="بوردینو">
+		<article className="bd-product bd-landing st-brutal lay-1 bd-page" aria-label="بردینو">
 			<header className="bd-header">
 				<Brand href={R.landing} />
 				<nav className="bd-header-links" aria-label="بخش‌های صفحه">
@@ -43,7 +43,7 @@ export default function Landing() {
 					<Link href={R.rules}>راهنما</Link>
 				</nav>
 				<Link className="bd-action" href={appHref}>
-					{isLoggedIn ? "ورود به برنامه" : "ورود به بوردینو"} <Icon name="arrow-up-left" />
+					{isLoggedIn ? "ورود به برنامه" : "ورود به بردینو"} <Icon name="arrow-up-left" />
 				</Link>
 			</header>
 			<main id="main">
@@ -63,10 +63,10 @@ export default function Landing() {
 								شروع یک بازی <Icon name="arrow-left" />
 							</Link>
 							<a className="bd-secondary" href="#how">
-								بوردینو چطور کار می‌کند؟
+								بردینو چطور کار می‌کند؟
 							</a>
 						</div>
-						<span className="bd-note">وب‌اپلیکیشن بوردینو · همراهت در موبایل و مرورگر</span>
+						<span className="bd-note">وب‌اپلیکیشن بردینو · همراهت در موبایل و مرورگر</span>
 					</div>
 					<Art name="hero" eager />
 				</section>
@@ -99,7 +99,7 @@ export default function Landing() {
 				{!installed && (
 					<section className="bd-how bd-get-app" id="app" aria-labelledby="get-app-title">
 						<div className="bd-section-head">
-							<h2 id="get-app-title">بوردینو روی گوشی</h2>
+							<h2 id="get-app-title">بردینو روی گوشی</h2>
 						</div>
 						<div className="bd-steps">
 							<div className="bd-step bd-get-app-card">
@@ -107,7 +107,7 @@ export default function Landing() {
 									<Icon name="smartphone" />
 								</span>
 								<h3>اندروید</h3>
-								<p>برنامهٔ بوردینو را دانلود و نصب کن. اگر گوشی پرسید، نصب از این منبع را اجازه بده.</p>
+								<p>برنامهٔ بردینو را دانلود و نصب کن. اگر گوشی پرسید، نصب از این منبع را اجازه بده.</p>
 								<a className="bd-action" href={APK_HREF} download="bordino.apk">
 									دانلود برنامه <Icon name="download" />
 								</a>
@@ -142,7 +142,7 @@ export default function Landing() {
 				</section>
 			</main>
 			<footer className="bd-landing-footer">
-				<span>بوردینو · بازی، امتیاز، قرعه‌کشی</span>
+				<span>بردینو · بازی، امتیاز، قرعه‌کشی</span>
 				<span>
 					<Link href={R.rules}>قوانین</Link> · <Link href={R.rules}>راهنما</Link>
 				</span>

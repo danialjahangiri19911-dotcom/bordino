@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-
-import { AppShell, Notice, Panel, R } from "../ui";
+import { AppShell, Notice, Panel } from "../ui";
 
 import useAuthStore from "@/libs/stores/authStore";
 import { GuideSteps, PrizeTable } from "./Guide";
@@ -16,7 +14,7 @@ export default function Rules() {
 	const { isLoggedIn } = useAuthStore();
 	return (
 		<AppShell nav="profile" title="شرایط و قوانین" allowGuest>
-			<Panel title="شرایط استفاده از بوردینو">
+			<Panel title="شرایط استفاده از بردینو">
 				<Notice tone="info">متن رسمی و کامل شرایط استفاده به‌زودی در همین صفحه منتشر می‌شود. آنچه در ادامه آمده، نحوهٔ کار بخش‌های فعلی برنامه است.</Notice>
 				<div className="rt-document">
 					<details open>
@@ -36,11 +34,6 @@ export default function Rules() {
 						<summary>بازی‌ها</summary>
 						<p>نتیجهٔ بازی‌های امتیازی (انفجار، مرغ فراری و گردونه) را سرور تعیین می‌کند؛ قوانین و ضرایب هر بازی با دکمهٔ اطلاعات در صفحهٔ همان بازی دیده می‌شود.</p>
 					</details>
-				</div>
-				<div className="bd-actions">
-					<Link className="bd-secondary" href={isLoggedIn ? R.lotteryGuide : R.login}>
-						راهنمای کامل قرعه‌کشی
-					</Link>
 				</div>
 			</Panel>
 		</AppShell>

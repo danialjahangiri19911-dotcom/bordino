@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import AvatarEditor from "../AvatarEditor";
 import Icon from "../Icon";
+import { useBackHandler } from "../back";
 import { openPhoto, PhotoError } from "../photo";
 import { AppShell, LoadState, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -78,6 +79,9 @@ function AvatarPicker({ image }: { image?: string | null }) {
 	}, [image, preview, upload.isSending, lastPicture]);
 	useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
+	// Android Back closes the menu (the editor handles its own).
+	useBackHandler(menu, () => (confirmRemove ? setConfirmRemove(false) : setMenu(false)));
+
 	useEffect(() => {
 		if (!menu) return;
 		const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
@@ -140,9 +144,9 @@ function AvatarPicker({ image }: { image?: string | null }) {
 				<span className="bd-avatar-status" role="status">
 					{opening ? "در حال باز کردن عکس…" : upload.isSending ? "در حال ذخیرهٔ عکس…" : remove.isSending ? "در حال حذف عکس…" : ""}
 				</span>
-				{/* Any image type: some phones send photos with no type at all; openPhoto decides. */}
-				<input ref={gallery} type="file" accept="image/*" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
-				<input ref={camera} type="file" accept="image/*" capture="user" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
+				{/* Any image type (HEIC named too: some file pickers file it under no image type); openPhoto decides. */}
+				<input ref={gallery} type="file" accept="image/*,.heic,.heif,.avif" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
+				<input ref={camera} type="file" accept="image/*,.heic,.heif,.avif" capture="user" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
 			</div>
 			{problem ? (
 				<div className="bd-toast" role="alert">
@@ -223,7 +227,7 @@ export default function Profile() {
 				<div className="rt-profile-hero">
 					<AvatarPicker image={profile.image_url} />
 					<div>
-						<h2>{profile.username || "کاربر بوردینو"}</h2>
+						<h2>{profile.username || "کاربر بردینو"}</h2>
 						<p dir="ltr" className="bd-phone">
 							0{profile.phone_number}
 						</p>
@@ -251,8 +255,8 @@ export default function Profile() {
 				</section>
 				<section className="bd-panel rt-panel">
 					<h3>راهنما</h3>
-					<ProfileRow href={R.rules} icon="file-text" title="شرایط و قوانین" text="قوانین استفاده از بوردینو" />
-					<ProfileRow href={R.lotteryGuide} icon="ticket" title="راهنمای قرعه‌کشی" text="مراحل و جایزهٔ هر بلیت" />
+					<ProfileRow href={R.rules} icon="file-text" title="شرایط و قوانین" text="قوانین استفاده از بردینو" />
+					<ProfileRow href={`${R.lotteryGuide}?from=profile`} icon="ticket" title="راهنمای قرعه‌کشی" text="مراحل و جایزهٔ هر بلیت" />
 					<button
 						className="bd-text-btn"
 						type="button"

@@ -14,6 +14,7 @@ import CrashControls, {
 } from "./CrashControls";
 import CrashGraph, { type CrashPhase } from "./CrashGraph";
 import FairnessDialog from "./FairnessDialog";
+import { useLeaveGuard } from "@/bd/back";
 import useCrashGame from "./useCrashGame";
 import {
 	CRASH_COLORS,
@@ -121,6 +122,12 @@ export default function CrashGame() {
 	const betValue = Number(bet) || 0;
 	const cashoutValue = Number(cashoutAt) || null;
 	const roundBusy = phase === "starting" || phase === "running";
+	// Android Back during a round: leaving now means no cash-out, so ask first.
+	useLeaveGuard(roundBusy || autoRunning, {
+		title: "دور در جریان است",
+		text: "اگر الان خارج شوی، برداشت نمی‌کنی و ممکن است امتیاز شرط را از دست بدهی.",
+		yes: "خروج از بازی",
+	});
 	const locked = roundBusy || autoRunning || busy;
 
 	const betProblem = useMemo(() => {

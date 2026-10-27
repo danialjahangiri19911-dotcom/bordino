@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import Link from "next/link";
 
 import { fa } from "../format";
@@ -49,8 +51,14 @@ export function PrizeTable() {
 }
 
 export default function Guide() {
+	// The guide is opened from the lottery pages (wallet tab) and from the profile; the tab the
+	// player came from stays selected («?from=profile»).
+	const [nav, setNav] = useState<"wallet" | "profile">("wallet");
+	useEffect(() => {
+		if (new URLSearchParams(window.location.search).get("from") === "profile") setNav("profile");
+	}, []);
 	return (
-		<AppShell nav="wallet" title="راهنمای قرعه‌کشی">
+		<AppShell nav={nav} title="راهنمای قرعه‌کشی">
 			<div className="rt-two">
 				<Panel title="قرعه‌کشی چطور کار می‌کند؟">
 					<div className="rt-document">

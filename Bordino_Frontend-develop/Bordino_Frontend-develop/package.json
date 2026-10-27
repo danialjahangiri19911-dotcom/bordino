@@ -37,6 +37,7 @@
 		"date-fns-jalali": "^4.1.0-0",
 		"dayjs": "^1.11.19",
 		"emotion": "^11.0.0",
+		"heic-to": "1.6.5",
 		"husky": "^9.1.7",
 		"idb-keyval": "^6.2.2",
 		"immer": "^11.1.4",

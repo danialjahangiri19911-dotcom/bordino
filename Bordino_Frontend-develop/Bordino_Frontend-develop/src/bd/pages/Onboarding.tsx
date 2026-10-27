@@ -58,7 +58,7 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 	return (
 		<div className="au-onboarding au-layout-1">
 			<div className="au-onboarding-top">
-				<span className="au-eyebrow">آشنایی با بوردینو</span>
+				<span className="au-eyebrow">آشنایی با بردینو</span>
 				<button type="button" className="bd-text-btn" onClick={onDone}>
 					رد کردن
 				</button>
@@ -164,7 +164,7 @@ export default function Onboarding() {
 
 	const onSaved = () => {
 		setUser({ username: username.trim(), gender: gender as "M" | "F", birthdate, registrationStep: "DailyUsageTime" });
-		setWelcome(`«${username.trim()}» به بوردینو خوش آمدی!`);
+		setWelcome(`«${username.trim()}» به بردینو خوش آمدی!`);
 		setPhase("intro");
 		queryClient.invalidateQueries();
 	};
@@ -177,7 +177,7 @@ export default function Onboarding() {
 
 	if (phase === "intro") {
 		return (
-			<AuthShell title="معرفی بوردینو">
+			<AuthShell title="معرفی بردینو">
 				<Intro
 					welcome={welcome && points.points ? `${welcome} موجودی امتیاز تو: ${fa(points.points)}` : welcome}
 					onDone={() => replace(R.home)}

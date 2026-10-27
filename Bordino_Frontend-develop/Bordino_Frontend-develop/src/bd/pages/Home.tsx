@@ -17,7 +17,7 @@ function LotteryPanel() {
 		return (
 			<section className="bd-panel bd-campaign">
 				<p className="bd-overline">
-					<Icon name="ticket" /> قرعه‌کشی بوردینو
+					<Icon name="ticket" /> قرعه‌کشی بردینو
 				</p>
 				<h3>منتظر دورهٔ بعدی باش</h3>
 				<p>در حال حاضر قرعه‌کشی فعالی وجود ندارد. دورهٔ بعدی به‌زودی اعلام می‌شود.</p>
@@ -30,7 +30,7 @@ function LotteryPanel() {
 	return (
 		<section className="bd-panel bd-campaign">
 			<p className="bd-overline">
-				<Icon name="ticket" /> قرعه‌کشی بوردینو
+				<Icon name="ticket" /> قرعه‌کشی بردینو
 			</p>
 			<h3>{lottery.name}</h3>
 			<p>
@@ -75,7 +75,7 @@ export default function Home() {
 			<div className="bd-dashboard-grid">
 				<section className="bd-panel bd-missions">
 					<div className="bd-panel-head">
-						<h3>گیمنت بوردینو</h3>
+						<h3>گیمنت بردینو</h3>
 						<span className="bd-tag">{fa(GAMES.length)} بازی</span>
 					</div>
 					<div className="bd-mission-list">
@@ -102,7 +102,7 @@ export default function Home() {
 				<section className="bd-panel bd-wheel-panel">
 					<div className="bd-wheel" aria-hidden="true" />
 					<div className="bd-wheel-copy">
-						<h3>گردونهٔ بوردینو</h3>
+						<h3>گردونهٔ بردینو</h3>
 						<small>یک انتخاب دیگر برای امتیازهایت</small>
 						<Link className="bd-text-btn" href={R.wheel}>
 							دیدن گردونه ←
@@ -113,7 +113,7 @@ export default function Home() {
 			<section className="bd-panel bd-progress-panel">
 				<div>
 					<h3>چند لحظه سرگرمی</h3>
-					<small className="bd-muted">بخش‌های سرگرمی بوردینو</small>
+					<small className="bd-muted">بخش‌های سرگرمی بردینو</small>
 				</div>
 				<div className="bd-actions" style={{ marginTop: 0 }}>
 					<Link className="bd-secondary" href={R.hafez}>
@@ -125,7 +125,7 @@ export default function Home() {
 				</div>
 			</section>
 			<section className="bd-detail" aria-live="polite">
-				<h3>{streak > 0 ? `${fa(streak)} روز پشت سر هم با بوردینو` : "بازی بعدی را انتخاب کن."}</h3>
+				<h3>{streak > 0 ? `${fa(streak)} روز پشت سر هم با بردینو` : "بازی بعدی را انتخاب کن."}</h3>
 				<p>
 					{streak > 0
 						? `بیشترین همراهی پیوستهٔ تو: ${fa(profile?.max_consecutive_days ?? streak)} روز. فردا هم سر بزن تا زنجیره ادامه پیدا کند.`
