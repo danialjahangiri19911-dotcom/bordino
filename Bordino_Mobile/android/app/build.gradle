@@ -30,6 +30,14 @@ android {
             }
         }
     }
+    // No key, no release: an unsigned APK cannot be installed or updated, so fail loudly instead.
+    if (!keystorePropsFile.exists()) {
+        gradle.taskGraph.whenReady { graph ->
+            if (graph.allTasks.any { it.name.toLowerCase().contains("release") }) {
+                throw new GradleException("Release signing key not found: ${keystorePropsFile} (see Bordino_Mobile/README.md)")
+            }
+        }
+    }
     buildTypes {
         release {
             if (keystorePropsFile.exists()) signingConfig signingConfigs.release
