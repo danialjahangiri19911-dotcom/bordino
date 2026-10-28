@@ -60,6 +60,20 @@ export function useHistory(kind: HistoryKind, accountId?: string) {
 	return { ...history, rows };
 }
 
+/** With rows already shown from one account, the other account's failure must still be visible. */
+export function PartialHistoryNotice({ parts }: { parts: { label: string; history: { isError: boolean; refetch: () => unknown } }[] }) {
+	const failed = parts.filter((p) => p.history.isError);
+	if (!failed.length) return null;
+	return (
+		<div className="rt-notice bd-notice-warn" role="alert">
+			تاریخچهٔ {failed.map((p) => p.label).join(" و ")} بارگذاری نشد؛ این فهرست کامل نیست.{" "}
+			<button type="button" className="bd-text-btn" onClick={() => failed.forEach((p) => void p.history.refetch())}>
+				تلاش دوباره
+			</button>
+		</div>
+	);
+}
+
 export function HistoryFooter({
 	history,
 	empty,

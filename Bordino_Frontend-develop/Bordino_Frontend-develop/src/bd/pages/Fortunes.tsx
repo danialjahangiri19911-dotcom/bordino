@@ -67,8 +67,11 @@ export function Tarot() {
 	const [spread, setSpread] = useState<TarotSpread>(3);
 	const [open, setOpen] = useState<number | null>(null);
 	const { cards, loading, error, fetchTarot } = useGetTarotReading();
+	// The positions belong to the spread the cards were drawn with, not to the selector's value now.
+	const [drawn, setDrawn] = useState<TarotSpread>(3);
 	const draw = () => {
 		setOpen(null);
+		setDrawn(spread);
 		void fetchTarot(spread);
 	};
 	const card = open !== null ? cards?.[open] : null;
@@ -106,18 +109,18 @@ export function Tarot() {
 									type="button"
 									className="rt-tarot-card"
 									aria-pressed={open === i}
-									aria-label={`کارت ${fa(i + 1)}: ${POSITIONS[spread][i] ?? ""}`}
+									aria-label={`کارت ${fa(i + 1)}: ${POSITIONS[drawn][i] ?? ""}`}
 									onClick={() => setOpen(i)}
 								>
 									{open === i || open !== null ? <span className="bd-tarot-symbol">{c.symbol}</span> : <Icon name="sparkles" />}
-									<small>{POSITIONS[spread][i] ?? "BORDINO"}</small>
+									<small>{POSITIONS[drawn][i] ?? "BORDINO"}</small>
 								</button>
 							))}
 						</div>
 						{card ? (
 							<div className="rt-fortune-result" aria-live="polite">
 								<h3>
-									{POSITIONS[spread][open ?? 0]}: {card.name}
+									{POSITIONS[drawn][open ?? 0]}: {card.name}
 								</h3>
 								<p style={{ whiteSpace: "pre-line" }}>{card.interpretation}</p>
 							</div>

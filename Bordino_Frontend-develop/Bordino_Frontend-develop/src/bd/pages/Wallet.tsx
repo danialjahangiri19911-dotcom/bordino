@@ -12,7 +12,9 @@ import useGetCurrencySummary from "@/api/wallet/hooks/useGetCurrencySummary";
 
 export function useCashAccount() {
 	const { data, isLoading, error, refetch } = useGetCurrencySummary();
-	const account = data?.result?.currency_wallet_accounts?.[0];
+	// The primary account: the one the server pays prizes to and withdraws from (not «the first»).
+	const all = data?.result?.currency_wallet_accounts ?? [];
+	const account = all.find((a) => a.primary) ?? all[0];
 	return {
 		account,
 		balance: data?.result ? Number(account?.balance ?? 0) : null,
@@ -25,7 +27,7 @@ export function useCashAccount() {
 export default function Wallet() {
 	const points = usePoints();
 	const cash = useCashAccount();
-	const { activeLotteries: lottery, lotteryData } = useExtractLotteries();
+	const { activeLotteries: lottery, lotteryData, loaded: lotteriesLoaded, error: lotteriesError, refetch: refetchLotteries } = useExtractLotteries();
 	const pointsHistory = useHistory("points", points.account?.id);
 	const recent = pointsHistory.rows.slice(0, 5);
 
@@ -45,7 +47,7 @@ export default function Wallet() {
 							</strong>
 							<p>
 								{fa(points.account?.total_tickets ?? 0)} بلیت فعال
-								{price ? ` · هر بلیت ${fa(price)} امتیاز` : " · قرعه‌کشی فعالی نیست"}
+								{price ? ` · هر بلیت ${fa(price)} امتیاز` : lotteriesLoaded ? " · قرعه‌کشی فعالی نیست" : ""}
 							</p>
 							{price ? (
 								<>
@@ -110,6 +112,8 @@ export default function Wallet() {
 								</Link>
 							</div>
 						</div>
+					) : !lotteriesLoaded ? (
+						<LoadState loading={!lotteriesError} error={lotteriesError} onRetry={refetchLotteries} errorText="قرعه‌کشی‌ها بارگذاری نشد." />
 					) : (
 						<EmptyState
 							title={(points.account?.total_tickets ?? 0) > 0 ? "دورهٔ فعالی نیست" : "هنوز بلیتی نداری"}

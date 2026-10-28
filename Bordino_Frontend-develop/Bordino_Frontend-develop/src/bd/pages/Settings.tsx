@@ -18,7 +18,7 @@ import {
 	sendTest,
 } from "../push";
 import { fa } from "../format";
-import { type Entry, HistoryRow, rowsOf } from "../history";
+import { type Entry, HistoryRow, PartialHistoryNotice, rowsOf } from "../history";
 import { AppShell, CopyButton, EmptyState, Facts, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
 import { useCashAccount } from "./Wallet";
 
@@ -176,9 +176,17 @@ export function Notifications() {
 	};
 	const disable = async () => {
 		setBusy(true);
-		await disableOnThisDevice().catch(() => undefined);
-		setDevice("off");
-		setBusy(false);
+		setProblem(null);
+		try {
+			await disableOnThisDevice();
+			setDevice("off");
+		} catch (e) {
+			// Still on: say so instead of showing «off».
+			setDevice((await currentSubscription().catch(() => null)) ? "on" : "off");
+			setProblem(`خاموش کردن اعلان روی این دستگاه نشد: ${gameErrorMessage(e)}`);
+		} finally {
+			setBusy(false);
+		}
 	};
 
 	const toggle = async (key: CategoryKey, value: boolean) => {
@@ -294,11 +302,19 @@ export function Prizes() {
 		<AppShell nav="profile" title="تاریخچهٔ جوایز">
 			<Panel title="جوایز من">
 				{prizes.length ? (
-					<div className="bd-rows">
-						{prizes.map((entry) => (
-							<HistoryRow key={`${entry.kind}-${entry.id}`} entry={entry} />
-						))}
-					</div>
+					<>
+						<PartialHistoryNotice
+							parts={[
+								{ label: "امتیاز", history: p },
+								{ label: "نقدی", history: c },
+							]}
+						/>
+						<div className="bd-rows">
+							{prizes.map((entry) => (
+								<HistoryRow key={`${entry.kind}-${entry.id}`} entry={entry} />
+							))}
+						</div>
+					</>
 				) : loading || failed ? (
 					<LoadState loading={loading} error={failed} onRetry={() => (p.isError ? p.refetch() : c.refetch())} />
 				) : !more ? (

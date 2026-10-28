@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useSearchParams } from "next/navigation";
 
-import { type Entry, HistoryFooter, HistoryRow, useHistory } from "../history";
+import { type Entry, HistoryFooter, HistoryRow, PartialHistoryNotice, useHistory } from "../history";
 import { AppShell, Chips, Panel, usePoints } from "../ui";
 import { useCashAccount } from "./Wallet";
 
@@ -51,6 +51,14 @@ export default function Transactions() {
 							<HistoryRow key={`${entry.kind}-${entry.id}`} entry={entry} />
 						))}
 					</div>
+				) : null}
+				{filter === "all" && rows.length ? (
+					<PartialHistoryNotice
+						parts={[
+							{ label: "امتیاز", history: pointsHistory },
+							{ label: "نقدی", history: cashHistory },
+						]}
+					/>
 				) : null}
 				{filter === "all" ? (
 					rows.length ? (

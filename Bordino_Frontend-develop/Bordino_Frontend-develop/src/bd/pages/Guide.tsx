@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { fa } from "../format";
-import { AppShell, Facts, Notice, Panel, R } from "../ui";
+import { AppShell, Facts, LoadState, Notice, Panel, R } from "../ui";
 
 import { GUIDE_SECTIONS } from "@/_pages/PwaApp/Lottery/LotteryGuide/content";
 import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
@@ -31,8 +31,9 @@ export function GuideSteps() {
 }
 
 export function PrizeTable() {
-	const { activeLotteries: lottery } = useExtractLotteries();
+	const { activeLotteries: lottery, loaded, error, refetch } = useExtractLotteries();
 	const rules = [...(lottery?.prize_rules ?? [])].sort((a, b) => b.match_count - a.match_count);
+	if (!lottery && !loaded) return <LoadState loading={!error} error={error} onRetry={refetch} errorText="جدول جایزه بارگذاری نشد." />;
 	if (!lottery || !rules.length) return <p className="bd-muted">جدول جایزهٔ هر دوره هنگام شروع آن دوره اعلام می‌شود.</p>;
 	return (
 		<>

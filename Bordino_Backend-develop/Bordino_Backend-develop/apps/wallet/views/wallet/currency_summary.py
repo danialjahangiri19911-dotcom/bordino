@@ -23,8 +23,12 @@ class CurrencyWalletSummaryView(APIView):
     def get(self, request):
         wallets = WalletQueryRepository.customer_wallet(request.user)
 
-        currency_accounts = CurrencyWalletAccount.objects.filter(wallet__in=wallets).select_related(
-            "preset_wallet", "preset_wallet__currency", "wallet"
+        # The primary account first, in the order balance.currency_account() picks it (prizes and
+        # withdrawals use that one), so a client reading the first account reads the right one.
+        currency_accounts = (
+            CurrencyWalletAccount.objects.filter(wallet__in=wallets)
+            .select_related("preset_wallet", "preset_wallet__currency", "wallet")
+            .order_by("-primary", "create_time")
         )
 
         account_summaries = []
