@@ -18,6 +18,9 @@ export const metadata: Metadata = {
 	icons: { icon: LOGO_ADDRESS, apple: "/bd/icons/apple-touch-icon.png" },
 	// iPhone «Add to Home Screen» opens full-screen with the Persian name.
 	appleWebApp: { capable: true, title: "بردینو", statusBarStyle: "default" },
+	// iPhone Safari turns digit runs (phone numbers, amounts) into links before React starts, which
+	// changes the page under it (hydration error) and makes numbers tappable «call» links.
+	formatDetection: { telephone: false, date: false, email: false, address: false },
 };
 
 export const viewport: Viewport = {
