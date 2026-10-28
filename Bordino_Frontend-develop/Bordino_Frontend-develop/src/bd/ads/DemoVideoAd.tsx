@@ -20,6 +20,8 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 	const [muted, setMuted] = useState(true);
 	const [leaving, setLeaving] = useState(false);
 	const [failed, setFailed] = useState(false);
+	const [stalled, setStalled] = useState(false);
+	const leavingRef = useRef(false);
 	const done = useRef(false);
 
 	useBackHandler(true, () => (leaving ? setLeaving(false) : setLeaving(true)));
@@ -29,12 +31,17 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 		if (!v) return;
 		// Muted autoplay is allowed everywhere; the player can turn the sound on.
 		v.play().catch(() => undefined);
-		const hidden = () => document.hidden && v.pause();
+		// Away (another app/tab): pause; back: carry on (unless the «close?» question is open).
+		const hidden = () => {
+			if (document.hidden) v.pause();
+			else if (!done.current && !leavingRef.current) v.play().catch(() => setStalled(true));
+		};
 		document.addEventListener("visibilitychange", hidden);
 		return () => document.removeEventListener("visibilitychange", hidden);
 	}, []);
 
 	useEffect(() => {
+		leavingRef.current = leaving;
 		const v = video.current;
 		if (!v) return;
 		if (leaving) v.pause();
@@ -95,7 +102,13 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 					}
 				}}
 				onError={() => setFailed(true)}
+				onPlay={() => setStalled(false)}
 			/>
+			{stalled && !leaving && !failed ? (
+				<button type="button" className="bd-ad-resume" onClick={() => void video.current?.play().catch(() => undefined)}>
+					<Icon name="play" /> ادامهٔ ویدیو
+				</button>
+			) : null}
 			<div className="bd-ad-bar" aria-hidden="true">
 				<i style={{ width: `${Math.min(100, (watched / need) * 100)}%` }} />
 			</div>

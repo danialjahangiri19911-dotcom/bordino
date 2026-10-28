@@ -34,13 +34,22 @@ export function parentOf(path: string): string {
 	return R.home;
 }
 
+/** The dialog the last Back sent Escape to: if it is still open, it ignores Escape. */
+let escaped: HTMLElement | null = null;
+
 /** The newest open dialog that only knows Escape (MUI dialogs, older parts of the app). */
 function closeOpenDialog(): boolean {
 	const open = [...document.querySelectorAll<HTMLElement>('[aria-modal="true"]')].filter(
 		(el) => !el.closest("[hidden]") && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden",
 	);
 	const top = open[open.length - 1];
-	if (!top) return false;
+	// Still open after the last Escape: it does not close that way, so Back must not stop here.
+	if (!top || top === escaped) return false;
+	escaped = top;
+	// If Escape did close it, forget it (the same dialog opened again later gets Escape again).
+	window.setTimeout(() => {
+		if (escaped === top && !(top.isConnected && top.getClientRects().length > 0)) escaped = null;
+	}, 300);
 	const target = top.contains(document.activeElement) ? (document.activeElement as HTMLElement) : top;
 	target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
 	return true;

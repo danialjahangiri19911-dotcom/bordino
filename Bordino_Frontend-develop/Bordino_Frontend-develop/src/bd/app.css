@@ -295,3 +295,4 @@ body { margin: 0; }
 #bordino-directions .bd-device-push { align-items: center; gap: 12px; }
 #bordino-directions .bd-device-push > span:first-child { display: flex; flex-direction: column; }
 #bordino-directions .bd-device-actions { display: flex; gap: 12px; flex: none; }
+#bordino-directions .bd-ad button.bd-ad-resume { position: absolute; inset-inline: 0; margin-inline: auto; top: 45%; width: max-content; display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: #ffc94a; color: #25252b; border: 2px solid #25252b; font-weight: 700; }
