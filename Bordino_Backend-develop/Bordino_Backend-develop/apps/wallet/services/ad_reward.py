@@ -72,9 +72,9 @@ class DemoVideoProvider(AdProvider):
         return {"video_url": setting("AD_DEMO_VIDEO_URL"), "seconds": self.watch_seconds(), "demo": True}
 
     def verify(self, session, evidence):
+        # Both times are the server's: the whole length must have passed.
         elapsed = (timezone.now() - session.create_time).total_seconds()
-        # A second of slack for the two clocks' rounding, never less than the video itself minus it.
-        return elapsed >= session.min_watch_seconds - 1
+        return elapsed >= session.min_watch_seconds
 
 
 PROVIDERS: dict[str, AdProvider] = {DemoVideoProvider.name: DemoVideoProvider()}

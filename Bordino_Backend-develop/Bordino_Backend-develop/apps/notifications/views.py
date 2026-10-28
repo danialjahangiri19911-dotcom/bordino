@@ -48,9 +48,10 @@ class PreferencesView(APIView):
         data = PreferenceSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         pref = services.preferences(request.user.customer)
-        for field, value in data.validated_data.items():
-            setattr(pref, field, value)
-        pref.save()
+        changes = data.validated_data
+        if changes:
+            # Only the switches sent: two quick changes in parallel must not undo each other.
+            type(pref).objects.filter(pk=pref.pk).update(**changes)
         return Response(_body(request.user.customer))
 
 
@@ -59,8 +60,8 @@ class SubscriptionSerializer(serializers.Serializer):
     keys = serializers.DictField(child=serializers.CharField(max_length=200))
 
     def validate_endpoint(self, value):
-        if not value.startswith("https://"):
-            raise serializers.ValidationError("Push endpoints are https.")
+        if not services.is_push_endpoint(value):
+            raise serializers.ValidationError("Not a browser push service address.")
         return value
 
     def validate_keys(self, value):
@@ -127,5 +128,8 @@ class TestNotificationView(APIView):
         category = next((c for c in Category.values if pref.wants(c)), None)
         if category is None:
             return Response({"error": "همهٔ اعلان‌ها خاموش است."}, status=status.HTTP_409_CONFLICT)
-        delivered = services.send(customer, category, "اعلان آزمایشی بردینو", "اعلان‌ها روی این دستگاه کار می‌کنند.", "/pwa/profile/notifications")
+        try:
+            delivered = services.send(customer, category, "اعلان آزمایشی بردینو", "اعلان‌ها روی این دستگاه کار می‌کنند.", "/pwa/profile/notifications")
+        except services.TransientPushError:
+            delivered = 0
         return Response({"delivered": delivered})

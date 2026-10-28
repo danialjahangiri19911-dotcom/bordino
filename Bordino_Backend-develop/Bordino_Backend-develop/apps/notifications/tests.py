@@ -59,6 +59,67 @@ class PreferenceTests(TestCase):
 
 
 @override_settings(CACHES=LOCMEM, **KEYS)
+class ReviewFixTests(TestCase):
+    """Codex phase-2 review (2026-10-28)."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_customer("9120001301")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_only_browser_push_services_are_accepted(self):
+        for bad in ["https://10.0.0.5/x", "https://localhost/x", "https://fcm.googleapis.com:8443/x", "https://evil.example/x",
+                    "https://fcm.googleapis.com.evil.example/x", "http://fcm.googleapis.com/x", "https://user@fcm.googleapis.com/x"]:
+            self.assertEqual(self.api.post(SUBS, {"endpoint": bad, "keys": {"p256dh": "k", "auth": "a"}}, format="json").status_code, 400, bad)
+        for good in ["https://fcm.googleapis.com/fcm/send/a", "https://updates.push.services.mozilla.com/wpush/v2/a",
+                     "https://wns2-db5p.notify.windows.com/w/?token=a", "https://web.push.apple.com/a"]:
+            self.assertEqual(self.api.post(SUBS, {"endpoint": good, "keys": {"p256dh": "k", "auth": "a"}}, format="json").status_code, 201, good)
+
+    def test_a_stored_foreign_endpoint_is_never_contacted(self):
+        try:
+            import pywebpush  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+        except ImportError:
+            self.skipTest("pywebpush not installed in this image")
+        PushSubscription.objects.create(customer=self.user.customer, endpoint="https://10.0.0.5/x", p256dh="k", auth="a")
+        with mock.patch("pywebpush.webpush") as webpush:
+            services._push(PushSubscription.objects.get(), {})
+        webpush.assert_not_called()
+        self.assertFalse(PushSubscription.objects.exists())
+
+    def test_a_failed_push_frees_its_key_for_the_retry(self):
+        PushSubscription.objects.create(customer=self.user.customer, endpoint="https://fcm.googleapis.com/fcm/send/a", p256dh="k", auth="a")
+        with mock.patch("apps.notifications.services._push", return_value="failed"):
+            with self.assertRaises(services.TransientPushError):
+                services.send(self.user.customer, "lottery", "t", key="k9")
+        self.assertFalse(NotificationLog.objects.exists())
+        with mock.patch("apps.notifications.services._push", return_value="ok") as push:
+            self.assertEqual(services.send(self.user.customer, "lottery", "t", key="k9"), 1)
+        push.assert_called_once()
+
+    def test_parallel_switch_changes_do_not_undo_each_other(self):
+        pref = services.preferences(self.user.customer)
+        stale = type(pref).objects.get(pk=pref.pk)  # read before the other change
+        self.api.patch(PREFS, {"account": False}, format="json")
+        stale.games = False  # the old code saved every field of a stale copy
+        type(pref).objects.filter(pk=pref.pk).update(games=False)
+        prefs = body(self.api.get(PREFS))
+        self.assertEqual((prefs["account"], prefs["games"]), (False, False))
+
+    @mock.patch("apps.notifications.tasks.send_notification.delay", side_effect=ConnectionError("broker down"))
+    def test_a_queue_that_is_down_does_not_break_the_saved_change(self, delay):
+        account = BankAccount.objects.create(
+            user=self.user, iban="IR700120000000000000000000", bank=Bank.objects.get(code="012"), account_holder="x"
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            account.status = BankAccount.Status.APPROVED
+            account.save()
+        delay.assert_called_once()
+        account.refresh_from_db()
+        self.assertEqual(account.status, BankAccount.Status.APPROVED)
+
+
+@override_settings(CACHES=LOCMEM, **KEYS)
 class SendingTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -66,7 +127,7 @@ class SendingTests(TestCase):
         self.customer = self.user.customer
         PushSubscription.objects.create(customer=self.customer, endpoint="https://e/1", p256dh="k", auth="a")
 
-    @mock.patch("apps.notifications.services._push", return_value=True)
+    @mock.patch("apps.notifications.services._push", return_value="ok")
     def test_a_switched_off_category_sends_nothing(self, push):
         services.preferences(self.customer)
         self.customer.notification_preference.games = False
@@ -75,14 +136,14 @@ class SendingTests(TestCase):
         self.assertEqual(services.send(self.customer, "lottery", "t"), 1)
         self.assertEqual(push.call_count, 1)
 
-    @mock.patch("apps.notifications.services._push", return_value=True)
+    @mock.patch("apps.notifications.services._push", return_value="ok")
     def test_a_keyed_notification_is_sent_once(self, push):
         self.assertEqual(services.send(self.customer, "lottery", "t", key="k1"), 1)
         self.assertEqual(services.send(self.customer, "lottery", "t", key="k1"), 0)
         self.assertEqual(NotificationLog.objects.get().delivered, 1)
 
     @override_settings(VAPID_PRIVATE_KEY="")
-    @mock.patch("apps.notifications.services._push", return_value=True)
+    @mock.patch("apps.notifications.services._push", return_value="ok")
     def test_without_keys_nothing_is_pushed(self, push):
         self.assertEqual(services.send(self.customer, "lottery", "t"), 0)
         push.assert_not_called()
@@ -122,7 +183,7 @@ class SendingTests(TestCase):
         self.assertEqual(delay.call_args.args[2], "برداشت واریز شد")
         self.assertIn("۲۰٬۰۰۰ تومان", delay.call_args.args[3])
 
-    @mock.patch("apps.notifications.services._push", return_value=True)
+    @mock.patch("apps.notifications.services._push", return_value="ok")
     def test_games_news_reaches_players_with_the_switch_on(self, push):
         from django.core.management import call_command  # pylint: disable=import-outside-toplevel
 
@@ -154,7 +215,7 @@ class WebPushWireTests(TestCase):
         point = serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
         user = make_customer("9120001201")
         sub = PushSubscription.objects.create(
-            customer=user.customer, endpoint="https://push.example/abc",
+            customer=user.customer, endpoint="https://fcm.googleapis.com/fcm/send/abc",
             p256dh=b64(browser.public_key().public_bytes(*point)), auth=b64(b"0123456789abcdef"),
         )
         sent = {}

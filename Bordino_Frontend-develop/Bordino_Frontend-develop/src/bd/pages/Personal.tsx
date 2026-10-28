@@ -47,7 +47,10 @@ export default function Personal() {
 		onError: (e) => setServerError(gameErrorMessage(e)),
 	});
 
-	const nameError = usernameProblem(username.trim());
+	// Only a name the player changes is checked here: one from the older app (e.g. «ali.reza») is
+	// valid on the server and must not block saving the other fields.
+	const nameChanged = username.trim() !== (profile?.username ?? "").trim();
+	const nameError = nameChanged || !username.trim() ? usernameProblem(username.trim()) : null;
 	const problem = nameError ?? (!birthdate ? "تاریخ تولد را کامل انتخاب کن." : !gender ? "جنسیت را انتخاب کن." : null);
 
 	return (
@@ -64,7 +67,7 @@ export default function Personal() {
 								setTried(true);
 								setSaved(false);
 								if (problem) return;
-								submitHandler({ username: username.trim(), birthdate, gender });
+								submitHandler({ ...(nameChanged ? { username: username.trim() } : {}), birthdate, gender });
 							}}
 						>
 							<div className="rt-form-grid">

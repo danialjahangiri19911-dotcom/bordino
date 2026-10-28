@@ -605,6 +605,13 @@ class AdRewardTests(TestCase):
         self.assertEqual(other.post(f"{self.START}{session['session_id']}/complete/", {}, format="json").status_code, 409)
         self.assertEqual(points(self.user), 100)
 
+    def test_not_a_second_before_the_whole_video(self):
+        session = self.start()
+        self.watched(session["session_id"], seconds=14)
+        self.assertEqual(self.complete(session["session_id"]).status_code, 409)
+        self.watched(session["session_id"], seconds=15)
+        self.assertEqual(self.complete(session["session_id"]).status_code, 200)
+
     def test_an_old_session_cannot_be_claimed(self):
         session = self.start()
         self.watched(session["session_id"], seconds=60 * 60)

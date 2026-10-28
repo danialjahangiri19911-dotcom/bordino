@@ -35,6 +35,7 @@ export default function Otp() {
 	const [showReferral, setShowReferral] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [info, setInfo] = useState<string | null>(null);
+	const [signedIn, setSignedIn] = useState(false);
 	const boxes = useRef<(HTMLInputElement | null)[]>([]);
 	const code = digits.join("");
 
@@ -44,7 +45,7 @@ export default function Otp() {
 	}, [phone_number, replace, startFrom, getOtpRemaining]);
 
 	// Signed in: where to go depends on the profile (a new player completes it first).
-	const { data: profile } = useGetCustomerProfile();
+	const { data: profile, error: profileError, refetch: refetchProfile, isLoading: profileLoading } = useGetCustomerProfile();
 	useEffect(() => {
 		const p = profile?.result;
 		if (!p || !isLoggedIn) return;
@@ -65,7 +66,11 @@ export default function Otp() {
 		hasHeader: false,
 		onSuccess: (data) => {
 			const tokens = data?.result?.tokens;
-			if (tokens) login(tokens.access_token, tokens.refresh_token);
+			if (tokens) {
+				// The code is used up: the form stays locked while the profile loads (no second post).
+				setSignedIn(true);
+				login(tokens.access_token, tokens.refresh_token);
+			}
 		},
 		onError: (e) => {
 			setError(authErrorMessage(e));
@@ -75,7 +80,7 @@ export default function Otp() {
 	});
 
 	const submit = (value: string) => {
-		if (value.length !== OTP_LENGTH || isSending || !phone_number) return;
+		if (value.length !== OTP_LENGTH || isSending || signedIn || !phone_number) return;
 		setError(null);
 		submitHandler({
 			phone_number,
@@ -131,7 +136,7 @@ export default function Otp() {
 								maxLength={index === 0 ? OTP_LENGTH : 1}
 								aria-label={`رقم ${fa(index + 1)} از ${fa(OTP_LENGTH)}`}
 								autoFocus={index === 0}
-								disabled={isSending}
+								disabled={isSending || signedIn}
 								onChange={(event) => {
 									const value = event.target.value;
 									if (!value) {
@@ -157,6 +162,14 @@ export default function Otp() {
 							{error}
 						</p>
 					) : null}
+					{signedIn && profileError ? (
+						<p className="au-error" role="alert">
+							وارد شدی، ولی اطلاعات حسابت بارگذاری نشد.{" "}
+							<button type="button" className="bd-text-btn" disabled={profileLoading} onClick={() => void refetchProfile()}>
+								تلاش دوباره
+							</button>
+						</p>
+					) : null}
 					{info ? <p role="status">{info}</p> : null}
 					{!userAlreadyExist ? (
 						showReferral ? (
@@ -170,8 +183,8 @@ export default function Otp() {
 							</button>
 						)
 					) : null}
-					<button type="submit" className="bd-action" disabled={code.length !== OTP_LENGTH || isSending}>
-						{isSending ? "در حال بررسی…" : "تأیید و ادامه"}
+					<button type="submit" className="bd-action" disabled={code.length !== OTP_LENGTH || isSending || signedIn}>
+						{isSending ? "در حال بررسی…" : signedIn ? "در حال ورود…" : "تأیید و ادامه"}
 					</button>
 				</form>
 				<button type="button" className="bd-text-btn" onClick={() => push(R.login)}>
