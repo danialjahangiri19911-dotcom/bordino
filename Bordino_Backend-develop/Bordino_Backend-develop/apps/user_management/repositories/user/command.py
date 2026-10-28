@@ -44,4 +44,6 @@ class UserCommandRepository:
         with transaction.atomic():
             user.username = username
             user.full_clean()
-            user.save()
+            # Only the name: a copy loaded before an admin disabled the account (or changed its
+            # password or roles) must not write the old values back.
+            user.save(update_fields=["username"])

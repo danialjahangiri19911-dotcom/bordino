@@ -171,6 +171,8 @@ class TestNotificationView(APIView):
             return Response({"error": "همهٔ اعلان‌ها خاموش است."}, status=status.HTTP_409_CONFLICT)
         try:
             delivered = services.send(customer, category, "اعلان آزمایشی بردینو", "اعلان‌ها روی این دستگاه کار می‌کنند.", "/pwa/profile/notifications")
+        except services.PartlyDelivered as e:
+            delivered = e.delivered
         except services.TransientPushError:
             delivered = 0
         return Response({"delivered": delivered})

@@ -251,3 +251,6 @@ class CustomerUpdateService:  # pylint: disable=too-many-instance-attributes
             )
         except Exception as e:
             logging.error("Error awarding complete profile points: %s", e)
+            # Up to the caller's transaction: «Completed» without the reward must not be saved
+            # (the step could not be submitted again to pay it).
+            raise

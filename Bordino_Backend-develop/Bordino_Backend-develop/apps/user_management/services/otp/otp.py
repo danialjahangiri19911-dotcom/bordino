@@ -42,8 +42,9 @@ class OTPService:
         Args:
             phone_number (str): The phone number to resend the OTP for.
         """
-        if not OtpAttempts(dto.phone_number).allow_send():
-            raise OtpNotSent(too_many=True)
+        refused = OtpAttempts(dto.phone_number).refuse_send()
+        if refused:
+            raise OtpNotSent(too_many=refused == "phone")
         try:
             user = self.otp_query_repository.filter_by_phone_number(dto.phone_number).first()
 

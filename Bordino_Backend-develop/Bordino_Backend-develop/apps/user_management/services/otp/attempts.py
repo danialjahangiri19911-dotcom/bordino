@@ -40,12 +40,12 @@ class OtpAttempts:
         compare before any is counted (each INCR is atomic: only the first N get a number in the
         limit). Returns None when the try may go on, else which limit it hit: "day" or "code".
         A right code gives its daily count back (`right_code`)."""
-        on_day = self._bump(self.day_key, DAY)
-        on_code = self._bump(self.code_key, settings.OTP_TTL)
-        if on_day > WRONG_PER_DAY:
-            return "day"
-        if on_code > TRIES_PER_CODE:
+        # The code's tries first: once this code is used up, further guesses at it are refused
+        # without touching the daily count, so hammering one code cannot lock the phone for a day.
+        if self._bump(self.code_key, settings.OTP_TTL) > TRIES_PER_CODE:
             return "code"
+        if self._bump(self.day_key, DAY) > WRONG_PER_DAY:
+            return "day"
         return None
 
     def right_code(self):
@@ -54,6 +54,12 @@ class OtpAttempts:
         except ValueError:  # window expired meanwhile
             pass
 
-    def allow_send(self) -> bool:
-        """Counts this send; False once the hourly limit is reached."""
-        return self._bump(self.send_key, HOUR) <= SENDS_PER_HOUR
+    def refuse_send(self) -> str | None:
+        """Counts this send. None when it may go; "phone" once this phone's hourly limit is
+        reached, "all" once the hourly ceiling for all phones together is (each new number costs
+        an SMS: the ceiling caps the bill whatever numbers a script rotates through)."""
+        if self._bump(self.send_key, HOUR) > SENDS_PER_HOUR:
+            return "phone"
+        if self._bump(f"{settings.CACHE_KEY_PREFIX}otp:sends_all", HOUR) > settings.OTP_SENDS_PER_HOUR_ALL:
+            return "all"
+        return None

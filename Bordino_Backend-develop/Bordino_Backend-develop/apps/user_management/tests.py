@@ -408,3 +408,62 @@ class ProfileEditTests(TestCase):
     def test_needs_a_session(self):
         r = APIClient().patch(self.URL, {"username": "Anon"}, format="json")
         self.assertEqual(r.status_code, 401)
+
+
+@override_settings(CACHES=LOCMEM)
+class AuditPhase3Tests(TestCase):
+    """Full Codex audit, phase 3 (2026-10-28): accounts, OTP, profile, notifications."""
+
+    def setUp(self):
+        cache.clear()
+        self.api = APIClient()
+        self.user = make_customer("9120003101")
+
+    def test_renaming_does_not_undo_a_suspension(self):
+        from apps.user_management.repositories.user.command import (  # pylint: disable=import-outside-toplevel
+            UserCommandRepository,
+        )
+
+        stale = get_user_model().objects.get(pk=self.user.pk)  # loaded before the admin acted
+        get_user_model().objects.filter(pk=self.user.pk).update(is_active=False)
+        UserCommandRepository.change_username(stale, "renamed_player")
+        fresh = get_user_model().objects.get(pk=self.user.pk)
+        self.assertEqual(fresh.username, "renamed_player")
+        self.assertFalse(fresh.is_active)
+
+    def test_the_fixed_test_code_needs_a_debug_build(self):
+        from apps.user_management.services.otp.utils import generate_random_code  # pylint: disable=import-outside-toplevel
+
+        with override_settings(ENVIRONMENT="dev", DEBUG=False, DEFAULT_TEST_OTP="1234"):
+            self.assertFalse(all(generate_random_code() == "1234" for _ in range(5)))
+        with override_settings(ENVIRONMENT="dev", DEBUG=True, DEFAULT_TEST_OTP="1234"):
+            self.assertEqual(generate_random_code(), "1234")
+
+    def test_guessing_at_a_used_up_code_does_not_lock_the_phone_for_the_day(self):
+        phone = self.user.phone_number
+        OTPCommandRepository.create(phone, "4321")
+        for _ in range(WRONG_PER_DAY + 5):  # far past the code's own tries
+            self.api.post(LOGIN, {"phone_number": phone, "otp": "0000"}, format="json")
+        OTPCommandRepository.create(phone, "8765")
+        r = self.api.post(LOGIN, {"phone_number": phone, "otp": "8765"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+
+    @mock.patch("apps.user_management.services.otp.otp.SMSService.send_sms", return_value="ok")
+    def test_registration_counts_against_the_hourly_sms_ceiling(self, send):
+        with override_settings(OTP_SENDS_PER_HOUR_ALL=2):
+            for i, expected in enumerate((201, 201, 400)):
+                r = self.api.post("/api/v1/registration/", {"phone_number": f"91200032{i:02d}"}, format="json")
+                self.assertEqual(r.status_code, expected, r.content)
+        self.assertEqual(send.call_count, 2)
+        # The refused registration left no account behind.
+        self.assertFalse(get_user_model().objects.filter(phone_number="9120003202").exists())
+
+    def test_a_failed_profile_reward_does_not_complete_the_profile(self):
+        Customer.objects.filter(user=self.user).update(registration_step=Customer.Step.INTEREST_SELECTION)
+        self.api.force_authenticate(self.user)
+        with mock.patch("apps.wallet.services.balance.add_points", side_effect=RuntimeError("db down")):
+            self.assertNotEqual(self.api.patch(INTERESTS, {}, format="json").status_code, 200)
+        self.user.customer.refresh_from_db()
+        self.assertEqual(self.user.customer.registration_step, Customer.Step.INTEREST_SELECTION)
+        r = self.api.patch(INTERESTS, {}, format="json")  # the retry completes and pays
+        self.assertEqual(r.status_code, 200, r.content)

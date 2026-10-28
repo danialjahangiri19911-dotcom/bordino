@@ -10,6 +10,7 @@ from apps.user_management.repositories.otp.command import OTPCommandRepository
 from apps.user_management.repositories.referral_code.command import ReferralCodeCommandRepository
 from apps.user_management.repositories.user.command import UserCommandRepository
 from apps.user_management.repositories.user.query import UserQueryRepository
+from apps.user_management.services.otp.attempts import OtpAttempts
 from apps.user_management.services.otp.otp import OtpNotSent, OTPService
 from apps.users.models.customer import Customer
 from apps.users.models.user import User
@@ -46,6 +47,10 @@ class UserRegistrationService:
         with transaction.atomic():
             user, created = self._create_user(dto)
             if created:
+                # The same limits as a resend; refused here, the new account is rolled back too.
+                refused = OtpAttempts(user.phone_number).refuse_send()
+                if refused:
+                    raise OtpNotSent(too_many=refused == "phone")
                 otp_code = self._create_sms_otp(user)
                 self._send_sms(user.phone_number, otp_code)
                 self._create_customer_for_user(user)

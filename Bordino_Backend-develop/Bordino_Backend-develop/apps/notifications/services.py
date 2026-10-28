@@ -44,6 +44,17 @@ class TransientPushError(Exception):
     """Every device failed for a reason that may pass (time-out, 5xx): worth retrying later."""
 
 
+class PartlyDelivered(Exception):
+    """Some devices got it and some failed for a reason that may pass: retry only those (the
+    others must not get it twice). `retry` is send()'s argument for that retry; `delivered` the
+    devices reached this time."""
+
+    def __init__(self, retry: dict, delivered: int):
+        super().__init__(f"retry {retry}")
+        self.retry = retry
+        self.delivered = delivered
+
+
 PUSHE_URL = "https://api.pushe.co/v2/messaging/rapid/"
 
 
@@ -119,14 +130,23 @@ def _push(sub: PushSubscription, payload: dict) -> str:
     return "ok"
 
 
-def send(customer: Customer, category: str, title: str, body: str = "", url: str = "/pwa/main", key: str | None = None) -> int:
-    """Sends now (Celery calls this). Returns the number of devices reached."""
+def send(
+    customer: Customer, category: str, title: str, body: str = "", url: str = "/pwa/main", key: str | None = None,
+    retry: dict | None = None,
+) -> int:
+    """Sends now (Celery calls this). Returns the number of devices reached. `retry` (from
+    PartlyDelivered) limits a retry to the devices that failed: {"subs": [ids], "pushe": bool}."""
     if not preferences(customer).wants(category):
         return 0
     subs = list(PushSubscription.objects.filter(customer=customer)) if push_available() else []
     devices = list(AppDevice.objects.filter(customer=customer)) if pushe_available() else []
     log = None
-    if key:
+    if retry is not None:
+        # The key's log row is already there (it holds what was delivered): only the rest.
+        subs = [s for s in subs if str(s.pk) in set(retry.get("subs", []))]
+        devices = devices if retry.get("pushe") else []
+        log = NotificationLog.objects.filter(customer=customer, key=(key or "")[:120]).first() if key else None
+    elif key:
         try:
             with transaction.atomic():
                 log = NotificationLog.objects.create(
@@ -140,17 +160,24 @@ def send(customer: Customer, category: str, title: str, body: str = "", url: str
         return 0
     payload = {"title": title, "body": body, "url": url, "tag": key or category}
     results = [_push(sub, payload) for sub in subs]
+    failed_subs = [str(sub.pk) for sub, result in zip(subs, results) if result == "failed"]
+    pushe_failed = False
     if devices:
         # One request for all the player's phones; it counts once per phone.
-        results += [_pushe(devices, payload)] * len(devices)
+        pushe = _pushe(devices, payload)
+        pushe_failed = pushe == "failed"
+        results += [pushe] * len(devices)
     delivered = results.count("ok")
-    if not delivered and "failed" in results:
+    if not delivered and "failed" in results and retry is None:
         # Nothing arrived, for a reason that may pass: free the key so a retry sends it.
         if log:
             log.delete()
         raise TransientPushError(f"{results.count('failed')} device(s) failed")
-    if log:
-        NotificationLog.objects.filter(pk=log.pk).update(delivered=delivered)
+    if log and delivered:
+        NotificationLog.objects.filter(pk=log.pk).update(delivered=models.F("delivered") + delivered)
+    if failed_subs or pushe_failed:
+        # Some got it (or this is already a retry): next time only the ones that failed.
+        raise PartlyDelivered({"subs": failed_subs, "pushe": pushe_failed}, delivered)
     return delivered
 
 
@@ -176,15 +203,24 @@ def broadcast_now(category: str, title: str, body: str = "", url: str = "/pwa/ma
     ).distinct()
     total = 0
     for customer in customers.iterator():
+        retry = None
         try:
             total += send(customer, category, title, body, url, f"{key}:{customer.pk}" if key else None)
+            continue
+        except PartlyDelivered as e:
+            total += e.delivered
+            retry = e.retry
         except TransientPushError:
-            # Their key was freed: hand them to the retrying task (back-off, up to 5 tries).
-            from apps.notifications.tasks import send_notification  # pylint: disable=import-outside-toplevel
+            pass
+        # Their key was freed (or only some devices failed): hand them to the retrying task
+        # (back-off, up to 5 tries).
+        from apps.notifications.tasks import send_notification  # pylint: disable=import-outside-toplevel
 
-            item_key = f"{key}:{customer.pk}" if key else None
-            try:
-                send_notification.apply_async((str(customer.pk), category, title, body, url, item_key), countdown=60)
-            except Exception:  # pylint: disable=broad-exception-caught
-                logger.warning("Broadcast %s: could not queue a retry for %s", key, customer.pk)
+        item_key = f"{key}:{customer.pk}" if key else None
+        try:
+            send_notification.apply_async(
+                (str(customer.pk), category, title, body, url, item_key), {"retry": retry}, countdown=60
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.warning("Broadcast %s: could not queue a retry for %s", key, customer.pk)
     return total

@@ -350,6 +350,8 @@ CACHE_KEY_PREFIX = get_env_value("CACHE_KEY_PREFIX")
 OTP_TTL = int(get_env_value("OTP_TTL"))
 DEFAULT_TEST_OTP = get_env_value("DEFAULT_TEST_OTP")
 OTP_LENGTH = int(get_env_value("OTP_LENGTH", default_value=4))
+# All login/registration SMS together, per hour (caps the bill against rotated numbers).
+OTP_SENDS_PER_HOUR_ALL = int(get_env_value("OTP_SENDS_PER_HOUR_ALL", default_value=300))
 
 API_RESEND_OTP_ENDPOINT = get_env_value("API_RESEND_OTP_ENDPOINT")
 API_LOGIN_ENDPOINT = get_env_value("API_LOGIN_ENDPOINT")

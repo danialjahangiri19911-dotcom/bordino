@@ -308,3 +308,37 @@ class PusheTests(TestCase):
             self.assertEqual(services.send(self.user.customer, "lottery", "t"), 0)
         post.assert_not_called()
         self.assertFalse(body(self.api.get(PREFS))["app_push_available"])
+
+
+@override_settings(CACHES=LOCMEM)
+class PartlyDeliveredTests(TestCase):
+    """Full Codex audit, phase 3: one device failing must be retried without repeating the rest."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_customer("9120003151")
+        self.good = PushSubscription.objects.create(customer=self.user.customer, endpoint="https://fcm.googleapis.com/fcm/send/good", p256dh="k", auth="a")
+        self.bad = PushSubscription.objects.create(customer=self.user.customer, endpoint="https://fcm.googleapis.com/fcm/send/bad", p256dh="k", auth="a")
+
+    def test_only_the_failed_device_is_retried(self):
+        first = lambda sub, payload: "ok" if sub.pk == self.good.pk else "failed"  # noqa: E731
+        with mock.patch("apps.notifications.services._push", side_effect=first):
+            with self.assertRaises(services.PartlyDelivered) as caught:
+                services.send(self.user.customer, "lottery", "t", key="k-part")
+        self.assertEqual(caught.exception.retry, {"subs": [str(self.bad.pk)], "pushe": False})
+        self.assertEqual(NotificationLog.objects.get(key="k-part").delivered, 1)
+        with mock.patch("apps.notifications.services._push", return_value="ok") as push:
+            self.assertEqual(services.send(self.user.customer, "lottery", "t", key="k-part", retry=caught.exception.retry), 1)
+        self.assertEqual([c.args[0].pk for c in push.call_args_list], [self.bad.pk])
+        self.assertEqual(NotificationLog.objects.get(key="k-part").delivered, 2)
+
+    def test_the_task_retries_with_the_failed_devices_only(self):
+        from apps.notifications.tasks import send_notification  # pylint: disable=import-outside-toplevel
+
+        first = lambda sub, payload: "ok" if sub.pk == self.good.pk else "failed"  # noqa: E731
+        with mock.patch("apps.notifications.services._push", side_effect=first), mock.patch.object(
+            send_notification, "retry", side_effect=RuntimeError("retry scheduled")
+        ) as retry:
+            with self.assertRaises(RuntimeError):
+                send_notification.run(str(self.user.customer.pk), "lottery", "t", key="k-task")
+        self.assertEqual(retry.call_args.kwargs["kwargs"], {"retry": {"subs": [str(self.bad.pk)], "pushe": False}})
