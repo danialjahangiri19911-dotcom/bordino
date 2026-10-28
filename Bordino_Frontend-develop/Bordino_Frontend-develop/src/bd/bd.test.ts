@@ -49,6 +49,13 @@ describe("wheel slices", () => {
 		expect(three[2].short).toBe("۳۰");
 		expect(span(three[0])).toBeGreaterThan(span(one[0]));
 	});
+	it("draw small prizes at their exact chance (no minimum size that inflates them)", () => {
+		// Codex phase 1 #7: a 1% prize at ×5 is a 0.2% chance on the server, so 0.72° — not 3.6°.
+		const wheel = [prize(1, "empty", 0, 99), prize(2, "recharge", 50, 1)];
+		const five = slicesFor(wheel, 5);
+		expect(five[1].end - five[1].start).toBeCloseTo(0.72);
+		expect(five[0].end - five[0].start).toBeCloseTo(359.28);
+	});
 });
 
 describe("wheel landing", () => {

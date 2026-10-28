@@ -17,7 +17,7 @@ import useChargeGamePlay from "@/api/games/useChargeGamePlay";
 import useGetPlayCost from "@/api/games/useGetPlayCost";
 import { GAME_URLS } from "@/api/urls";
 import { useSudokuStore } from "@/libs/games/sudoku/storage";
-import type { CellValue, Difficulty, Index } from "@/libs/games/sudoku/types";
+import type { CellValue, Difficulty, GameConfig, Index } from "@/libs/games/sudoku/types";
 import { useSudoku } from "@/libs/hooks/useSudoku";
 import { fetchWithAuth } from "@/libs/http/query";
 
@@ -54,6 +54,8 @@ export default function SudokuGame() {
 	const { chargeAsync, isCharging } = useChargeGamePlay();
 	const [level, setLevel] = useState<Difficulty>("easy");
 	const [confirm, setConfirm] = useState<Confirm>("");
+	// A charge on its way (start or continue): the buttons that would replace the board wait.
+	const [paying, setPaying] = useState(false);
 	const [pendingLevel, setPendingLevel] = useState<Difficulty | null>(null);
 	const [noteMode, setNoteMode] = useState(false);
 	const [help, setHelp] = useState(false);
@@ -118,23 +120,29 @@ export default function SudokuGame() {
 			if (busy.current) return;
 			busy.current = true;
 			setProblem(null);
+			let config: GameConfig | undefined;
 			try {
-				await fetchWithAuth(`${GAME_URLS.CONFIG}?difficulty_level=${difficulty}&game_name=sudoku`, {});
+				const { data } = await fetchWithAuth(`${GAME_URLS.CONFIG}?difficulty_level=${difficulty}&game_name=sudoku`, {});
+				config = (data as { result?: GameConfig })?.result;
+				if (!config) throw new Error("no config");
 			} catch {
 				setProblem("این سطح در دسترس نیست.");
 				busy.current = false;
 				return;
 			}
+			setPaying(true);
 			try {
 				await chargeAsync({ game_name: "sudoku" });
 				void refetchCost();
 				setNoteMode(false);
 				setConfirm("");
-				game.generateGame(difficulty);
+				// The configuration checked before paying: no second request after the charge.
+				game.startWithConfig(difficulty, config);
 			} catch (e) {
 				setProblem(gameErrorMessage(e));
 			} finally {
 				busy.current = false;
+				setPaying(false);
 			}
 		},
 		[chargeAsync, refetchCost, game],
@@ -144,6 +152,7 @@ export default function SudokuGame() {
 	const continueAfterLoss = async () => {
 		if (busy.current) return;
 		busy.current = true;
+		setPaying(true);
 		setProblem(null);
 		try {
 			await chargeAsync({ game_name: "sudoku" });
@@ -153,10 +162,13 @@ export default function SudokuGame() {
 			setProblem(gameErrorMessage(e));
 		} finally {
 			busy.current = false;
+			setPaying(false);
 		}
 	};
 
 	const toMenu = () => {
+		// Not while a payment is on its way: a paid continuation would land on an empty menu.
+		if (busy.current) return;
 		game.exitToMenu();
 		setConfirm("");
 		setProblem(null);
@@ -407,7 +419,7 @@ export default function SudokuGame() {
 												<button type="button" className="sd-primary" disabled={isCharging} onClick={() => void continueAfterLoss()}>
 													{isCharging ? "در حال پرداخت…" : "ادامهٔ همین جدول"}
 												</button>
-												<button type="button" className="sd-secondary" onClick={toMenu}>
+												<button type="button" className="sd-secondary" disabled={paying} onClick={toMenu}>
 													جدول تازه
 												</button>
 											</>

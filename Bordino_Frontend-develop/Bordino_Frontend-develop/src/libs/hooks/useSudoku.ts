@@ -22,6 +22,7 @@ import {
 import type {
 	CellValue,
 	Difficulty,
+	GameConfig,
 	GameState,
 	Index,
 } from "@/libs/games/sudoku/types";
@@ -266,6 +267,21 @@ export function useSudoku() {
 		isFreshGame.current = true; // mark as fresh start
 	}, []);
 
+	/**
+	 * Starts a board with a configuration the caller already has (fetched before the paid start):
+	 * no second request that could fail after the player has paid.
+	 */
+	const startWithConfig = useCallback(
+		(difficulty: Difficulty, config: GameConfig) => {
+			setIsResumeCheckDone(false);
+			isFreshGame.current = true;
+			const solution = makePuzzle();
+			const { puzzle } = pluck(solution, TARGET_CELLS_BY_DIFFICULTY[difficulty]);
+			dispatch({ type: "START_GAME", payload: { puzzle, solution, difficulty, config } });
+		},
+		[dispatch],
+	);
+
 	const selectCell = useCallback(
 		(x: Index, y: Index) => {
 			dispatch({ type: "SELECT_CELL", payload: { x, y } });
@@ -339,6 +355,7 @@ export function useSudoku() {
 		remainingHints: state.remainingHints,
 		maxHints: state.maxHints,
 		generateGame,
+		startWithConfig,
 		selectCell,
 		fillCell,
 		eraseCell,

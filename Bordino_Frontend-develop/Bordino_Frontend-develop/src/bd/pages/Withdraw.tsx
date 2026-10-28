@@ -128,6 +128,7 @@ export default function Withdraw() {
 	const [step, setStep] = useState<"form" | "review" | "done">("form");
 	const [requestId, setRequestId] = useState(newRequestId);
 	const [serverError, setServerError] = useState<string | null>(null);
+	const [uncertain, setUncertain] = useState(false);
 
 	const balance = cash.balance ?? 0;
 	const amount = parseAmount(amountText);
@@ -153,6 +154,7 @@ export default function Withdraw() {
 		onSuccess: () => {
 			setStep("done");
 			setServerError(null);
+			setUncertain(false);
 			setRequestId(newRequestId());
 			queryClient.invalidateQueries();
 		},
@@ -160,6 +162,10 @@ export default function Withdraw() {
 		// answers with that withdrawal instead of making a second one.
 		onError: (e) => {
 			setServerError(gameErrorMessage(e));
+			// No answer, or a server error: the withdrawal may have been made. Its id must stay, so
+			// whatever is sent next is recognised as the same request (or refused as a conflict).
+			const status = (e as { response?: { status?: number } })?.response?.status;
+			setUncertain(!status || status >= 500 || status === 409);
 			cash.refetch();
 		},
 	});
@@ -245,7 +251,8 @@ export default function Withdraw() {
 								onClick={() => {
 									setStep("form");
 									setServerError(null);
-									setRequestId(newRequestId());
+									// A new id only when the server clearly refused the last one.
+									if (!uncertain) setRequestId(newRequestId());
 								}}
 							>
 								ویرایش
