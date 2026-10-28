@@ -26,8 +26,8 @@ class LotteryWinnerService:
     def _calculate_matches(self, ticket_numbers):
         """تعدادِ توپ‌های منطبق = شماره‌هایی از بلیط که در شماره‌های برنده هستند
         (مقداری، هم‌سان با نمایشِ UI — نه بر اساسِ موقعیت)."""
-        winning_numbers = set(self.lottery.numbers or [])
-        return len([n for n in (ticket_numbers or []) if n in winning_numbers])
+        # Each different number counts once (a repeated number is not two matches).
+        return len(set(ticket_numbers or []) & set(self.lottery.numbers or []))
 
     def _validate_lottery_state(self):
         """Validate lottery is ready for winner calculation"""
@@ -144,9 +144,9 @@ class LotteryWinnerService:
         allocations, expired = self._compute_allocations()
 
         # بلیط‌های بدونِ جایزه منقضی می‌شوند
-        for ticket in expired:
-            ticket.status = Ticket.Status.EXPIRED
-            ticket.save()
+        # Only the result fields: settlement must not rewrite a ticket's numbers (an old unsorted
+        # ticket re-sorted onto its twin would fail the unique check and roll the whole draw back).
+        Ticket.objects.filter(pk__in=[t.pk for t in expired]).update(status=Ticket.Status.EXPIRED)
 
         results = {
             "total_winners": 0,
@@ -158,7 +158,9 @@ class LotteryWinnerService:
             ticket.matched_numbers = match_count
             ticket.prize_amount = prize
             ticket.status = Ticket.Status.WINNER
-            ticket.save()
+            Ticket.objects.filter(pk=ticket.pk).update(
+                matched_numbers=match_count, prize_amount=prize, status=Ticket.Status.WINNER
+            )
 
             # واریزِ جایزه به کیفِ نقدیِ اصلیِ برنده + ثبتِ تراکنش. One winner whose prize
             # cannot be paid (expired or missing wallet) does not stop the others: their prize

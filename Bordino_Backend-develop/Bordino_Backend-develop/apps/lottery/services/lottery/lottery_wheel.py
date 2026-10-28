@@ -32,12 +32,16 @@ class LotteryWheelService:
         lottery_wheel: LotteryWheel
         token_wallet_account: TokenWalletAccount
         multiplier: int = 1
+        # One id per spin the app starts; a retry with it gets the first spin back, not a new one.
+        request_id: str | None = None
 
     def _validate_prizes(self, prizes):
         """Validate that prizes have valid probabilities"""
         if not prizes.exists():
             raise ValidationError(_("Lottery wheel must have at least one prize"))
 
+        if any((prize.prize_amount or 0) < 0 for prize in prizes):
+            raise ValidationError(_("A wheel prize cannot be negative."))
         total_probability = sum(prize.probability for prize in prizes)
         if total_probability != 100:
             raise ValidationError(_("Total probability of all prizes must equal 100"))
@@ -116,8 +120,23 @@ class LotteryWheelService:
             .first()
             or 0
         )
+        if dto.request_id:
+            earlier = (
+                LotteryWheelSpinLog.objects.filter(customer=dto.customer, request_id=dto.request_id)
+                .select_related("prize")
+                .first()
+            )
+            if earlier:
+                prize = earlier.prize
+                if prize and prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
+                    prize.prize_amount = prize.prize_amount * earlier.multiplier
+                return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
         if mine >= wheel.max_spins_per_customer:
             raise ValidationError(_("You have reached your maximum spins for this wheel"))
+        # A cash prize needs the player's cash account: refuse before charging, rather than roll a
+        # won spin back (and let a retry draw again).
+        if any(p.prize_type == LotteryWheelPrize.PrizeType.CASH for p in prizes) and not dto.token_wallet_account.wallet.currency_wallet_accounts.filter(primary=True).exists():
+            raise ValidationError(_("کیف نقدی برای دریافت جایزه پیدا نشد؛ با پشتیبانی تماس بگیر."))
 
         # Locked, checked and debited in one go: two spins at once cannot both pass the check,
         # and no other change to the account is overwritten.
@@ -193,6 +212,7 @@ class LotteryWheelService:
             cost=int(dto.lottery_wheel.cost_per_spin),
             multiplier=multiplier,
             prize=selected_prize if selected_prize.pk else None,
+            request_id=dto.request_id or None,
         )
 
         return selected_prize, spin

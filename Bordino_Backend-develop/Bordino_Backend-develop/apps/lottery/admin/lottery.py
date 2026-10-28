@@ -50,6 +50,16 @@ class LotteryAdmin(BaseAdmin):
     # Drawn by the server at settlement (random, after sales close); shown, never typed in.
     readonly_fields = ("numbers",)
 
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        # Only what the form changed: the pool counters (balance, points spent) move with every
+        # ticket bought, and a copy loaded before a purchase must not write them back.
+        fields = [f for f in form.changed_data if f in {fl.name for fl in obj._meta.concrete_fields}]
+        if fields:
+            obj.save(update_fields=[*fields, "update_time"])
+        return None
+
     fieldsets = (
         (
             _("قرعه‌کشی"),

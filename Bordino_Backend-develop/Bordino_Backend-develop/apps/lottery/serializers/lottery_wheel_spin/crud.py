@@ -26,6 +26,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
     multiplier = serializers.IntegerField(
         min_value=1, max_value=5, default=1, write_only=True, required=False
     )
+    request_id = serializers.CharField(max_length=64, required=False, write_only=True)
     prize = LotteryWheelPrizeMinimalSerializer(read_only=True)
 
     class Meta:
@@ -34,6 +35,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
             "lottery_wheel",
             "token_wallet_account",
             "multiplier",
+            "request_id",
             "prize",
             "count",
         )
@@ -50,6 +52,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
                     lottery_wheel=validated_data["lottery_wheel"],
                     token_wallet_account=validated_data["token_wallet_account"],
                     multiplier=validated_data.get("multiplier", 1),
+                    request_id=validated_data.get("request_id"),
                 )
             )
             # Add the prize to the spin instance for serialization
@@ -66,6 +69,13 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         if token_wallet_account is None:
             raise serializers.ValidationError(_("Points account not found."))
         validated_data["token_wallet_account"] = token_wallet_account
+        # A retry of a spin that already happened: the service returns it (no limit checks here,
+        # the player may be at the limit because of that very spin).
+        from apps.lottery.models import LotteryWheelSpinLog  # pylint: disable=import-outside-toplevel
+
+        request_id = validated_data.get("request_id")
+        if request_id and LotteryWheelSpinLog.objects.filter(customer=user.customer, request_id=request_id).exists():
+            return validated_data
 
         # Check total spins for the wheel (only this wheel)
         total_spins = (

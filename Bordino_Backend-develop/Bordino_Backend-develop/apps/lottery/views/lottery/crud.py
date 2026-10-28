@@ -123,6 +123,10 @@ class LotteryCRUDView(
     )
     @action(detail=True, methods=["get"], url_path="results/winners/(?P<winner_id>[^/.]+)")
     def winners(self, request, pk, winner_id):  # pylint: disable=unused-argument
+        # A player's winning tickets are theirs only: another player's id gets nothing.
+        me = getattr(request.user, "customer", None)
+        if me is None or str(me.pk) != str(winner_id):
+            return Response({"error": "Not found."}, status=404)
         try:
             lottery = self.get_object()
             serializer = self.get_serializer(lottery)

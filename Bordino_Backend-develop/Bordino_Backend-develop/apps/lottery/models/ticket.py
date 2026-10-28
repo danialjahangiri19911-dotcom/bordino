@@ -73,6 +73,11 @@ class Ticket(AbstractBaseModel):
         super().clean()
         if self.numbers and len(self.numbers) != 6:
             raise ValidationError(_("The 'numbers' field must contain exactly 6 integers."))
+        # Six DIFFERENT numbers from the draw's range: «1,1,1,1,1,1» would match six times.
+        from apps.lottery.services.lottery.draw import HIGHEST_NUMBER  # pylint: disable=import-outside-toplevel
+
+        if self.numbers and (len(set(self.numbers)) != 6 or not all(1 <= n <= HIGHEST_NUMBER for n in self.numbers)):
+            raise ValidationError(_("A ticket needs six different numbers between 1 and %(n)s.") % {"n": HIGHEST_NUMBER})
 
     @property
     def is_winner(self):

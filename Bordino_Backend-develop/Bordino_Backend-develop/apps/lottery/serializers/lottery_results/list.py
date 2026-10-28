@@ -25,7 +25,10 @@ class CustomerWinnerSerializer(serializers.Serializer):
     Serializer for customer winner information.
     """
 
-    customer_id = serializers.UUIDField()
+    # Other players are shown as a masked name with their prize — no id, avatar or ticket numbers;
+    # the requester's own entry is complete (is_me).
+    customer_id = serializers.SerializerMethodField()
+    is_me = serializers.SerializerMethodField()
     username = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     prize_amount = serializers.DecimalField(
@@ -35,15 +38,33 @@ class CustomerWinnerSerializer(serializers.Serializer):
     highest_match = serializers.IntegerField()
     winning_tickets = serializers.SerializerMethodField()
 
+    def _mine(self, obj) -> bool:
+        request = self.context.get("request")
+        me = getattr(getattr(request, "user", None), "customer", None)
+        return bool(me) and str(me.pk) == str(obj["customer_id"])
+
+    def get_is_me(self, obj):
+        return self._mine(obj)
+
+    def get_customer_id(self, obj):
+        return str(obj["customer_id"]) if self._mine(obj) else None
+
     def get_username(self, obj):
         customer_info = self.context.get("customer_info") or {}
-        return customer_info.get(str(obj["customer_id"]), {}).get("username")
+        name = customer_info.get(str(obj["customer_id"]), {}).get("username") or ""
+        if self._mine(obj) or not name:
+            return name or None
+        return name[0] + "***"
 
     def get_avatar(self, obj):
+        if not self._mine(obj):
+            return None
         customer_info = self.context.get("customer_info") or {}
         return customer_info.get(str(obj["customer_id"]), {}).get("avatar")
 
     def get_winning_tickets(self, obj):
+        if not self._mine(obj):
+            return []
         tickets = Ticket.objects.filter(id__in=obj["winning_tickets"]).select_related(
             "customer", "customer__user"
         )

@@ -240,6 +240,12 @@ class ApiTests(TestCase):
         self.assertEqual(body["round"]["crash_point"], "1.50")
         self.assertEqual(body["round"]["server_seed"], CrashRound.objects.get().server_seed)
 
+    def test_a_step_must_say_which_lane_it_starts_from(self):
+        # Audit phase 2: without from_step a retried step would move the chicken twice.
+        round_, _ = chicken.place_bet(self.user, 100, "easy")
+        r = self.api.post(f"/api/v1/games/chicken/rounds/{round_.pk}/step/", {}, format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_wallet_history_lists_bet_and_win(self):
         round_, _ = rounds.place_bet(self.user, 100, D("2.00"))
         CrashRound.objects.filter(pk=round_.pk).update(
@@ -415,7 +421,7 @@ class ChickenApiTests(TestCase):
         self.assertEqual(r.status_code, 201, r.content)
         round_id = self.result(r)["round"]["id"]
         ChickenRound.objects.filter(pk=round_id).update(hit_lane=None)
-        r = self.api.post(f"/api/v1/games/chicken/rounds/{round_id}/step/", {}, format="json")
+        r = self.api.post(f"/api/v1/games/chicken/rounds/{round_id}/step/", {"from_step": 0}, format="json")
         self.assertEqual(self.result(r)["round"]["step"], 1)
         r = self.api.post(f"/api/v1/games/chicken/rounds/{round_id}/cashout/")
         body = self.result(r)
@@ -425,7 +431,7 @@ class ChickenApiTests(TestCase):
 
     def test_cannot_touch_another_players_round(self):
         round_, _ = chicken.place_bet(self.other, 100, "easy")
-        r = self.api.post(f"/api/v1/games/chicken/rounds/{round_.pk}/step/", {}, format="json")
+        r = self.api.post(f"/api/v1/games/chicken/rounds/{round_.pk}/step/", {"from_step": 0}, format="json")
         self.assertEqual(r.status_code, 404)
         r = self.api.post(f"/api/v1/games/chicken/rounds/{round_.pk}/cashout/")
         self.assertEqual(r.status_code, 404)

@@ -15,3 +15,11 @@ class TicketAdmin(BaseAdmin):
         "numbers",
         "status",
     )
+
+    # Tickets are bought (points paid, pool counted), never typed in: no adding here, and what was
+    # bought (lottery, player, numbers) stays as it was.
+    def has_add_permission(self, request):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("lottery", "customer", "numbers") if obj else ()

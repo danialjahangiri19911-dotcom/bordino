@@ -7,6 +7,7 @@ import type {
 import { LOTTERY_WHEEL } from "@/api/urls";
 import { withAuth } from "@/libs/http/query";
 import requester, { type RequestError } from "@/libs/http/requester";
+import { withRequestId } from "@/libs/http/requestId";
 
 /**
  * چرخشِ سرور-محور: جایزه را سرور انتخاب می‌کند، امتیاز را کم و جایزه را واریز می‌کند.
@@ -20,14 +21,18 @@ export default function useSpinWheel() {
 	>({
 		// Through withAuth: an expired access token is renewed and the spin sent again, instead
 		// of a silent 401.
-		mutationFn: async (payload) => {
-			const { data } = await withAuth((token) =>
-				requester.post<SpinWheelApiResponse>(LOTTERY_WHEEL.SPIN, payload, {
-					headers: { Authorization: `Bearer ${token}` },
-				}),
-			);
-			return data;
-		},
+		// One id per spin, kept until the server answers: a retry gets the same spin back.
+		mutationFn: (payload) =>
+			withRequestId(`spin:${payload.lottery_wheel}`, async (requestId) => {
+				const { data } = await withAuth((token) =>
+					requester.post<SpinWheelApiResponse>(
+						LOTTERY_WHEEL.SPIN,
+						{ ...payload, request_id: requestId },
+						{ headers: { Authorization: `Bearer ${token}` } },
+					),
+				);
+				return data;
+			}),
 	});
 
 	return {

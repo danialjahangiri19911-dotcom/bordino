@@ -255,7 +255,8 @@ class ChickenStepSerializer(serializers.Serializer):
     # Absent = one lane; a lane number = cross up to it and cash out there (Go Max = last lane).
     to = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     # The lane the player sees the chicken on; a mismatch (lost response) returns 409.
-    from_step = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    # Required: a retried step without it would move the chicken one lane further.
+    from_step = serializers.IntegerField(min_value=0)
 
 
 def _chicken_state(request, round_):

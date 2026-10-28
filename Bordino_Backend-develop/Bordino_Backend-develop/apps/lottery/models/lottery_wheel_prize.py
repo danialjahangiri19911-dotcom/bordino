@@ -1,4 +1,4 @@
-from django.core.validators import MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -28,6 +28,8 @@ class LotteryWheelPrize(models.Model):
         verbose_name=_("Prize Amount"),
         max_digits=20,
         decimal_places=0,
+        # A prize only pays: a negative one would take cash/points from the player.
+        validators=[MinValueValidator(0)],
     )
     probability = models.PositiveSmallIntegerField(
         verbose_name=_("probability"),

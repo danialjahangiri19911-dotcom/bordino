@@ -260,3 +260,93 @@ class Batch4cTests(TestCase):
             UserRegistrationService()._validate_and_store_referral_code(  # pylint: disable=protected-access
                 chain[-1].customer.referral_code, chain[0]
             )
+
+
+@override_settings(CACHES=LOCMEM)
+class AuditPhase2Tests(TestCase):
+    """Full Codex audit, phase 2 (2026-10-28): tickets, results privacy, wheel, chicken."""
+
+    def setUp(self):
+        from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+
+        self.player = make_customer("9120003001", points=1000)
+        self.other = make_customer("9120003002", points=1000)
+        self.sponsor = Sponsor.objects.create(user=make_customer("9120003003"))
+        token = balance.points_account(self.player).token
+        token.price = 1
+        token.save()
+        now = timezone.now()
+        self.lottery = Lottery.objects.create(
+            name="audit", owner=self.sponsor, token=token, ticket_price=10, status=Lottery.Status.ACTIVE,
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        PrizeRule.objects.create(lottery=self.lottery, match_count=1, prize_amount=100)
+        self.wheel = LotteryWheel.objects.create(name="w", owner=self.sponsor, cost_per_spin=10, max_spins=100, max_spins_per_customer=10)
+        self.empty = LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="empty", prize_amount=0, probability=100, prize_type=LotteryWheelPrize.PrizeType.EMPTY)
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+
+    def test_a_ticket_needs_six_different_numbers_and_repeats_match_once(self):
+        ticket = Ticket(name="t", lottery=self.lottery, customer=self.player.customer, numbers=[1, 1, 1, 1, 1, 1])
+        with self.assertRaises(ValidationError):
+            ticket.full_clean()
+        self.lottery.numbers = [1, 2, 3, 4, 5, 6]
+        self.assertEqual(LotteryWinnerService(self.lottery)._calculate_matches([1, 1, 1, 1, 1, 1]), 1)  # pylint: disable=protected-access
+
+    def test_the_admin_cannot_add_tickets(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        self.assertFalse(site._registry[Ticket].has_add_permission(None))  # pylint: disable=protected-access
+
+    def test_results_hide_other_players_and_winners_answers_only_for_me(self):
+        for user, numbers in ((self.player, [1, 2, 3, 4, 5, 6]), (self.other, [1, 7, 8, 9, 10, 11])):
+            TicketPurchaseService().purchase_with_numbers(user.customer, numbers)
+        Lottery.objects.filter(pk=self.lottery.pk).update(end_date=timezone.now() - timedelta(minutes=1))
+        self.lottery.refresh_from_db()
+        with mock.patch("apps.lottery.services.lottery.lottery_winner.draw_numbers", return_value=[1, 20, 21, 22, 23, 24]):
+            LotteryWinnerService(self.lottery).process_winners()
+        body = self.api.get(f"/api/v1/lotteries/{self.lottery.pk}/results/").json()
+        body = body.get("result", body)
+        winners = [w for g in body["results_by_match"] for w in g["winners"]]
+        mine = [w for w in winners if w["is_me"]]
+        others = [w for w in winners if not w["is_me"]]
+        self.assertEqual(len(mine), 1)
+        self.assertTrue(mine[0]["customer_id"] and mine[0]["winning_tickets"])
+        self.assertTrue(others and all(w["customer_id"] is None and w["avatar"] is None and w["winning_tickets"] == [] for w in others))
+        other_id = self.other.customer.pk
+        self.assertEqual(self.api.get(f"/api/v1/lotteries/{self.lottery.pk}/results/winners/{other_id}/").status_code, 404)
+        self.assertEqual(self.api.get(f"/api/v1/lotteries/{self.lottery.pk}/results/winners/{self.player.customer.pk}/").status_code, 200)
+
+    def test_a_retried_spin_is_the_same_spin(self):
+        url = "/api/v1/lotteries/lottery-wheel/spin/"
+        for _ in range(2):
+            r = self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "request_id": "spin-1"}, format="json")
+            self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual(balance.points_account(self.player).amount, 990)
+        self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "request_id": "spin-2"}, format="json")
+        self.assertEqual(balance.points_account(self.player).amount, 980)
+
+    def test_a_negative_wheel_prize_is_refused(self):
+        from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+
+        LotteryWheelPrize.objects.filter(pk=self.empty.pk).update(probability=50)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="bad", prize_amount=-500, probability=50, prize_type=LotteryWheelPrize.PrizeType.CASH)
+        r = self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(self.wheel.pk), "request_id": "s-neg"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+        with self.assertRaises(ValidationError):
+            LotteryWheelPrize(lottery_wheel=self.wheel, name="x", prize_amount=-1, probability=1, prize_type="cash").full_clean()
+
+    def test_an_admin_save_does_not_write_back_stale_pool_counters(self):
+        from types import SimpleNamespace  # pylint: disable=import-outside-toplevel
+
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        stale = Lottery.objects.get(pk=self.lottery.pk)  # loaded before the purchase
+        TicketPurchaseService().purchase_with_numbers(self.player.customer, [5, 6, 7, 8, 9, 10])
+        fresh = Lottery.objects.get(pk=self.lottery.pk)
+        stale.name = "renamed"
+        site._registry[Lottery].save_model(None, stale, SimpleNamespace(changed_data=["name"]), True)  # pylint: disable=protected-access
+        after = Lottery.objects.get(pk=self.lottery.pk)
+        self.assertEqual(after.name, "renamed")
+        self.assertEqual((after.balance, after.tickets_points_spent), (fresh.balance, fresh.tickets_points_spent))

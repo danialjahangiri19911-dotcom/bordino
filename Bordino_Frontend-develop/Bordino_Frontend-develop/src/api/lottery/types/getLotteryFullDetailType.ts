@@ -8,7 +8,9 @@ export interface LotteryWinningTicket {
 }
 
 export interface LotteryWinner {
-	customer_id: string;
+	/** Only on the requester's own entry (others are anonymous). */
+	customer_id: string | null;
+	is_me?: boolean;
 	username: string | null;
 	avatar: string | null;
 	prize_amount: number;

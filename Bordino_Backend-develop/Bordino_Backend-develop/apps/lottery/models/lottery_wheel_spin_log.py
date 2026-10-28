@@ -16,6 +16,13 @@ class LotteryWheelSpinLog(AbstractBaseModel):
             models.Index(fields=["lottery_wheel", "customer"]),
             models.Index(fields=["create_time"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("customer", "request_id"),
+                condition=models.Q(request_id__isnull=False),
+                name="wheel_spin_unique_request_id",
+            )
+        ]
 
     lottery_wheel = models.ForeignKey(
         LotteryWheel,
@@ -29,6 +36,8 @@ class LotteryWheelSpinLog(AbstractBaseModel):
         related_name="lottery_wheel_spin_logs",
         verbose_name=_("Customer"),
     )
+    # The app's id for this spin (a retried request returns this spin instead of spinning again).
+    request_id = models.CharField(max_length=64, null=True, blank=True, editable=False)
     # Points paid for this spin (the wheel's cost at the time).
     cost = models.PositiveIntegerField(verbose_name=_("Cost"), default=0)
     multiplier = models.PositiveSmallIntegerField(
