@@ -78,7 +78,8 @@ export default function SudokuGame() {
 	const modal: Modal = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : game.paused ? "pause" : "");
 	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
 	// header's exit button does).
-	useBackHandler(true, () => (confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
+	// A charge on its way (start/continue) holds Back: leaving now would lose what is being paid for.
+	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 
 	// ── music: one switch for music and effects; never in a hidden tab or behind a dialog ──
 	useEffect(() => {
@@ -304,7 +305,7 @@ export default function SudokuGame() {
 						<button type="button" className="sd-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="sd-icon" aria-label="خروج از بازی" onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
+						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
 							<Icon name="arrow-right" />
 						</button>
 					</div>

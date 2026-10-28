@@ -52,7 +52,8 @@ function View() {
 	const playing = !game.needsStart && game.status === "ongoing";
 	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
 	// header's exit button does).
-	useBackHandler(true, () => (confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
+	// A charge on its way holds Back: leaving now would lose the game being paid for.
+	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 
 	useEffect(() => {
@@ -188,7 +189,7 @@ function View() {
 						<button type="button" className="g48-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="g48-icon" aria-label="خروج از بازی" onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
+						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
 							<Icon name="arrow-right" />
 						</button>
 					</div>

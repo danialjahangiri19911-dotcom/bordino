@@ -138,5 +138,12 @@ def broadcast_now(category: str, title: str, body: str = "", url: str = "/pwa/ma
         try:
             total += send(customer, category, title, body, url, f"{key}:{customer.pk}" if key else None)
         except TransientPushError:
-            logger.warning("Broadcast %s: nothing delivered to %s this time", key, customer.pk)
+            # Their key was freed: hand them to the retrying task (back-off, up to 5 tries).
+            from apps.notifications.tasks import send_notification  # pylint: disable=import-outside-toplevel
+
+            item_key = f"{key}:{customer.pk}" if key else None
+            try:
+                send_notification.apply_async((str(customer.pk), category, title, body, url, item_key), countdown=60)
+            except Exception:  # pylint: disable=broad-exception-caught
+                logger.warning("Broadcast %s: could not queue a retry for %s", key, customer.pk)
     return total

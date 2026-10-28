@@ -18,7 +18,7 @@ import {
 	sendTest,
 } from "../push";
 import { fa } from "../format";
-import { type Entry, HistoryRow, PartialHistoryNotice, rowsOf } from "../history";
+import { type Entry, HistoryRow, PartialHistoryNotice, withSummary, rowsOf } from "../history";
 import { AppShell, CopyButton, EmptyState, Facts, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
 import { useCashAccount } from "./Wallet";
 
@@ -305,8 +305,8 @@ export function Prizes() {
 					<>
 						<PartialHistoryNotice
 							parts={[
-								{ label: "امتیاز", history: p },
-								{ label: "نقدی", history: c },
+								{ label: "امتیاز", history: withSummary(p, points) },
+								{ label: "نقدی", history: withSummary(c, cash) },
 							]}
 						/>
 						<div className="bd-rows">

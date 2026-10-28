@@ -74,6 +74,17 @@ export function PartialHistoryNotice({ parts }: { parts: { label: string; histor
 	);
 }
 
+/** An account's history counts as failed when its summary (which gives the account id) failed too. */
+export function withSummary(
+	history: { isError: boolean; refetch: () => unknown },
+	summary: { error: unknown; refetch: () => unknown },
+) {
+	return {
+		isError: history.isError || !!summary.error,
+		refetch: () => (summary.error ? summary.refetch() : history.refetch()),
+	};
+}
+
 export function HistoryFooter({
 	history,
 	empty,

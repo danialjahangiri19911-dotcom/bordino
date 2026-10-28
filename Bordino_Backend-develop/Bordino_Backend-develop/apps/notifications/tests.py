@@ -97,6 +97,16 @@ class ReviewFixTests(TestCase):
             self.assertEqual(services.send(self.user.customer, "lottery", "t", key="k9"), 1)
         push.assert_called_once()
 
+    def test_a_broadcast_recipient_whose_push_failed_is_retried(self):
+        PushSubscription.objects.create(customer=self.user.customer, endpoint="https://fcm.googleapis.com/fcm/send/a", p256dh="k", auth="a")
+        with mock.patch("apps.notifications.services._push", return_value="failed"), mock.patch(
+            "apps.notifications.tasks.send_notification.apply_async"
+        ) as retry:
+            services.broadcast_now("lottery", "t", key="lottery-new:1")
+        retry.assert_called_once()
+        self.assertEqual(retry.call_args.args[0][0], str(self.user.customer.pk))
+        self.assertEqual(retry.call_args.args[0][-1], f"lottery-new:1:{self.user.customer.pk}")
+
     def test_parallel_switch_changes_do_not_undo_each_other(self):
         pref = services.preferences(self.user.customer)
         stale = type(pref).objects.get(pk=pref.pk)  # read before the other change

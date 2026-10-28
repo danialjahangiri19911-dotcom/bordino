@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useSearchParams } from "next/navigation";
 
-import { type Entry, HistoryFooter, HistoryRow, PartialHistoryNotice, useHistory } from "../history";
+import { type Entry, HistoryFooter, HistoryRow, PartialHistoryNotice, useHistory, withSummary } from "../history";
 import { AppShell, Chips, Panel, usePoints } from "../ui";
 import { useCashAccount } from "./Wallet";
 
@@ -52,11 +52,11 @@ export default function Transactions() {
 						))}
 					</div>
 				) : null}
-				{filter === "all" && rows.length ? (
+				{filter === "all" && (rows.length || points.error || cash.error) ? (
 					<PartialHistoryNotice
 						parts={[
-							{ label: "امتیاز", history: pointsHistory },
-							{ label: "نقدی", history: cashHistory },
+							{ label: "امتیاز", history: withSummary(pointsHistory, points) },
+							{ label: "نقدی", history: withSummary(cashHistory, cash) },
 						]}
 					/>
 				) : null}

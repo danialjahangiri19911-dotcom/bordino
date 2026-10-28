@@ -71,8 +71,11 @@ export async function enableOnThisDevice(vapidKey: string): Promise<Notification
 export async function disableOnThisDevice() {
 	const sub = await currentSubscription();
 	if (!sub) return;
-	await call("post", "notifications/push-subscriptions/remove/", { endpoint: sub.endpoint }).catch(() => undefined);
-	await sub.unsubscribe();
+	const { endpoint } = sub;
+	// The browser first: once unsubscribed, nothing for this account can show here, whatever the
+	// network does. Then the server forgets the device (a dead endpoint would be dropped anyway).
+	await sub.unsubscribe().catch(() => undefined);
+	await call("post", "notifications/push-subscriptions/remove/", { endpoint }).catch(() => undefined);
 }
 
 export const savePrefs = (change: Partial<Pick<NotificationPrefs, "lottery" | "account" | "games">>) =>
