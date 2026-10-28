@@ -87,13 +87,15 @@ export default function GameProvider({
 	).current;
 
 	useEffect(() => {
-		if (game && !game.isLoading) {
+		// Only a paid game is saved: a saved game counts as paid when the page opens again, so
+		// the unpaid board shown before «start» must not become one.
+		if (game && !game.isLoading && !needsStart) {
 			debouncedSave(game);
 		}
 		return () => {
 			debouncedSave.cancel();
 		};
-	}, [game, debouncedSave]);
+	}, [game, debouncedSave, needsStart]);
 
 	return (
 		<GameContext.Provider value={{ ...game, startPaidGame, isCharging, needsStart }}>

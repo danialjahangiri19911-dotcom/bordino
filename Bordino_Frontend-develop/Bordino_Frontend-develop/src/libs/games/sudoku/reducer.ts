@@ -4,7 +4,19 @@ import {
 	initializeBoard,
 	isBoardCompleteAndValid,
 } from "./helpers";
-import type { Board, CellValue, GameAction, GameState } from "./types";
+import type { Board, BoardWithMeta, CellValue, GameAction, GameState } from "./types";
+
+import { enableMapSet } from "immer";
+
+// Cell notes are Sets: immer can only draft them with its Map/Set plugin (without it, the first
+// move after a note threw and the board went blank).
+enableMapSet();
+
+/** A copy of the board for the undo history. JSON would turn the notes' Sets into «{}» (an undo
+ * to a noted cell then crashed the board: notes not iterable). */
+function snapshot(board: BoardWithMeta): BoardWithMeta {
+	return board.map((row) => row.map((cell) => ({ value: cell.value, prefilled: cell.prefilled, notes: cell.notes ? new Set(cell.notes) : null })));
+}
 
 // While paused nothing on the board changes and the clock does not run.
 const BLOCKED_WHILE_PAUSED = new Set<GameAction["type"]>(["FILL_CELL", "ERASE_CELL", "TOGGLE_NOTE", "HINT", "UNDO", "REDO", "TICK"]);
@@ -136,7 +148,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			// History (only if game still active)
 			if (draft.status === "playing" || draft.status === "won") {
 				draft.history = draft.history.slice(0, draft.historyIndex + 1);
-				draft.history.push(JSON.parse(JSON.stringify(draft.board)));
+				draft.history.push(snapshot(draft.board));
 				draft.historyIndex = draft.history.length - 1;
 			}
 			break;
@@ -171,7 +183,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			);
 
 			draft.history = draft.history.slice(0, draft.historyIndex + 1);
-			draft.history.push(JSON.parse(JSON.stringify(draft.board)));
+			draft.history.push(snapshot(draft.board));
 			draft.historyIndex = draft.history.length - 1;
 			break;
 		}
@@ -192,7 +204,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			}
 
 			draft.history = draft.history.slice(0, draft.historyIndex + 1);
-			draft.history.push(JSON.parse(JSON.stringify(draft.board)));
+			draft.history.push(snapshot(draft.board));
 			draft.historyIndex = draft.history.length - 1;
 			break;
 		}
@@ -264,7 +276,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			}
 
 			draft.history = draft.history.slice(0, draft.historyIndex + 1);
-			draft.history.push(JSON.parse(JSON.stringify(draft.board)));
+			draft.history.push(snapshot(draft.board));
 			draft.historyIndex = draft.history.length - 1;
 			break;
 		}
@@ -272,9 +284,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 		case "UNDO": {
 			if (draft.historyIndex > 0) {
 				draft.historyIndex -= 1;
-				draft.board = JSON.parse(
-					JSON.stringify(draft.history[draft.historyIndex]),
-				);
+				draft.board = snapshot(draft.history[draft.historyIndex]);
 				const { rowCounts, colCounts, squareCounts } = initializeBoard(
 					draft.board.map((row) =>
 						row.map((cell) => (cell.value ? cell.value : 0)),
@@ -302,9 +312,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 		case "REDO": {
 			if (draft.historyIndex < draft.history.length - 1) {
 				draft.historyIndex += 1;
-				draft.board = JSON.parse(
-					JSON.stringify(draft.history[draft.historyIndex]),
-				);
+				draft.board = snapshot(draft.history[draft.historyIndex]);
 				const { rowCounts, colCounts, squareCounts } = initializeBoard(
 					draft.board.map((row) =>
 						row.map((cell) => (cell.value ? cell.value : 0)),

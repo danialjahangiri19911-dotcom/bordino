@@ -18,17 +18,12 @@ import useGetBankAccounts from "@/api/wallet/hooks/useGetBankAccounts";
 import useGetBanks from "@/api/wallet/hooks/useGetBanks";
 import type { BankAccount } from "@/api/wallet/types/getBankAccountsType";
 import { isValidIban, normalizeIban } from "@/libs/components/Drawer/AddBankAccountDrawer/validations";
+import { isUncertain, requestIdFor, settleRequestId } from "@/libs/http/requestId";
 import useMutate from "@/libs/http/useMutate";
 import { parseAmount } from "@/libs/utils/persianNumberConverter";
 
 const STATUS: Record<string, string> = { approved: "تأیید شده", pending: "در انتظار تأیید", rejected: "رد شده" };
 
-function newRequestId() {
-	// randomUUID needs a secure context; the plain-http address falls back to time + random.
-	return typeof crypto !== "undefined" && crypto.randomUUID
-		? crypto.randomUUID()
-		: `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 function AddAccount({ onAdded }: { onAdded: () => void }) {
 	const { data: banks, isLoading, error, refetch } = useGetBanks();
@@ -119,6 +114,9 @@ function AddAccount({ onAdded }: { onAdded: () => void }) {
 	);
 }
 
+/** One pending withdrawal per browser: its id survives a reload until the server answers clearly. */
+const WITHDRAW_KEY = "withdraw";
+
 export default function Withdraw() {
 	const cash = useCashAccount();
 	const accounts = useGetBankAccounts();
@@ -126,9 +124,7 @@ export default function Withdraw() {
 	const [amountText, setAmountText] = useState("");
 	const [accountId, setAccountId] = useState("");
 	const [step, setStep] = useState<"form" | "review" | "done">("form");
-	const [requestId, setRequestId] = useState(newRequestId);
 	const [serverError, setServerError] = useState<string | null>(null);
-	const [uncertain, setUncertain] = useState(false);
 
 	const balance = cash.balance ?? 0;
 	const amount = parseAmount(amountText);
@@ -154,8 +150,7 @@ export default function Withdraw() {
 		onSuccess: () => {
 			setStep("done");
 			setServerError(null);
-			setUncertain(false);
-			setRequestId(newRequestId());
+			settleRequestId(WITHDRAW_KEY);
 			queryClient.invalidateQueries();
 		},
 		// The same request id goes with a retry: if the first one did reach the server, the server
@@ -164,8 +159,7 @@ export default function Withdraw() {
 			setServerError(gameErrorMessage(e));
 			// No answer, or a server error: the withdrawal may have been made. Its id must stay, so
 			// whatever is sent next is recognised as the same request (or refused as a conflict).
-			const status = (e as { response?: { status?: number } })?.response?.status;
-			setUncertain(!status || status >= 500 || status === 409);
+			if (!isUncertain(e)) settleRequestId(WITHDRAW_KEY);
 			cash.refetch();
 		},
 	});
@@ -240,7 +234,7 @@ export default function Withdraw() {
 								type="button"
 								className="bd-action"
 								disabled={isSending}
-								onClick={() => submitHandler({ amount, bank_account_id: accountId, request_id: requestId })}
+								onClick={() => submitHandler({ amount, bank_account_id: accountId, request_id: requestIdFor(WITHDRAW_KEY) })}
 							>
 								{isSending ? "در حال ثبت…" : serverError ? "تلاش دوباره" : "تأیید و ثبت برداشت"}
 							</button>
@@ -251,8 +245,7 @@ export default function Withdraw() {
 								onClick={() => {
 									setStep("form");
 									setServerError(null);
-									// A new id only when the server clearly refused the last one.
-									if (!uncertain) setRequestId(newRequestId());
+									// The id stays while the last request's outcome is unknown (also across a reload).
 								}}
 							>
 								ویرایش

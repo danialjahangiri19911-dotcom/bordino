@@ -98,6 +98,9 @@ export function use2048(initialState?: StoredGameState | null) {
 			const timer = setTimeout(() => {
 				engineRef.current?.cleanup();
 				engineRef.current?.addRandomTile();
+				// Won (a 2048 tile) or lost (no move left) is decided on the finished board, before
+				// it goes into the history (so undo can step back from a loss).
+				engineRef.current?.updateStatus();
 				engineRef.current?.commitMove();
 			}, mergeAnimationDuration);
 			return () => clearTimeout(timer);
