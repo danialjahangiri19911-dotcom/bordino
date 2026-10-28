@@ -116,10 +116,20 @@ export default function ChickenGame() {
 		[sound],
 	);
 	const stopAudio = useCallback(() => {
-		music.current?.pause();
+		// Never in the way of leaving: some Safari versions throw when a sound that never loaded
+		// (iPhone blocks sound until a tap) is paused or rewound.
+		try {
+			music.current?.pause();
+		} catch {
+			// ignore
+		}
 		voices.current.forEach((a) => {
-			a.pause();
-			a.currentTime = 0;
+			try {
+				a.pause();
+				a.currentTime = 0;
+			} catch {
+				// ignore
+			}
 		});
 		voices.current.clear();
 	}, []);
@@ -264,8 +274,11 @@ export default function ChickenGame() {
 		setView(READY);
 	};
 	const leave = () => {
-		stopAudio();
-		push(R.games);
+		try {
+			stopAudio();
+		} finally {
+			push(R.games);
+		}
 	};
 
 	// Android Back: closes the open panel, asks before leaving a round in play, else leaves (as the
@@ -300,7 +313,7 @@ export default function ChickenGame() {
 				: config && !config.enabled
 					? "مرغ فراری فعلاً غیرفعال است."
 					: lowBalance && view.phase === "ready"
-						? "امتیاز کافی برای شروع نداری."
+						? `امتیاز کافی برای شروع نداری (موجودی ${fa(balance)}، کمترین شرط ${fa(minBet)} امتیاز).`
 						: amountError && view.phase === "ready"
 							? amountError
 							: {
