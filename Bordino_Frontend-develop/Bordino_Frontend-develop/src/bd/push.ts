@@ -11,17 +11,34 @@ export interface NotificationPrefs {
 	push_available: boolean;
 	vapid_public_key: string | null;
 	devices: number;
+	/** The Android app (Pushe): can the server send, and which of the player's phones are on. */
+	app_push_available?: boolean;
+	app_device_ids?: string[];
+}
+
+/** The Android app's native side (Bordino_Mobile BordinoPushPlugin, Pushe). */
+interface AppPushPlugin {
+	status(): Promise<{ available: boolean; registered: boolean; deviceId: string | null; permission: "granted" | "denied" | "prompt" }>;
+	enable(): Promise<{ deviceId: string }>;
+	disable(): Promise<{ deviceId: string | null }>;
+}
+
+export function appPush(): AppPushPlugin | null {
+	if (typeof window === "undefined") return null;
+	const plugin = (window as unknown as { Capacitor?: { Plugins?: { BordinoPush?: AppPushPlugin } } }).Capacitor?.Plugins?.BordinoPush;
+	return plugin && typeof plugin.enable === "function" ? plugin : null;
 }
 
 export const PREFS_URL = "notifications/preferences/";
 
-/** What this device can do about notifications. */
-export type DeviceSupport = "ok" | "android-app" | "ios-install" | "unsupported";
+/** What this device can do about notifications ("app": the Android app with Pushe; "android-app": an
+ * older app version without it). */
+export type DeviceSupport = "ok" | "app" | "android-app" | "ios-install" | "unsupported";
 
 export function deviceSupport(): DeviceSupport {
 	if (typeof window === "undefined") return "unsupported";
-	// The Android app's WebView has no Web Push (Bordino_Mobile would need a native push service).
-	if (/BordinoApp\//.test(navigator.userAgent)) return "android-app";
+	// The Android app's WebView has no Web Push: from app 1.2 on, Pushe does it natively.
+	if (/BordinoApp\//.test(navigator.userAgent)) return appPush() ? "app" : "android-app";
 	const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 	const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
 	// iPhone allows Web Push only to a site added to the home screen (iOS 16.4+).
@@ -68,7 +85,26 @@ export async function enableOnThisDevice(vapidKey: string): Promise<Notification
 	return "granted";
 }
 
+/** The Android app: permission + Pushe registration, then the server learns this phone. */
+export async function enableAppPush(): Promise<string> {
+	const plugin = appPush();
+	if (!plugin) throw new Error("no app push");
+	const { deviceId } = await plugin.enable();
+	await call("post", "notifications/app-devices/", { provider: "pushe", device_id: deviceId });
+	return deviceId;
+}
+
+/** The Android app stops showing notifications here; the server forgets the phone. */
+export async function disableAppPush() {
+	const plugin = appPush();
+	if (!plugin) return;
+	// The phone first (shows nothing more, whatever the network does), then the server.
+	const { deviceId } = await plugin.disable().catch(() => ({ deviceId: null as string | null }));
+	if (deviceId) await call("post", "notifications/app-devices/remove/", { provider: "pushe", device_id: deviceId }).catch(() => undefined);
+}
+
 export async function disableOnThisDevice() {
+	if (appPush()) return disableAppPush();
 	const sub = await currentSubscription();
 	if (!sub) return;
 	const { endpoint } = sub;

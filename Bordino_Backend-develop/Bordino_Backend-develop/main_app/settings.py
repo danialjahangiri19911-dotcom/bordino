@@ -326,6 +326,10 @@ if ENVIRONMENT == "prod":
 VAPID_PUBLIC_KEY = get_env_value("VAPID_PUBLIC_KEY", default_value="")
 VAPID_PRIVATE_KEY = get_env_value("VAPID_PRIVATE_KEY", default_value="")
 VAPID_SUBJECT = get_env_value("VAPID_SUBJECT", default_value="mailto:support@bordino.co")
+# The Android app's notifications go through Pushe (console.pushe.co): the 40-character API token
+# («وب‌سرویس - api») and the app's app_id. Both empty → the app's switch says it is not available yet.
+PUSHE_API_TOKEN = get_env_value("PUSHE_API_TOKEN", default_value="")
+PUSHE_APP_ID = get_env_value("PUSHE_APP_ID", default_value="")
 
 KAVENEGAR_API_KEY = get_env_value("KAVENEGAR_API_KEY")
 KAVENEGAR_OTP_TEMPLATE = get_env_value("KAVENEGAR_OTP_TEMPLATE", default_value="otp")

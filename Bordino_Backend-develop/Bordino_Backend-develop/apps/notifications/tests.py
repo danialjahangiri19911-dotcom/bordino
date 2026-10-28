@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.notifications import services
-from apps.notifications.models import NotificationLog, PushSubscription
+from apps.notifications.models import AppDevice, NotificationLog, PushSubscription
 from apps.wallet.models import Bank, BankAccount
 from apps.wallet.tests import LOCMEM, make_customer
 
@@ -244,3 +244,67 @@ class WebPushWireTests(TestCase):
         self.assertEqual(sent["headers"].get("Content-Encoding"), "aes128gcm")
         self.assertTrue(sent["headers"]["Authorization"].startswith("vapid t="))
         self.assertNotIn("سلام".encode(), sent["data"])  # encrypted, not plain
+
+
+PUSHE = {"PUSHE_API_TOKEN": "t" * 40, "PUSHE_APP_ID": "app123"}
+APP_DEVICES = "/api/v1/notifications/app-devices/"
+
+
+@override_settings(CACHES=LOCMEM, **KEYS, **PUSHE)
+class PusheTests(TestCase):
+    """The Android app: no Web Push in its WebView, so notifications go through Pushe."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_customer("9120001401")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_a_phone_is_registered_listed_and_removed(self):
+        self.assertEqual(self.api.post(APP_DEVICES, {"device_id": "abc123def"}, format="json").status_code, 201)
+        prefs = body(self.api.get(PREFS))
+        self.assertTrue(prefs["app_push_available"])
+        self.assertEqual(prefs["app_device_ids"], ["abc123def"])
+        self.assertEqual(self.api.post(APP_DEVICES, {"device_id": "bad id!"}, format="json").status_code, 400)
+        other = APIClient()
+        other.force_authenticate(make_customer("9120001402"))
+        other.post(f"{APP_DEVICES}remove/", {"device_id": "abc123def"}, format="json")  # not theirs
+        self.assertEqual(AppDevice.objects.count(), 1)
+        self.api.post(f"{APP_DEVICES}remove/", {"device_id": "abc123def"}, format="json")
+        self.assertEqual(AppDevice.objects.count(), 0)
+
+    def test_a_notification_goes_to_the_players_phones_through_pushe(self):
+        AppDevice.objects.create(customer=self.user.customer, device_id="dev-1")
+        AppDevice.objects.create(customer=self.user.customer, device_id="dev-2")
+        with mock.patch("requests.post", return_value=mock.Mock(status_code=201, text="")) as post:
+            self.assertEqual(services.send(self.user.customer, "account", "برداشت واریز شد", "۲۰٬۰۰۰ تومان"), 2)
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], "https://api.pushe.co/v2/messaging/rapid/")
+        sent = post.call_args.kwargs["json"]
+        self.assertEqual(sent["app_id"], "app123")
+        self.assertEqual(sorted(sent["device_id"]), ["dev-1", "dev-2"])
+        self.assertEqual((sent["data"]["title"], sent["data"]["content"]), ("برداشت واریز شد", "۲۰٬۰۰۰ تومان"))
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], f"Token {'t' * 40}")
+
+    def test_the_switches_apply_to_the_app_too(self):
+        AppDevice.objects.create(customer=self.user.customer, device_id="dev-1")
+        self.api.patch(PREFS, {"games": False}, format="json")
+        with mock.patch("requests.post") as post:
+            self.assertEqual(services.send(self.user.customer, "games", "t"), 0)
+        post.assert_not_called()
+
+    def test_a_pushe_outage_is_retried_but_a_configuration_error_is_not(self):
+        AppDevice.objects.create(customer=self.user.customer, device_id="dev-1")
+        with mock.patch("requests.post", return_value=mock.Mock(status_code=503, text="down")):
+            with self.assertRaises(services.TransientPushError):
+                services.send(self.user.customer, "lottery", "t", key="k-out")
+        with mock.patch("requests.post", return_value=mock.Mock(status_code=401, text="bad token")):
+            self.assertEqual(services.send(self.user.customer, "lottery", "t", key="k-cfg"), 0)
+
+    @override_settings(PUSHE_API_TOKEN="")
+    def test_without_pushe_settings_the_app_is_not_contacted(self):
+        AppDevice.objects.create(customer=self.user.customer, device_id="dev-1")
+        with mock.patch("requests.post") as post:
+            self.assertEqual(services.send(self.user.customer, "lottery", "t"), 0)
+        post.assert_not_called()
+        self.assertFalse(body(self.api.get(PREFS))["app_push_available"])

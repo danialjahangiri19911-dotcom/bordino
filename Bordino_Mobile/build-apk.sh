@@ -11,7 +11,7 @@ docker run --rm \
   -v "$PWD":/app -w /app/android \
   -v lottery-android-sdk:/sdk -v lottery-android-gradle:/root/.gradle \
   -v "$KEYDIR":/keystore:ro \
-  -e ANDROID_HOME=/sdk -e BORDINO_KEYSTORE_PROPS=/keystore/keystore.properties \
+  -e ANDROID_HOME=/sdk -e BORDINO_KEYSTORE_PROPS=/keystore/keystore.properties -e BORDINO_PUSHE_PROPS=/keystore/pushe.properties \
   eclipse-temurin:21.0.12_8-jdk-noble \
   sh -c './gradlew --no-daemon -q assembleRelease'
 # The APK must carry the release signature (the one every installed copy was signed with).

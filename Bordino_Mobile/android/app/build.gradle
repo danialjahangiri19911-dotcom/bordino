@@ -3,12 +3,24 @@ apply plugin: 'com.android.application'
 android {
     namespace "co.bordino.lottery"
     compileSdk rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
+    // Pushe manifest token (from console.pushe.co): pushe.properties → pushe_token=PUSHE_…
+    // (BORDINO_PUSHE_PROPS points elsewhere, e.g. next to the signing key). Optional: without it
+    // the app builds and runs, only without Android notifications.
+    def pusheFile = file(System.getenv("BORDINO_PUSHE_PROPS") ?: "../pushe.properties")
+    def pusheProps = new Properties()
+    if (pusheFile.exists()) pusheFile.withInputStream { pusheProps.load(it) }
+    def pusheToken = (pusheProps["pushe_token"] ?: "").toString().trim()
     defaultConfig {
+        manifestPlaceholders = [pusheToken: pusheToken, pusheEnabled: pusheToken ? "true" : "false"]
+        buildConfigField "boolean", "PUSHE_ENABLED", pusheToken ? "true" : "false"
         applicationId "co.bordino.lottery"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -59,6 +71,10 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // Pushe (Iranian push service) — only what notifications need: no analytics/datalytics/sentry.
+    implementation "co.pushe.plus:core:2.6.4"
+    implementation "co.pushe.plus:fcm:2.6.4"
+    implementation "co.pushe.plus:notification:2.6.4"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

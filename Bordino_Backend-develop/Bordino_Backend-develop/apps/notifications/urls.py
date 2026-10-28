@@ -1,6 +1,8 @@
 from django.urls import path
 
 from apps.notifications.views import (
+    AppDeviceRemoveView,
+    AppDeviceView,
     PreferencesView,
     PushSubscriptionView,
     PushUnsubscribeView,
@@ -12,4 +14,6 @@ urlpatterns = [
     path("api/v1/notifications/push-subscriptions/", PushSubscriptionView.as_view(), name="push_subscribe"),
     path("api/v1/notifications/push-subscriptions/remove/", PushUnsubscribeView.as_view(), name="push_unsubscribe"),
     path("api/v1/notifications/test/", TestNotificationView.as_view(), name="notification_test"),
+    path("api/v1/notifications/app-devices/", AppDeviceView.as_view(), name="app_device"),
+    path("api/v1/notifications/app-devices/remove/", AppDeviceRemoveView.as_view(), name="app_device_remove"),
 ]

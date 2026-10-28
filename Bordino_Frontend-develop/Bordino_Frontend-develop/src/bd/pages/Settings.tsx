@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
@@ -9,9 +9,11 @@ import { BadgeArt, type BadgeFacts, badgeStates } from "../achievements";
 import {
 	type NotificationPrefs,
 	PREFS_URL,
+	appPush,
 	currentSubscription,
 	deviceSupport,
 	disableOnThisDevice,
+	enableAppPush,
 	enableOnThisDevice,
 	permission,
 	savePrefs,
@@ -89,17 +91,19 @@ function DevicePanel({ prefs, device, onEnable, onDisable, busy }: {
 }) {
 	const support = deviceSupport();
 	const [test, setTest] = useState<string | null>(null);
-	if (!prefs.push_available) return <Notice tone="info">ارسال اعلان روی سرور بردینو هنوز روشن نشده است؛ انتخاب‌هایت ذخیره می‌شود و از همان روز اعمال می‌شود.</Notice>;
+	if (support !== "app" && !prefs.push_available) return <Notice tone="info">ارسال اعلان روی سرور بردینو هنوز روشن نشده است؛ انتخاب‌هایت ذخیره می‌شود و از همان روز اعمال می‌شود.</Notice>;
 	if (support === "android-app")
-		return (
-			<Notice tone="info">
-				برنامهٔ اندروید بردینو فعلاً اعلان نمی‌گیرد (به‌زودی). انتخاب‌هایت ذخیره می‌شود؛ تا آن موقع اگر بردینو را در Chrome باز کنی و اعلان را آن‌جا روشن کنی، اعلان‌ها به گوشی‌ات می‌رسد.
-			</Notice>
-		);
+		return <Notice tone="info">این نسخهٔ برنامه اعلان نمی‌گیرد. نسخهٔ تازهٔ برنامهٔ اندروید را از صفحهٔ اول بردینو دانلود و نصب کن؛ انتخاب‌هایت ذخیره است.</Notice>;
+	if (support === "app" && !prefs.app_push_available)
+		return <Notice tone="info">ارسال اعلان به برنامهٔ اندروید هنوز روی سرور بردینو روشن نشده است؛ انتخاب‌هایت ذخیره می‌شود و از همان روز اعمال می‌شود.</Notice>;
 	if (support === "ios-install") return <Notice tone="info">در آیفون اعلان فقط برای برنامهٔ نصب‌شده کار می‌کند: بردینو را از Safari با «Add to Home Screen» نصب کن و از همان‌جا اعلان را روشن کن.</Notice>;
 	if (support === "unsupported") return <Notice tone="info">این مرورگر اعلان وب را پشتیبانی نمی‌کند؛ بردینو را در Chrome، Firefox یا Edge باز کن.</Notice>;
 	if (device === "blocked")
-		return <Notice>اعلان‌های بردینو در تنظیمات این مرورگر مسدود است. از تنظیمات سایت (آیکن قفل کنار آدرس) «اعلان‌ها» را مجاز کن و این صفحه را دوباره باز کن.</Notice>;
+		return support === "app" ? (
+			<Notice>اعلان‌های بردینو در تنظیمات اندروید خاموش است. از «تنظیمات گوشی ← برنامه‌ها ← بردینو ← اعلان‌ها» روشنش کن و این صفحه را دوباره باز کن.</Notice>
+		) : (
+			<Notice>اعلان‌های بردینو در تنظیمات این مرورگر مسدود است. از تنظیمات سایت (آیکن قفل کنار آدرس) «اعلان‌ها» را مجاز کن و این صفحه را دوباره باز کن.</Notice>
+		);
 	return (
 		<div className="rt-setting bd-device-push">
 			<span>
@@ -141,6 +145,8 @@ function DevicePanel({ prefs, device, onEnable, onDisable, busy }: {
 export function Notifications() {
 	const { data, isLoading, error, refetch } = useQuery<ResponseApiData<NotificationPrefs>>({ url: PREFS_URL, headers: true });
 	const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
+	const prefsRef = useRef<NotificationPrefs | null>(null);
+	prefsRef.current = prefs;
 	const [saving, setSaving] = useState<CategoryKey | null>(null);
 	const [device, setDevice] = useState<"checking" | "on" | "off" | "blocked">("checking");
 	const [busy, setBusy] = useState(false);
@@ -151,7 +157,16 @@ export function Notifications() {
 	useEffect(() => {
 		let alive = true;
 		(async () => {
-			if (deviceSupport() !== "ok") return alive && setDevice("off");
+			const support = deviceSupport();
+			if (support === "app") {
+				// On when this phone's Pushe id is one the server has for the player, and Android allows it.
+				const st = await appPush()?.status().catch(() => null);
+				if (!alive || !st) return alive && setDevice("off");
+				if (st.permission === "denied") return setDevice("blocked");
+				setDevice(st.deviceId && prefsRef.current?.app_device_ids?.includes(st.deviceId) ? "on" : "off");
+				return;
+			}
+			if (support !== "ok") return alive && setDevice("off");
 			if (permission() === "denied") return alive && setDevice("blocked");
 			const sub = await currentSubscription().catch(() => null);
 			if (alive) setDevice(sub ? "on" : "off");
@@ -159,9 +174,24 @@ export function Notifications() {
 		return () => {
 			alive = false;
 		};
-	}, []);
+	}, [prefs !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const enable = async () => {
+		if (deviceSupport() === "app") {
+			setBusy(true);
+			setProblem(null);
+			try {
+				await enableAppPush();
+				setDevice("on");
+			} catch (e) {
+				const code = (e as { code?: string })?.code;
+				if (code === "DENIED") setDevice("blocked");
+				else setProblem(code === "TIMEOUT" ? "ثبت این گوشی در سرویس اعلان طول کشید؛ اینترنت را بررسی کن و دوباره امتحان کن." : `روشن کردن اعلان نشد: ${gameErrorMessage(e)}`);
+			} finally {
+				setBusy(false);
+			}
+			return;
+		}
 		if (!prefs?.vapid_public_key) return;
 		setBusy(true);
 		setProblem(null);
@@ -196,8 +226,11 @@ export function Notifications() {
 		setSaving(key);
 		setProblem(null);
 		// Turning something on also asks this device (the browser wants the request straight from the tap).
+		const support = deviceSupport();
 		const asking =
-			value && device === "off" && deviceSupport() === "ok" && prefs.push_available && prefs.vapid_public_key && permission() === "default" ? enable() : null;
+			value && device === "off" && ((support === "ok" && prefs.push_available && prefs.vapid_public_key && permission() === "default") || (support === "app" && prefs.app_push_available))
+				? enable()
+				: null;
 		try {
 			setPrefs(await savePrefs({ [key]: value }));
 		} catch (e) {

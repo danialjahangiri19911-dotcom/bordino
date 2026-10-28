@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -24,6 +25,16 @@
 
         </activity>
 
+        <!-- Pushe (Android notifications). The token comes from pushe.properties at build time; without
+             one, Pushe's start-up provider stays disabled and the app behaves as before. -->
+        <meta-data android:name="pushe_token" android:value="${pusheToken}" />
+        <provider
+            android:name="co.pushe.plus.internal.PusheInitializer"
+            android:authorities="${applicationId}.pusheinitializer"
+            android:enabled="${pusheEnabled}"
+            android:exported="false"
+            tools:replace="android:enabled" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -38,4 +49,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+: asked from «مدیریت اعلان‌ها» when the player turns notifications on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Pushe adds the advertising-id permission; notifications do not need it. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 </manifest>

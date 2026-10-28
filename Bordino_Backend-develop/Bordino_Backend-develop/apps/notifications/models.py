@@ -54,6 +54,26 @@ class PushSubscription(AbstractBaseModel):
         return f"{self.customer} · {self.user_agent[:40]}"
 
 
+class AppDevice(AbstractBaseModel):
+    """The Android app on one phone, registered with Pushe (the app's WebView has no Web Push)."""
+
+    class Provider(models.TextChoices):
+        PUSHE = "pushe", "Pushe"
+
+    customer = models.ForeignKey("users.Customer", on_delete=models.CASCADE, related_name="app_devices")
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.PUSHE)
+    device_id = models.CharField(max_length=200)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta(AbstractBaseModel.Meta):
+        verbose_name = _("App device")
+        verbose_name_plural = _("App devices")
+        constraints = [models.UniqueConstraint(fields=("provider", "device_id"), name="app_device_once")]
+
+    def __str__(self):
+        return f"{self.customer} · {self.provider}"
+
+
 class NotificationLog(AbstractBaseModel):
     """Every notification sent, once per (customer, key): a retried job or a second admin action
     does not notify twice."""

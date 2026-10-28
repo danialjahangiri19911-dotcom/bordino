@@ -11,11 +11,12 @@ import logging
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.db import models
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.notifications.models import NotificationLog, NotificationPreference, PushSubscription
+from apps.notifications.models import AppDevice, NotificationLog, NotificationPreference, PushSubscription
 from apps.users.models.customer import Customer
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,40 @@ def is_push_endpoint(url: str) -> bool:
 
 class TransientPushError(Exception):
     """Every device failed for a reason that may pass (time-out, 5xx): worth retrying later."""
+
+
+PUSHE_URL = "https://api.pushe.co/v2/messaging/rapid/"
+
+
+def pushe_available() -> bool:
+    """The Android app's notifications (Pushe API token + app id from console.pushe.co)."""
+    return bool(settings.PUSHE_API_TOKEN and settings.PUSHE_APP_ID)
+
+
+def _pushe(devices: list[AppDevice], payload: dict) -> str:
+    """One Pushe «rapid» (transactional) request for this player's app devices: "ok", "failed"
+    (may pass: network, 5xx) or "error" (4xx: configuration)."""
+    import requests  # pylint: disable=import-outside-toplevel
+
+    body = {
+        "app_id": settings.PUSHE_APP_ID,
+        "device_id": [d.device_id for d in devices][:500],
+        "data": {"title": payload["title"], "content": payload["body"] or payload["title"], "action": {"action_type": "A"}},
+    }
+    try:
+        r = requests.post(
+            PUSHE_URL, json=body, timeout=10,
+            headers={"Authorization": f"Token {settings.PUSHE_API_TOKEN}", "Content-Type": "application/json"},
+        )
+    except requests.RequestException as e:
+        logger.warning("Pushe send failed: %s", e)
+        return "failed"
+    if 200 <= r.status_code < 300:
+        AppDevice.objects.filter(pk__in=[d.pk for d in devices]).update(last_sent_at=timezone.now())
+        return "ok"
+    logger.warning("Pushe answered %s: %s", r.status_code, r.text[:300])
+    # 5xx may pass (retried); 4xx is a wrong token/app id/device — retrying would not help.
+    return "failed" if r.status_code >= 500 else "error"
 
 
 def push_available() -> bool:
@@ -88,7 +123,8 @@ def send(customer: Customer, category: str, title: str, body: str = "", url: str
     """Sends now (Celery calls this). Returns the number of devices reached."""
     if not preferences(customer).wants(category):
         return 0
-    subs = list(PushSubscription.objects.filter(customer=customer))
+    subs = list(PushSubscription.objects.filter(customer=customer)) if push_available() else []
+    devices = list(AppDevice.objects.filter(customer=customer)) if pushe_available() else []
     log = None
     if key:
         try:
@@ -100,10 +136,13 @@ def send(customer: Customer, category: str, title: str, body: str = "", url: str
             # Already sent under this key (save() validates the unique key first; the database
             # constraint catches two senders at the same moment).
             return 0
-    if not subs or not push_available():
+    if not subs and not devices:
         return 0
     payload = {"title": title, "body": body, "url": url, "tag": key or category}
     results = [_push(sub, payload) for sub in subs]
+    if devices:
+        # One request for all the player's phones; it counts once per phone.
+        results += [_pushe(devices, payload)] * len(devices)
     delivered = results.count("ok")
     if not delivered and "failed" in results:
         # Nothing arrived, for a reason that may pass: free the key so a retry sends it.
@@ -132,7 +171,9 @@ def queue_broadcast(category: str, title: str, body: str = "", url: str = "/pwa/
 
 
 def broadcast_now(category: str, title: str, body: str = "", url: str = "/pwa/main", key: str | None = None) -> int:
-    customers = Customer.objects.filter(push_subscriptions__isnull=False).distinct()
+    customers = Customer.objects.filter(
+        models.Q(push_subscriptions__isnull=False) | models.Q(app_devices__isnull=False)
+    ).distinct()
     total = 0
     for customer in customers.iterator():
         try:

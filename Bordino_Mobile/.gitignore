@@ -9,3 +9,5 @@ android/keystore.properties
 *.jks
 *.apk
 *.aab
+pushe.properties
+android/pushe.properties

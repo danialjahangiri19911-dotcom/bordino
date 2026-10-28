@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.notifications import services
-from apps.notifications.models import Category, PushSubscription
+from apps.notifications.models import AppDevice, Category, PushSubscription
 
 
 def _body(customer):
@@ -21,6 +21,9 @@ def _body(customer):
         "push_available": services.push_available(),
         "vapid_public_key": settings.VAPID_PUBLIC_KEY or None,
         "devices": PushSubscription.objects.filter(customer=customer).count(),
+        # The Android app (Pushe): whether the server can send, and which of the player's phones are on.
+        "app_push_available": services.pushe_available(),
+        "app_device_ids": list(AppDevice.objects.filter(customer=customer).values_list("device_id", flat=True)),
     }
 
 
@@ -107,6 +110,44 @@ class PushUnsubscribeView(APIView):
         data = EndpointSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         PushSubscription.objects.filter(endpoint=data.validated_data["endpoint"], customer__user=request.user).delete()
+        if not hasattr(request.user, "customer"):
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(_body(request.user.customer))
+
+
+class AppDeviceSerializer(serializers.Serializer):
+    provider = serializers.ChoiceField(choices=AppDevice.Provider.choices, default=AppDevice.Provider.PUSHE)
+    device_id = serializers.RegexField(r"^[A-Za-z0-9_.:-]{6,200}$")
+
+
+class AppDeviceView(APIView):
+    """The Android app on this phone (Pushe device id), saved when the player turns notifications on."""
+
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=["notifications"], summary="Register this phone (Android app)", request=AppDeviceSerializer)
+    def post(self, request):
+        if not hasattr(request.user, "customer"):
+            return Response({"error": "No customer profile"}, status=status.HTTP_400_BAD_REQUEST)
+        data = AppDeviceSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        # One row per phone: the same phone signed in as another player moves to that player.
+        AppDevice.objects.update_or_create(
+            provider=data.validated_data["provider"],
+            device_id=data.validated_data["device_id"],
+            defaults={"customer": request.user.customer},
+        )
+        return Response(_body(request.user.customer), status=status.HTTP_201_CREATED)
+
+
+class AppDeviceRemoveView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=["notifications"], summary="Forget this phone (Android app)", request=AppDeviceSerializer)
+    def post(self, request):
+        data = AppDeviceSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        AppDevice.objects.filter(device_id=data.validated_data["device_id"], customer__user=request.user).delete()
         if not hasattr(request.user, "customer"):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(_body(request.user.customer))
