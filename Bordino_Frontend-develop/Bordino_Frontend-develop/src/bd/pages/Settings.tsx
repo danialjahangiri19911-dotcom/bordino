@@ -147,7 +147,9 @@ export function Notifications() {
 	const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
 	const prefsRef = useRef<NotificationPrefs | null>(null);
 	prefsRef.current = prefs;
-	const [saving, setSaving] = useState<CategoryKey | null>(null);
+	const [saving, setSaving] = useState<Partial<Record<CategoryKey, boolean>>>({});
+	/** The newest change per switch: an older answer arriving late must not overwrite it. */
+	const latest = useRef<Partial<Record<CategoryKey, number>>>({});
 	const [device, setDevice] = useState<"checking" | "on" | "off" | "blocked">("checking");
 	const [busy, setBusy] = useState(false);
 	const [problem, setProblem] = useState<string | null>(null);
@@ -221,9 +223,13 @@ export function Notifications() {
 
 	const toggle = async (key: CategoryKey, value: boolean) => {
 		if (!prefs) return;
-		const before = prefs;
-		setPrefs({ ...prefs, [key]: value });
-		setSaving(key);
+		const previous = prefs[key];
+		const seq = (latest.current[key] ?? 0) + 1;
+		latest.current[key] = seq;
+		const newest = () => latest.current[key] === seq;
+		// Only this switch changes: another switch saved meanwhile keeps its own answer.
+		setPrefs((p) => (p ? { ...p, [key]: value } : p));
+		setSaving((s) => ({ ...s, [key]: true }));
 		setProblem(null);
 		// Turning something on also asks this device (the browser wants the request straight from the tap).
 		const support = deviceSupport();
@@ -232,12 +238,15 @@ export function Notifications() {
 				? enable()
 				: null;
 		try {
-			setPrefs(await savePrefs({ [key]: value }));
+			const saved = await savePrefs({ [key]: value });
+			if (newest()) setPrefs((p) => (p ? { ...p, [key]: saved[key] } : saved));
 		} catch (e) {
-			setPrefs(before);
-			setProblem(`ذخیره نشد: ${gameErrorMessage(e)}`);
+			if (newest()) {
+				setPrefs((p) => (p ? { ...p, [key]: previous } : p));
+				setProblem(`ذخیره نشد: ${gameErrorMessage(e)}`);
+			}
 		} finally {
-			setSaving(null);
+			if (newest()) setSaving((s) => ({ ...s, [key]: false }));
 		}
 		await asking;
 	};
@@ -258,8 +267,8 @@ export function Notifications() {
 								<input
 									type="checkbox"
 									checked={prefs[key]}
-									disabled={saving === key}
-									aria-busy={saving === key}
+									disabled={!!saving[key]}
+									aria-busy={!!saving[key]}
 									onChange={(e) => void toggle(key, e.currentTarget.checked)}
 								/>
 							</label>

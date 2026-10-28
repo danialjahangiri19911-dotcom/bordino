@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Icon, { type IconName } from "./Icon";
 import { confirmLeave } from "./back";
 import { fa } from "./format";
+import { reconcilePushOwner } from "./push";
 import useGetCustomerProfile from "@api/customer/hooks/useGetCustomerProfile";
 import useGetPointsSummary from "@api/wallet/hooks/useGetPointsSummary";
 
@@ -134,6 +135,10 @@ export function useRequireLogin(allowGuest = false) {
 export function useProfileSync() {
 	const { data, error, isLoading, refetch } = useGetCustomerProfile();
 	const { setUser } = useUserStore();
+	// A device whose notifications belong to an earlier account on it stops showing them.
+	useEffect(() => {
+		void reconcilePushOwner();
+	}, []);
 	useEffect(() => {
 		const p = data?.result;
 		if (!p) return;

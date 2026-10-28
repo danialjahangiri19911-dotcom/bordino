@@ -17,25 +17,44 @@ export default async function signOut() {
 	// Before the session lock (it may need a token) and never longer than a few seconds.
 	await Promise.race([disableOnThisDevice().catch(() => undefined), new Promise((r) => setTimeout(r, 4000))]);
 	// Under the session lock: a refresh in progress (in any tab) finishes first, so the tokens
-	// ended here are the newest ones, not a pair that refresh is about to replace.
-	await withSessionLock(async () => {
-		await useAuthStore.persist.rehydrate();
+	// ended here are the newest ones, not a pair that refresh is about to replace. The wait for the
+	// lock is bounded too: past it the device is cleared anyway (a refresh answering later sees
+	// the session gone and ends its new pair on the server instead of restoring it).
+	const endOnServer = async () => {
 		const { accessToken, refreshToken } = useAuthStore.getState();
-		if (refreshToken) {
-			try {
-				await requester.post(
-					AUTH_URLS.LOGOUT,
-					{ refresh: refreshToken },
-					{
-						headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-						timeout: 5000,
-					},
-				);
-			} catch {
-				// The tokens are forgotten below either way.
-			}
+		if (!refreshToken) return;
+		try {
+			await requester.post(
+				AUTH_URLS.LOGOUT,
+				{ refresh: refreshToken },
+				{
+					headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+					timeout: 5000,
+				},
+			);
+		} catch {
+			// The tokens are forgotten below either way.
 		}
+	};
+	const clear = () => {
 		useUserStore.getState().clearUser();
 		useAuthStore.getState().logout();
+	};
+	let done = false;
+	const locked = withSessionLock(async () => {
+		if (done) return;
+		await useAuthStore.persist.rehydrate();
+		await endOnServer();
+		done = true;
+		clear();
 	});
+	await Promise.race([locked, new Promise((resolve) => setTimeout(resolve, LOCK_WAIT_MS))]);
+	if (!done) {
+		done = true;
+		await endOnServer();
+		clear();
+	}
 }
+
+/** How long logout waits for a refresh in progress before clearing the device anyway. */
+const LOCK_WAIT_MS = 8000;

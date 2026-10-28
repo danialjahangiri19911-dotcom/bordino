@@ -3,6 +3,18 @@
  * server (apps/notifications), which then delivers what the switches allow.
  */
 import { call } from "@/api/games/request";
+import { currentUserId } from "@/libs/stores/authStore";
+
+/** The account that turned notifications on in this browser / app (its device is theirs). */
+const OWNER_KEY = "bd-push-owner";
+function setOwner(owner: string | null) {
+	try {
+		if (owner) localStorage.setItem(OWNER_KEY, owner);
+		else localStorage.removeItem(OWNER_KEY);
+	} catch {
+		// private mode: the logout paths still tear the device down
+	}
+}
 
 export interface NotificationPrefs {
 	lottery: boolean;
@@ -82,6 +94,7 @@ export async function enableOnThisDevice(vapidKey: string): Promise<Notification
 		(await reg.pushManager.getSubscription()) ??
 		(await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(vapidKey) }));
 	await call("post", "notifications/push-subscriptions/", sub.toJSON());
+	setOwner(currentUserId());
 	return "granted";
 }
 
@@ -91,6 +104,7 @@ export async function enableAppPush(): Promise<string> {
 	if (!plugin) throw new Error("no app push");
 	const { deviceId } = await plugin.enable();
 	await call("post", "notifications/app-devices/", { provider: "pushe", device_id: deviceId });
+	setOwner(currentUserId());
 	return deviceId;
 }
 
@@ -104,6 +118,7 @@ export async function disableAppPush() {
 }
 
 export async function disableOnThisDevice() {
+	setOwner(null);
 	if (appPush()) return disableAppPush();
 	const sub = await currentSubscription();
 	if (!sub) return;
@@ -118,3 +133,34 @@ export const savePrefs = (change: Partial<Pick<NotificationPrefs, "lottery" | "a
 	call<NotificationPrefs>("patch", PREFS_URL, change);
 
 export const sendTest = () => call<{ delivered: number }>("post", "notifications/test/", {});
+
+/**
+ * This device stops showing notifications, without asking the server (for a session that has
+ * already ended, e.g. a refresh the server refused: the server drops a dead browser endpoint at
+ * its next send, and a phone re-registers under whoever turns notifications on next).
+ */
+export async function forgetOnThisDevice() {
+	setOwner(null);
+	try {
+		const plugin = appPush();
+		if (plugin) await plugin.disable();
+		else await (await currentSubscription())?.unsubscribe();
+	} catch {
+		// nothing more can be done here
+	}
+}
+
+/**
+ * Another account signed in on a device where an earlier one had notifications on (whatever ended
+ * that session): this device stops showing the earlier account's notifications.
+ */
+export async function reconcilePushOwner() {
+	let owner: string | null = null;
+	try {
+		owner = localStorage.getItem(OWNER_KEY);
+	} catch {
+		return;
+	}
+	const me = currentUserId();
+	if (owner && me && owner !== me) await forgetOnThisDevice();
+}

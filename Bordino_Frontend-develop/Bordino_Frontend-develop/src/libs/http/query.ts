@@ -52,9 +52,12 @@ async function refreshAccessToken(refreshToken: string) {
 					access: string;
 					refresh: string;
 				};
-			}>(`${process.env.NEXT_PUBLIC_REFRESH_URL}token/refresh/`, {
-				refresh: stored.refreshToken,
-			});
+			}>(
+				`${process.env.NEXT_PUBLIC_REFRESH_URL}token/refresh/`,
+				{ refresh: stored.refreshToken },
+				// Bounded: a hung refresh would hold the session lock, and logout waits for it.
+				{ timeout: 15000 },
+			);
 
 			const {
 				result: { access, refresh },
@@ -78,6 +81,13 @@ async function refreshAccessToken(refreshToken: string) {
 				error.response?.status === 401 &&
 				useAuthStore.getState().refreshToken === stored.refreshToken
 			) {
+				// The session is over: this device must not keep showing its notifications to
+				// whoever signs in next. Local only (the server would need this very session) and
+				// before logout(), which leaves the page.
+				await Promise.race([
+					import("@/bd/push").then((push) => push.forgetOnThisDevice()),
+					new Promise((resolve) => setTimeout(resolve, 3000)),
+				]).catch(() => undefined);
 				useAuthStore.getState().logout();
 				useUserStore.getState().clearUser();
 			}
