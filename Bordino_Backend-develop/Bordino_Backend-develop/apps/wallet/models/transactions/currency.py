@@ -29,9 +29,11 @@ class CurrencyTransaction(BaseTransaction):
         null=True,
         blank=True,
     )
+    # PROTECT: a withdrawal must keep its destination (and its refund depends on it); players
+    # remove accounts by soft delete (is_deleted).
     bank_account = models.ForeignKey(
         "wallet.BankAccount",
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="transactions",

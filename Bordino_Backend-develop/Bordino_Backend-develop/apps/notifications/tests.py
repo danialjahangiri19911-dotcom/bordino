@@ -183,7 +183,7 @@ class SendingTests(TestCase):
         )
         api = APIClient()
         api.force_authenticate(self.user)
-        api.post("/api/v1/wallet/currency/withdraw/", {"amount": 20_000, "bank_account_id": str(account.pk)}, format="json")
+        api.post("/api/v1/wallet/currency/withdraw/", {"amount": 20_000, "bank_account_id": str(account.pk), "request_id": "n-1"}, format="json")
         tx = CurrencyTransaction.objects.get()
         delay.reset_mock()
         with self.captureOnCommitCallbacks(execute=True):

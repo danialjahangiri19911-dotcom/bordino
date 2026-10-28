@@ -15,3 +15,6 @@ class CurrencyWalletAccountAdmin(BaseAdmin):
         "status",
         "primary",
     )
+    # Cash moves only through transactions (withdrawals, prizes): an edited balance would have no
+    # history and could overwrite a payment made at the same moment.
+    readonly_fields = ("balance",)

@@ -20,7 +20,8 @@ class WithdrawSerializer(serializers.Serializer):
     bank_account_id = serializers.UUIDField()
     # One id per withdrawal the player starts (made by the app). A retry of a request whose answer
     # was lost carries the same id and gets the first result back instead of a second withdrawal.
-    request_id = serializers.CharField(max_length=64, required=False)
+    # Required: a withdrawal retried without it would be a second withdrawal.
+    request_id = serializers.CharField(max_length=64)
 
 
 class CurrencyWithdrawViewSet(ViewSet):

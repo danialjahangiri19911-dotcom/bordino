@@ -58,6 +58,9 @@ class WithdrawTests(TestCase):
         )
 
     def withdraw(self, amount, **extra):
+        import uuid  # pylint: disable=import-outside-toplevel
+
+        extra.setdefault("request_id", str(uuid.uuid4()))
         return self.api.post(
             WITHDRAW,
             {"amount": amount, "bank_account_id": str(self.bank_account.pk), **extra},
@@ -302,7 +305,7 @@ class HistoryTests(TestCase):
             user=self.user, iban="IR062960000000100324200001", bank=bank,
             account_holder="Test", status=BankAccount.Status.APPROVED,
         )
-        self.api.post(WITHDRAW, {"amount": 20_000, "bank_account_id": str(account.pk)}, format="json")
+        self.api.post(WITHDRAW, {"amount": 20_000, "bank_account_id": str(account.pk), "request_id": "h-1"}, format="json")
         tx = CurrencyTransaction.objects.get()
         tx.status = CurrencyTransaction.Status.FAILED
         tx.save()
@@ -643,3 +646,98 @@ class AdRewardTests(TestCase):
         with self.assertRaises(ValueError):
             RecordActionService.record_action(self.user, "rewarded_ad", "ad:forged")
         self.assertEqual(points(self.user), 105)
+
+
+
+@override_settings(CACHES=LOCMEM)
+class AuditPhase1Tests(TestCase):
+    """Full Codex audit, phase 1 (2026-10-28): money integrity."""
+
+    def setUp(self):
+        from django.core.cache import cache  # pylint: disable=import-outside-toplevel
+
+        cache.clear()
+        self.user = make_customer("9120002001", points=100, rial=100_000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_an_admin_adjustment_adds_to_the_balance_of_that_moment_and_is_in_the_history(self):
+        from apps.wallet.services.adjust import adjust_points  # pylint: disable=import-outside-toplevel
+
+        stale = balance.points_account(self.user)  # read at 100
+        balance.add_points(stale, -30)  # a purchase in between → 70
+        adjust_points(stale, 100)  # the old code saved 100 + 100 = 200
+        self.assertEqual(points(self.user), 170)
+        rows = self.api.get("/api/v1/wallet/points/transactions/").json()
+        rows = (rows.get("result") or rows)
+        rows = rows.get("results", rows) if isinstance(rows, dict) else rows
+        self.assertIn("تنظیم امتیاز توسط پشتیبانی", {r["title"] for r in rows})
+
+    def test_a_cancelled_reward_takes_back_what_was_posted_not_an_edited_amount(self):
+        from apps.wallet.models import ActivityTransaction  # pylint: disable=import-outside-toplevel
+
+        tx = ActivityTransaction.objects.create(
+            customer=self.user.customer, section="admin_adjust", action_type="t-1", score_value=10,
+            reward_data={}, status=ActivityTransaction.Status.COMPLETED,
+        )
+        self.assertEqual(points(self.user), 110)
+        tx.score_value = 100  # edited in the admin, then cancelled
+        tx.status = ActivityTransaction.Status.CANCELLED
+        tx.save()
+        self.assertEqual(points(self.user), 100)
+        tx.refresh_from_db()
+        self.assertEqual(tx.score_value, 10)
+
+    def test_deleting_a_stale_copy_of_a_cancelled_reward_takes_nothing_more(self):
+        from apps.wallet.models import ActivityTransaction  # pylint: disable=import-outside-toplevel
+
+        tx = ActivityTransaction.objects.create(
+            customer=self.user.customer, section="admin_adjust", action_type="t-2", score_value=10,
+            reward_data={}, status=ActivityTransaction.Status.COMPLETED,
+        )
+        stale = ActivityTransaction.objects.get(pk=tx.pk)  # loaded while still completed
+        tx.status = ActivityTransaction.Status.CANCELLED
+        tx.save()
+        self.assertEqual(points(self.user), 100)
+        stale.delete()  # the old code read stale.status (completed) and took 10 again
+        self.assertEqual(points(self.user), 100)
+
+    def test_a_bank_account_with_withdrawals_cannot_be_hard_deleted(self):
+        from django.db.models import ProtectedError  # pylint: disable=import-outside-toplevel
+
+        account = BankAccount.objects.create(
+            user=self.user, iban="IR700120000000000000000000", bank=Bank.objects.get(code="012"),
+            account_holder="x", status=BankAccount.Status.APPROVED,
+        )
+        self.assertEqual(self.api.post(WITHDRAW, {"amount": 40_000, "bank_account_id": str(account.pk), "request_id": "w-1"}, format="json").status_code, 201)
+        with self.assertRaises(ProtectedError):
+            account.delete()
+
+    def test_a_withdrawal_without_a_request_id_is_refused(self):
+        account = BankAccount.objects.create(
+            user=self.user, iban="IR700120000000000000000000", bank=Bank.objects.get(code="012"),
+            account_holder="x", status=BankAccount.Status.APPROVED,
+        )
+        self.assertEqual(self.api.post(WITHDRAW, {"amount": 10_000, "bank_account_id": str(account.pk)}, format="json").status_code, 400)
+        self.assertEqual(rial(self.user), 100_000)
+
+    def test_a_retried_game_charge_charges_once(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.filter(game_name="sudoku").delete()
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="easy", timer=600, play_cost=3)
+        url = "/api/v1/wallet/games/charge/"
+        for _ in range(2):
+            self.assertEqual(self.api.post(url, {"game_name": "sudoku", "request_id": "play-1"}, format="json").status_code, 200)
+        self.assertEqual(points(self.user), 97)
+        self.assertEqual(self.api.post(url, {"game_name": "game_2048", "request_id": "play-1"}, format="json").status_code, 400)
+        self.api.post(url, {"game_name": "sudoku", "request_id": "play-2"}, format="json")
+        self.assertEqual(points(self.user), 94)
+
+    def test_an_unknown_ad_provider_offers_nothing(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.filter(key="AD_REWARD_PROVIDER").update(value="adddelivery-typo")
+        offer = self.api.get("/api/v1/wallet/ad-reward/offer/").json()
+        self.assertFalse((offer.get("result") or offer)["available"])
+        self.assertEqual(self.api.post("/api/v1/wallet/ad-reward/sessions/", {}, format="json").status_code, 409)

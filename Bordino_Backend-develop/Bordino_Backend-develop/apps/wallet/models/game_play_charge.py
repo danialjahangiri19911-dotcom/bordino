@@ -12,6 +12,13 @@ class GamePlayCharge(AbstractBaseModel):
         verbose_name = _("Game play charge")
         verbose_name_plural = _("Game play charges")
         indexes = [models.Index(fields=["customer", "game_name"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("customer", "request_id"),
+                condition=models.Q(request_id__isnull=False),
+                name="game_charge_unique_request_id",
+            )
+        ]
 
     customer = models.ForeignKey(
         "users.Customer", on_delete=models.CASCADE, related_name="game_play_charges"
@@ -25,6 +32,9 @@ class GamePlayCharge(AbstractBaseModel):
     )
     game_name = models.CharField(max_length=50)
     cost = models.PositiveIntegerField(default=0)
+    # One id per play the app starts; a retry of a request whose answer was lost sends the same id
+    # and gets the first result instead of a second charge.
+    request_id = models.CharField(max_length=64, null=True, blank=True, editable=False)
 
     def __str__(self):
         return f"{self.customer_id} {self.game_name} -{self.cost}"

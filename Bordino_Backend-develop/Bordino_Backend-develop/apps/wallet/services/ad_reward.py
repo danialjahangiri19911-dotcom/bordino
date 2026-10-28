@@ -80,8 +80,10 @@ class DemoVideoProvider(AdProvider):
 PROVIDERS: dict[str, AdProvider] = {DemoVideoProvider.name: DemoVideoProvider()}
 
 
-def provider() -> AdProvider:
-    return PROVIDERS.get(str(setting("AD_REWARD_PROVIDER")), PROVIDERS["demo"])
+def provider() -> AdProvider | None:
+    # An unknown name (a typo, or the real SDK's provider not deployed yet) offers nothing rather
+    # than quietly paying through the demo.
+    return PROVIDERS.get(str(setting("AD_REWARD_PROVIDER")))
 
 
 def _rewarded_today(customer: Customer) -> int:
@@ -102,6 +104,8 @@ class Offer:
 
 def offer(customer: Customer) -> Offer:
     p = provider()
+    if p is None:
+        return Offer(False, 0, 0, "", {})
     limit = max(0, int(setting("AD_REWARD_DAILY_LIMIT")))
     remaining = max(0, limit - _rewarded_today(customer))
     points = max(0, int(setting("AD_REWARD_POINTS")))

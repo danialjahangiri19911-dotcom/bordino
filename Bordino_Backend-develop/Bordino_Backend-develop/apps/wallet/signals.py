@@ -15,6 +15,30 @@ from apps.wallet.services import balance
 from apps.wallet.services.token_wallet_account.creation import TokenWalletAccountCreationService
 
 
+# ---- Points transactions -------------------------------------------------------------------------
+# What a status change or a delete gives back is what was posted: the stored row, read under a row
+# lock (the admin saves inside a transaction, so two edits of one row run one after the other),
+# never the edited or stale in-memory copy. The posted amount and accounts do not change.
+
+
+def _posted(model, instance, fields):
+    if not instance.pk:
+        return None
+    rows = model.objects.filter(pk=instance.pk)
+    if connection.in_atomic_block:
+        rows = rows.select_for_update()
+    return rows.values("status", *fields).first()
+
+
+def _keep_posted(model, instance, fields):
+    stored = _posted(model, instance, fields)
+    instance._stored = stored
+    instance._previous_status = stored["status"] if stored else None
+    if stored:
+        for field in fields:
+            setattr(instance, field, stored[field])
+
+
 @receiver(post_save, sender=LotteryTicketTransaction)
 def update_wallet_on_ticket_transaction(sender, instance, created, **kwargs):
     with transaction.atomic():
@@ -36,19 +60,19 @@ def update_wallet_on_ticket_transaction(sender, instance, created, **kwargs):
 
 @receiver(pre_save, sender=LotteryTicketTransaction)
 def store_previous_status_ticket(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_instance = LotteryTicketTransaction.objects.get(pk=instance.pk)
-            instance._previous_status = old_instance.status
-        except LotteryTicketTransaction.DoesNotExist:
-            instance._previous_status = None
-    else:
-        instance._previous_status = None
+    _keep_posted(LotteryTicketTransaction, instance, ('amount', 'source_wallet_id'))
+
+
+@receiver(pre_delete, sender=LotteryTicketTransaction)
+def store_deleted_lotterytickettransaction(sender, instance, **kwargs):
+    instance._stored = _posted(LotteryTicketTransaction, instance, ('amount', 'source_wallet_id'))
 
 
 @receiver(post_delete, sender=LotteryTicketTransaction)
 def reverse_wallet_on_ticket_transaction_delete(sender, instance, **kwargs):
-    if instance.status == LotteryTicketTransaction.Status.COMPLETED:
+    stored = getattr(instance, "_stored", None)
+    if stored and stored["status"] == LotteryTicketTransaction.Status.COMPLETED:
+        instance.amount, instance.source_wallet_id = stored["amount"], stored["source_wallet_id"]
         with transaction.atomic():
             wallet_account = instance.source_wallet
             balance.add_points(wallet_account, int(instance.amount))
@@ -89,19 +113,19 @@ def update_wallet_on_referral_reward(sender, instance, created, **kwargs):
 
 @receiver(pre_save, sender=ReferralRewardTransaction)
 def store_previous_status_referral(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_instance = ReferralRewardTransaction.objects.get(pk=instance.pk)
-            instance._previous_status = old_instance.status
-        except ReferralRewardTransaction.DoesNotExist:
-            instance._previous_status = None
-    else:
-        instance._previous_status = None
+    _keep_posted(ReferralRewardTransaction, instance, ('tokens_amount', 'referrer_id', 'token_id'))
+
+
+@receiver(pre_delete, sender=ReferralRewardTransaction)
+def store_deleted_referralrewardtransaction(sender, instance, **kwargs):
+    instance._stored = _posted(ReferralRewardTransaction, instance, ('tokens_amount', 'referrer_id', 'token_id'))
 
 
 @receiver(post_delete, sender=ReferralRewardTransaction)
 def reverse_wallet_on_referral_reward_delete(sender, instance, **kwargs):
-    if instance.status == ReferralRewardTransaction.Status.COMPLETED:
+    stored = getattr(instance, "_stored", None)
+    if stored and stored["status"] == ReferralRewardTransaction.Status.COMPLETED:
+        instance.tokens_amount = stored["tokens_amount"]
         with transaction.atomic():
             query_repo = TokenWalletAccountQueryRepository()
             wallet_account = query_repo.filter_by_customer_and_token(
@@ -136,19 +160,20 @@ def update_wallet_on_token_transaction(sender, instance, created, **kwargs):
 
 @receiver(pre_save, sender=TokenTransaction)
 def store_previous_status_token(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_instance = TokenTransaction.objects.get(pk=instance.pk)
-            instance._previous_status = old_instance.status
-        except TokenTransaction.DoesNotExist:
-            instance._previous_status = None
-    else:
-        instance._previous_status = None
+    _keep_posted(TokenTransaction, instance, ('amount', 'source_wallet_id', 'destination_wallet_id'))
+
+
+@receiver(pre_delete, sender=TokenTransaction)
+def store_deleted_tokentransaction(sender, instance, **kwargs):
+    instance._stored = _posted(TokenTransaction, instance, ('amount', 'source_wallet_id', 'destination_wallet_id'))
 
 
 @receiver(post_delete, sender=TokenTransaction)
 def reverse_wallet_on_token_transaction_delete(sender, instance, **kwargs):
-    if instance.status == TokenTransaction.Status.COMPLETED:
+    stored = getattr(instance, "_stored", None)
+    if stored and stored["status"] == TokenTransaction.Status.COMPLETED:
+        instance.amount = stored["amount"]
+        instance.source_wallet_id, instance.destination_wallet_id = stored["source_wallet_id"], stored["destination_wallet_id"]
         with transaction.atomic():
             amount = int(instance.amount)
             source_wallet = instance.source_wallet
@@ -187,19 +212,19 @@ def update_wallet_on_activity_transaction(sender, instance, created, **kwargs):
 
 @receiver(pre_save, sender=ActivityTransaction)
 def store_previous_status_activity(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_instance = ActivityTransaction.objects.get(pk=instance.pk)
-            instance._previous_status = old_instance.status
-        except ActivityTransaction.DoesNotExist:
-            instance._previous_status = None
-    else:
-        instance._previous_status = None
+    _keep_posted(ActivityTransaction, instance, ('score_value', 'customer_id'))
+
+
+@receiver(pre_delete, sender=ActivityTransaction)
+def store_deleted_activitytransaction(sender, instance, **kwargs):
+    instance._stored = _posted(ActivityTransaction, instance, ('score_value', 'customer_id'))
 
 
 @receiver(post_delete, sender=ActivityTransaction)
 def reverse_wallet_on_activity_transaction_delete(sender, instance, **kwargs):
-    if instance.status == ActivityTransaction.Status.COMPLETED and instance.score_value:
+    stored = getattr(instance, "_stored", None)
+    if stored and stored["status"] == ActivityTransaction.Status.COMPLETED and stored["score_value"]:
+        instance.score_value = stored["score_value"]
         with transaction.atomic():
             wallet_account = balance.points_account(instance.customer.user)
 

@@ -23,7 +23,7 @@ class GamePlayChargeService:
         new_amount: int
 
     @transaction.atomic
-    def charge(self, user, game_name: str) -> "GamePlayChargeService.ChargeResult":
+    def charge(self, user, game_name: str, request_id: str | None = None) -> "GamePlayChargeService.ChargeResult":
         game_name = (game_name or "").lower().strip()
 
         game_config = GameConfigurationQueryRepository.filter_by_game_name(
@@ -36,12 +36,21 @@ class GamePlayChargeService:
         if account is None:
             raise ValidationError(_("کیفِ امتیازی برای کاربر یافت نشد."))
 
+        if request_id:
+            # Under the account lock: a retry (or two copies at once) finds the first charge.
+            earlier = GamePlayCharge.objects.filter(customer=user.customer, request_id=request_id).first()
+            if earlier:
+                if earlier.game_name != game_name:
+                    raise ValidationError(_("این درخواست قبلاً برای بازی دیگری ثبت شده است."))
+                return self.ChargeResult(game_name=game_name, cost=earlier.cost, new_amount=int(account.amount))
+
         if cost > 0:
             balance.check_debit(account, cost, _("امتیازِ کافی برای بازی نداری."))
             balance.add_points(account, -cost)
         # Recorded even when free: it is the play's history row and its proof (activity rewards).
         GamePlayCharge.objects.create(
-            customer=user.customer, token_account=account, game_name=game_name, cost=cost
+            customer=user.customer, token_account=account, game_name=game_name, cost=cost,
+            request_id=request_id or None,
         )
 
         return self.ChargeResult(

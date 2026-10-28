@@ -13,6 +13,8 @@ from apps.wallet.services.game_play.charge import GamePlayChargeService
 
 class GamePlayChargeSerializer(serializers.Serializer):
     game_name = serializers.CharField()
+    # Made by the app for each play it starts and kept for its retries (see GamePlayCharge).
+    request_id = serializers.CharField(max_length=64, required=False, allow_blank=False)
 
 
 class GamePlayChargeResponseSerializer(serializers.Serializer):
@@ -73,6 +75,7 @@ class GamePlayChargeView(APIView):
             result = GamePlayChargeService().charge(
                 user=request.user,
                 game_name=serializer.validated_data["game_name"],
+                request_id=serializer.validated_data.get("request_id"),
             )
         except ValidationError as exc:
             message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
