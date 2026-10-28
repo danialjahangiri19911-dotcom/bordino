@@ -103,7 +103,14 @@ export async function enableAppPush(): Promise<string> {
 	const plugin = appPush();
 	if (!plugin) throw new Error("no app push");
 	const { deviceId } = await plugin.enable();
-	await call("post", "notifications/app-devices/", { provider: "pushe", device_id: deviceId });
+	try {
+		await call("post", "notifications/app-devices/", { provider: "pushe", device_id: deviceId });
+	} catch (e) {
+		// The server may still have this phone under an earlier account: until it is registered to
+		// this one, the phone must not show anything (it would be that account's notifications).
+		await plugin.disable().catch(() => undefined);
+		throw e;
+	}
 	setOwner(currentUserId());
 	return deviceId;
 }

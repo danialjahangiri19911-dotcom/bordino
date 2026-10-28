@@ -4,7 +4,8 @@ const jwt = (user: string) => `${b64({ alg: "HS256" })}.${b64({ user_id: user, e
 
 jest.mock("@/api/games/request", () => ({ call: jest.fn() }));
 
-import { reconcilePushOwner } from "./push";
+import { enableAppPush, reconcilePushOwner } from "./push";
+import { call } from "@/api/games/request";
 import useAuthStore from "@/libs/stores/authStore";
 
 const unsubscribe = jest.fn(async () => true);
@@ -38,5 +39,19 @@ describe("push owner", () => {
 		useAuthStore.setState({ isLoggedIn: true, accessToken: jwt("a"), refreshToken: jwt("a") });
 		await reconcilePushOwner();
 		expect(unsubscribe).not.toHaveBeenCalled();
+	});
+});
+
+describe("Android app notifications (Codex audit phase 6)", () => {
+	it("a phone whose registration to this account failed shows nothing", async () => {
+		const plugin = { enable: jest.fn(async () => ({ deviceId: "dev-1" })), disable: jest.fn(async () => ({ deviceId: "dev-1" })), status: jest.fn() };
+		(window as unknown as { Capacitor: unknown }).Capacitor = { Plugins: { BordinoPush: plugin } };
+		(call as jest.Mock).mockRejectedValueOnce(new Error("network"));
+		await expect(enableAppPush()).rejects.toThrow("network");
+		expect(plugin.disable).toHaveBeenCalled();
+		(call as jest.Mock).mockResolvedValueOnce({});
+		await expect(enableAppPush()).resolves.toBe("dev-1");
+		expect(plugin.disable).toHaveBeenCalledTimes(1);
+		delete (window as unknown as { Capacitor?: unknown }).Capacitor;
 	});
 });
