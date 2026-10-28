@@ -1,44 +1,14 @@
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  width="32"
-  height="32"
-  viewBox="0 0 32 32"
-  role="img"
-  aria-label="چرخونه شانسی"
->
-  <!--
-    Caller: display at 24–28px inside a link with a minimum 44×44px
-    touch target and the accessible name "چرخونه شانسی".
-    Static artwork: no motion, including with prefers-reduced-motion.
-  -->
-
-  <!-- Outer rim and six alternating prize segments. -->
-  <circle cx="16" cy="17" r="12.5" fill="#E64056"/>
-
-  <g fill="#FFBA51">
-    <path d="M16 17V5.5A11.5 11.5 0 0 1 25.959 11.25Z"/>
-    <path d="M16 17 25.959 22.75A11.5 11.5 0 0 1 16 28.5Z"/>
-    <path d="M16 17 6.041 22.75A11.5 11.5 0 0 1 6.041 11.25Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle cx="17" cy="18.5" r="12.5" fill="#25252b"/>
+  <g stroke="#25252b" stroke-width="1.25" stroke-linejoin="round">
+    <path d="M15 17V5.5A11.5 11.5 0 0 1 24.96 11.25Z" fill="#d64142"/>
+    <path d="M15 17 24.96 11.25A11.5 11.5 0 0 1 24.96 22.75Z" fill="#ffe332"/>
+    <path d="M15 17 24.96 22.75A11.5 11.5 0 0 1 15 28.5Z" fill="#fff8eb"/>
+    <path d="M15 17V28.5A11.5 11.5 0 0 1 5.04 22.75Z" fill="#6942bc"/>
+    <path d="M15 17 5.04 22.75A11.5 11.5 0 0 1 5.04 11.25Z" fill="#ffe332"/>
+    <path d="M15 17 5.04 11.25A11.5 11.5 0 0 1 15 5.5Z" fill="#fff8eb"/>
   </g>
-
-  <!-- Light dividers stay readable at small sizes. -->
-  <path
-    d="M16 5.5V28.5M6.041 11.25 25.959 22.75M6.041 22.75 25.959 11.25"
-    fill="none"
-    stroke="#FFFFFF"
-    stroke-width="1"
-  />
-
-  <!-- Central spindle. -->
-  <circle cx="16" cy="17" r="3.5" fill="#FFFFFF"/>
-  <circle cx="16" cy="17" r="2.25" fill="#E64056"/>
-
-  <!-- Fixed top pointer, separated from the wheel by a white outline. -->
-  <path
-    d="M12.5 2H19.5L16 8Z"
-    fill="#E64056"
-    stroke="#FFFFFF"
-    stroke-width="1.5"
-    stroke-linejoin="round"
-  />
+  <circle cx="15" cy="17" r="11.5" fill="none" stroke="#25252b" stroke-width="2.5"/>
+  <circle cx="15" cy="17" r="3.25" fill="#fff8eb" stroke="#25252b" stroke-width="2"/>
+  <path d="M11 1.5H19L15 9Z" fill="#ffe332" stroke="#25252b" stroke-width="2" stroke-linejoin="round"/>
 </svg>

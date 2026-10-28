@@ -29,6 +29,7 @@ function Cover({ game }: { game: GameEntry }) {
 			</div>
 		);
 	}
+	if (game.logo) return <img className="ng-logo" src={game.logo} alt="" width={76} height={76} />;
 	return <Icon name={game.icon} />;
 }
 

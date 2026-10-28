@@ -8,14 +8,20 @@ import { APPEARANCE_SCRIPT } from "@/bd/appearance";
 // The design's stylesheet first; app.css (production frame and additions) overrides it.
 import "@/bd/bd.css";
 import "@/bd/app.css";
-import { LOGO_ADDRESS } from "@/constants/imagePaths";
 import Layout from "@/libs/components/layouts/Layout";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
 	title: "بردینو",
-	icons: { icon: LOGO_ADDRESS, apple: "/bd/icons/apple-touch-icon.png" },
+	// The tab icon: the «ب» brand tile (drawn as SVG; PNG for browsers without SVG favicons).
+	icons: {
+		icon: [
+			{ url: "/bd/icons/favicon.svg", type: "image/svg+xml" },
+			{ url: "/bd/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+		],
+		apple: "/bd/icons/apple-touch-icon.png",
+	},
 	// iPhone «Add to Home Screen» opens full-screen with the Persian name.
 	appleWebApp: { capable: true, title: "بردینو", statusBarStyle: "default" },
 	// iPhone Safari turns digit runs (phone numbers, amounts) into links before React starts, which

@@ -92,8 +92,8 @@ export default function Home() {
 					<div className="bd-mission-list">
 						{GAMES.map((game) => (
 							<div className="bd-mission" key={game.id}>
-								<span className="bd-mission-icon">
-									<Icon name={game.icon} />
+								<span className={`bd-mission-icon ${game.logo ? "bd-mission-logo" : ""}`}>
+									{game.logo ? <img src={game.logo} alt="" width={36} height={36} /> : <Icon name={game.icon} />}
 								</span>
 								<div className="bd-mission-copy">
 									<b>{game.name}</b>

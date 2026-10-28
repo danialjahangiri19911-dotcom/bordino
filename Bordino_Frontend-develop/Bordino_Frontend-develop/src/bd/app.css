@@ -127,6 +127,11 @@ body { margin: 0; }
 #bordino-directions .bd-chicken-page { min-height: 100dvh; background: #fff8eb; }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-chicken-page { background: #24211e; }
 #bordino-directions .bd-chicken-page .ck-game { min-height: 100dvh; border-radius: 0; max-width: 1440px; margin: 0 auto; }
+/* The chicken and crash logos (public/bd/games) carry their own tile, border and shadow. */
+#bordino-directions .ng-cover > img.ng-logo { width: 76px; height: 76px; transform: rotate(-6deg); }
+#bordino-directions .ng-game[data-game=crash] .ng-cover::before { content: none; }
+#bordino-directions .bd-mission-icon.bd-mission-logo { background: none; border-radius: 0; }
+#bordino-directions .bd-mission-icon.bd-mission-logo img { width: 36px; height: 36px; display: block; }
 /* «انفجار»: the Crash-Game-Design card on the page, full width on a phone. */
 #bordino-directions .bd-crash-page { min-height: 100dvh; background: #fff8eb; padding: 16px 0; }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-crash-page { background: #24211e; }
