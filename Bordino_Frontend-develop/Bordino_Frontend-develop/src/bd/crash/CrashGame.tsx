@@ -64,6 +64,36 @@ function useFrameClock(active: boolean) {
 }
 
 /**
+ * The browser's own Back (a browser, not the Android app, whose Back is useBackHandler's): while
+ * `active`, one extra history entry for this same page catches it and `onBack` asks instead. The
+ * entry copies Next's history state, so its router just shows this page again; it is taken back
+ * off when the round is over.
+ */
+function useBrowserBackGuard(active: boolean, onBack: () => void) {
+	const handler = useRef(onBack);
+	handler.current = onBack;
+	useEffect(() => {
+		if (!active || typeof window === "undefined") return undefined;
+		const guard = { crashGuard: true };
+		window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+		let armed = true;
+		const onPop = () => {
+			if (!armed) return;
+			// Back left the guard entry: put it back and ask.
+			window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+			handler.current();
+		};
+		window.addEventListener("popstate", onPop);
+		return () => {
+			armed = false;
+			window.removeEventListener("popstate", onPop);
+			// The round is over (or the page is leaving): drop the guard entry if it is still on top.
+			if ((window.history.state as { crashGuard?: boolean } | null)?.crashGuard) window.history.back();
+		};
+	}, [active]);
+}
+
+/**
  * «انفجار» in the Bordino-Crash-Game-Design look (neobrutalism, like the rest of the app), driven by
  * the server's rounds (apps/crash): the bet, the cash-out and the crash point are the server's; the
  * page only animates the curve the server's clock describes. Automatic play is a series of ordinary
@@ -151,8 +181,10 @@ export default function CrashGame() {
 	else if (round) phase = elapsed < 0 ? "waiting" : "running";
 	const multiplier = phase === "running" ? multiplierAt(elapsed, growth) : phase === "crashed" ? (crashPoint ?? 1) : 1;
 	const cashedAt = round?.status === "won" && round.cashout_multiplier ? Number(round.cashout_multiplier) : 0;
-	const target = round?.auto_cashout ? Number(round.auto_cashout) : null;
-	// Passing the target on screen is not a win yet: the server confirms it (the long-poll answers then).
+	// The server's effective target: the player's cash-out multiplier, or lower when the payout cap
+	// stops the round first (it settles there by itself). Passing it on screen is not a win yet: the
+	// server confirms it (the long-poll answers then).
+	const target = round?.target_multiplier ? Number(round.target_multiplier) : null;
 	const autoPending = phase === "running" && round?.status === "active" && !!target && multiplier >= target;
 	const flying = phase === "waiting" || phase === "running";
 	const flightSec =
@@ -207,46 +239,77 @@ export default function CrashGame() {
 	const { placeBet } = game;
 	const bet = useCallback((stake: number, auto: boolean) => placeBet(stake, autoCashout(form, auto)), [placeBet, form]);
 
+	// Automatic play lives in refs, not only in state: «stop», leaving and hiding the page take effect
+	// at once (a state update lands a render later, after a queued bet could already have started).
 	const autoTimer = useRef<number | null>(null);
-	const counted = useRef("");
+	const autoOn = useRef(false);
+	const runSeq = useRef(0);
+	/** The run's own rounds (by id) and the ones already counted in its result. */
+	const run = useRef<{ id: number; rounds: Set<string>; counted: Set<string>; state: AutoRun } | null>(null);
+	const mounted = useRef(true);
 	const stopAuto = useCallback((why: string) => {
+		autoOn.current = false;
 		setAutoRunning(false);
 		if (autoTimer.current) window.clearTimeout(autoTimer.current);
 		autoTimer.current = null;
-		setNotice(why);
+		if (why) setNotice(why);
 	}, []);
-	useEffect(() => () => {
-		if (autoTimer.current) window.clearTimeout(autoTimer.current);
-	}, []);
-	// Hidden page: the round on the server goes on, but no new automatic bet starts unseen.
 	useEffect(() => {
-		if (hidden && autoRunning) stopAuto(flying ? "تکرار خودکار متوقف شد؛ این دور روی سرور ادامه دارد." : "اجرای خودکار متوقف شد.");
-	}, [hidden, autoRunning, flying, stopAuto]);
+		mounted.current = true;
+		// Hidden page: the round on the server goes on, but no new automatic bet starts unseen.
+		const onHide = () => {
+			if (document.hidden && autoOn.current) stopAuto("اجرای خودکار متوقف شد چون صفحه پنهان شد؛ دور در جریان روی سرور ادامه دارد.");
+		};
+		document.addEventListener("visibilitychange", onHide);
+		return () => {
+			mounted.current = false;
+			autoOn.current = false;
+			document.removeEventListener("visibilitychange", onHide);
+			if (autoTimer.current) window.clearTimeout(autoTimer.current);
+		};
+	}, [stopAuto]);
+
+	/** One automatic bet, only while this run is still the live one and the page is seen. */
+	const autoBet = useCallback(
+		async (stake: number, id: number) => {
+			if (!mounted.current || !autoOn.current || runSeq.current !== id || document.hidden) return false;
+			const placed = await bet(stake, true);
+			if (placed && run.current?.id === id) run.current.rounds.add(placed.id);
+			return !!placed;
+		},
+		[bet],
+	);
 
 	const startAuto = async () => {
 		const stake = num(form.stake);
-		// The round on screen is the last manual one: it must not count as the first automatic result.
-		counted.current = round?.id ?? "";
-		setAutoRun({ base: stake, stake, played: 0, net: 0 });
+		const id = ++runSeq.current;
+		const state = { base: stake, stake, played: 0, net: 0 };
+		run.current = { id, rounds: new Set(), counted: new Set(), state };
+		autoOn.current = true;
+		setAutoRun(state);
 		setAutoRunning(true);
 		setNotice("");
-		if (!(await bet(stake, true))) setAutoRunning(false);
+		if (!(await autoBet(stake, id)) && runSeq.current === id && autoOn.current) stopAuto("");
 	};
 
 	useEffect(() => {
-		if (!autoRunning || !autoRun || !round?.revealed || counted.current === round.id) return;
-		counted.current = round.id;
-		const { next, stop } = afterAutoRound(autoRun, round, form, limits);
+		const current = run.current;
+		if (!current || !round?.revealed || !current.rounds.has(round.id) || current.counted.has(round.id)) return;
+		// Every round of the run counts in its result once, even one that finished after «stop».
+		current.counted.add(round.id);
+		const { next, stop } = afterAutoRound(current.state, round, form, limits);
+		current.state = next;
 		setAutoRun(next);
+		if (!autoOn.current || runSeq.current !== current.id) return;
 		if (stop) {
 			stopAuto(stop);
 			return;
 		}
 		autoTimer.current = window.setTimeout(async () => {
 			autoTimer.current = null;
-			if (!(await bet(next.stake, true))) setAutoRunning(false);
+			if (!(await autoBet(next.stake, current.id)) && runSeq.current === current.id && autoOn.current) stopAuto("");
 		}, AUTO_PAUSE_MS);
-	}, [autoRunning, autoRun, round, form, limits, bet, stopAuto]);
+	}, [round, form, limits, autoBet, stopAuto]);
 
 	// ── the main button ──
 	let main: { label: string; disabled: boolean; cash?: boolean; run: () => void } = {
@@ -259,8 +322,10 @@ export default function CrashGame() {
 		if (reconnecting || !online) main = { label: "در حال اتصال دوباره…", disabled: true, run: () => undefined };
 		else if (cashedAt) main = { label: "برداشت شد؛ منتظر پایان دور", disabled: true, run: () => undefined };
 		else if (autoPending) main = { label: `در انتظار تأیید ${fa2(target ?? 0)}×…`, disabled: true, run: () => undefined };
-		else if (round)
-			main = { label: `برداشت ${fa(Math.floor(round.bet * multiplier))}`, disabled: busy, cash: true, run: () => void game.cashOut() };
+		else if (round) {
+			const offer = Math.min(Math.floor(round.bet * multiplier), config?.max_payout ?? Infinity);
+			main = { label: `برداشت ${fa(offer)}`, disabled: busy, cash: true, run: () => void game.cashOut() };
+		}
 	} else if (autoRunning) main = { label: "دور بعدی به‌زودی…", disabled: true, run: () => undefined };
 
 	// Space = the main button, when not typing in a field.
@@ -280,6 +345,7 @@ export default function CrashGame() {
 	// ── leaving: the round goes on at the server, so ask first while one is in play ──
 	const leave = () => {
 		try {
+			stopAuto("");
 			music.current?.stop();
 		} finally {
 			push(R.games);
@@ -287,6 +353,7 @@ export default function CrashGame() {
 	};
 	const inPlay = flying || autoRunning || busy;
 	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? setPanel("exit") : leave()));
+	useBrowserBackGuard(inPlay, () => setPanel("exit"));
 
 	if (!allowed) return null;
 
@@ -334,8 +401,8 @@ export default function CrashGame() {
 			<article className={`cr cr-brutal ${scheme === "dark" ? "cr-dark" : ""}`} data-style-name="brutal" dir="rtl" aria-label="بازی انفجار">
 				<header className="cr-header">
 					<div className="cr-brand">
-						<span className="cr-mark">
-							<Icon name="rocket" />
+						<span className="cr-mark cr-logo">
+							<img src="/bd/games/crash-logo.svg" alt="" width={48} height={48} />
 						</span>
 						<div>
 							<small>بردینو / بازی‌ها</small>
