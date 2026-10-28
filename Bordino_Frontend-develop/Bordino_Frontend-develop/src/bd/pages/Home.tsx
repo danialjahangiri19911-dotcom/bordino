@@ -6,13 +6,24 @@ import Icon from "../Icon";
 import { GAMES } from "../games";
 import { fa } from "../format";
 import useCountdown, { formatLeft } from "../useCountdown";
-import { AppShell, Art, Balance, R, useProfileSync } from "../ui";
+import { AppShell, Art, Balance, LoadState, R, useProfileSync } from "../ui";
 
 import useExtractLotteries from "@/api/lottery/utils/useExtractLotteries";
 
 function LotteryPanel() {
-	const { activeLotteries: lottery } = useExtractLotteries();
+	const { activeLotteries: lottery, loaded, isLoading, error, refetch } = useExtractLotteries();
 	const left = useCountdown(lottery?.end_date);
+	if (!lottery && !loaded) {
+		// Still loading, or the list failed: not the same as «no lottery right now».
+		return (
+			<section className="bd-panel bd-campaign">
+				<p className="bd-overline">
+					<Icon name="ticket" /> قرعه‌کشی بردینو
+				</p>
+				<LoadState loading={isLoading} error={error} onRetry={refetch} errorText="قرعه‌کشی‌ها بارگذاری نشد." />
+			</section>
+		);
+	}
 	if (!lottery) {
 		return (
 			<section className="bd-panel bd-campaign">

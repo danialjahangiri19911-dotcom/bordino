@@ -8,7 +8,7 @@ import { getRemainingSeconds } from "@/libs/utils/date";
 export default function useExtractLotteries() {
 	// While a lottery runs, ask again every minute (so an open page notices its end by itself),
 	// and every 30 s once sales closed and the draw is pending, so the result shows up.
-	const { data: lotteries } = useGetLotteryList({
+	const { data: lotteries, isLoading, error, refetch } = useGetLotteryList({
 		refetchInterval: (query: { state: { data?: Res<LotteryListApiResponse> } }) => {
 			const active = query.state.data?.data?.result?.results?.find(
 				(lottery: Lottery) => lottery.status === "active",
@@ -42,5 +42,6 @@ export default function useExtractLotteries() {
 		return lotteryData.filter((lottery) => lottery.status !== "active");
 	}, [lotteryData]);
 
-	return { lotteryData, activeLotteries, remainingTime, notActiveLotteries };
+	// `loaded`: the list came back, so «no active lottery» is a fact, not a request still on its way.
+	return { lotteryData, activeLotteries, remainingTime, notActiveLotteries, loaded: !!lotteries?.result, isLoading, error, refetch };
 }

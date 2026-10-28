@@ -38,8 +38,10 @@ export interface LeaveQuestion {
 	yes: string;
 }
 
-/** Asks `q` and, on «yes», leaves the page (set by BackButton; null outside the Android app). */
-let ask: ((q: LeaveQuestion) => void) | null = null;
+/** Asks `q`; on «yes» runs `go` (default: leave the page as Back would). Set by BackButton. */
+let ask: ((q: LeaveQuestion, go?: () => void) => void) | null = null;
+/** The questions of the leave guards now active (newest last). */
+const guards: LeaveQuestion[] = [];
 
 export function setLeaveAsker(fn: typeof ask) {
 	ask = fn;
@@ -51,4 +53,22 @@ export function setLeaveAsker(fn: typeof ask) {
  */
 export function useLeaveGuard(active: boolean, question: LeaveQuestion) {
 	useBackHandler(active, () => ask?.(question));
+	const q = useRef(question);
+	q.current = question;
+	useEffect(() => {
+		if (!active) return;
+		const entry = q.current;
+		guards.push(entry);
+		return () => {
+			const i = guards.lastIndexOf(entry);
+			if (i >= 0) guards.splice(i, 1);
+		};
+	}, [active]);
+}
+
+/** Leaving by a button (a game's exit): asks first while a leave guard is active, then runs `go`. */
+export function confirmLeave(go: () => void) {
+	const q = guards[guards.length - 1];
+	if (q && ask) ask(q, go);
+	else go();
 }

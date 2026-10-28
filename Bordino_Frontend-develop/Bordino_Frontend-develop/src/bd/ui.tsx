@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "./Icon";
+import { confirmLeave } from "./back";
 import { fa } from "./format";
 import useGetCustomerProfile from "@api/customer/hooks/useGetCustomerProfile";
 import useGetPointsSummary from "@api/wallet/hooks/useGetPointsSummary";
@@ -323,7 +324,8 @@ export function GameShell({
 						className="gf-icon"
 						aria-label="خروج از بازی"
 						onClick={() => {
-							if (!onExit || onExit()) push(R.games);
+							// A running round (crash) asks first, as the Android Back button does.
+							if (!onExit || onExit()) confirmLeave(() => push(R.games));
 						}}
 					>
 						<Icon name="log-out" />

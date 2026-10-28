@@ -60,6 +60,12 @@ export default function BackButton() {
 
 	useBackHandler(!!question, () => setQuestion(null));
 
+	// The leave question works everywhere (a game's exit button asks it in a browser too).
+	useEffect(() => {
+		setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()) }));
+		return () => setLeaveAsker(null);
+	}, []);
+
 	useEffect(() => {
 		const app = capacitorApp();
 		if (!app) return;
@@ -70,7 +76,7 @@ export default function BackButton() {
 			if (canGoBackNow) window.history.back();
 			else router.replace(parentOf(here));
 		};
-		setLeaveAsker((q) => setQuestion({ ...q, onYes: leave }));
+		setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? leave }));
 		const onBack = ({ canGoBack }: { canGoBack?: boolean }) => {
 			canGoBackNow = !!canGoBack;
 			if (handleBackInPage() || closeOpenDialog()) return;
@@ -90,7 +96,7 @@ export default function BackButton() {
 		};
 		const handle = app.addListener("backButton", onBack) as { remove?: () => void } | Promise<{ remove?: () => void }>;
 		return () => {
-			setLeaveAsker(null);
+			setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()) }));
 			void Promise.resolve(handle).then((h) => h?.remove?.());
 		};
 	}, [router]);
