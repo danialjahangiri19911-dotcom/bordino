@@ -45,6 +45,9 @@ class LotteryWheelSpinLog(AbstractBaseModel):
         default=1,
         help_text=_("ضریبِ انتخابیِ کاربر هنگامِ چرخش (۱ تا ۵)"),
     )
+    # What was actually paid (prize × multiplier) at the time: a retried request is answered with
+    # this, not with the prize's current amount (an admin may have changed it since).
+    paid_amount = models.DecimalField(max_digits=20, decimal_places=0, null=True, blank=True, editable=False)
     prize = models.ForeignKey(
         LotteryWheelPrize,
         on_delete=models.SET_NULL,

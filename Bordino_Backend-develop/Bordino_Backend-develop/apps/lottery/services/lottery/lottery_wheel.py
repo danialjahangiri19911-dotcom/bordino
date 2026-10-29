@@ -109,6 +109,24 @@ class LotteryWheelService:
         # same order everywhere): two requests that both passed the serializer's check must not
         # both spin past the limit.
         wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
+        # A retry of a spin that already happened is answered first — before the limits and the
+        # wheel's state, which that very spin may have changed — with exactly what was paid then.
+        # The same request id for another wheel or multiplier is not a retry: refused.
+        if dto.request_id:
+            earlier = (
+                LotteryWheelSpinLog.objects.filter(customer=dto.customer, request_id=dto.request_id)
+                .select_related("prize")
+                .first()
+            )
+            if earlier:
+                if earlier.lottery_wheel_id != wheel.pk or earlier.multiplier != max(1, int(dto.multiplier or 1)):
+                    raise ValidationError(_("This request was already used for another spin."))
+                prize = earlier.prize
+                if prize and prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
+                    prize.prize_amount = (
+                        earlier.paid_amount if earlier.paid_amount is not None else prize.prize_amount * earlier.multiplier
+                    )
+                return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
         if wheel.status != LotteryWheel.Status.ACTIVE:
             raise ValidationError(_("This wheel is not active."))
         total = LotteryWheelSpin.objects.filter(lottery_wheel=wheel).aggregate(n=Sum("count"))["n"] or 0
@@ -120,17 +138,6 @@ class LotteryWheelService:
             .first()
             or 0
         )
-        if dto.request_id:
-            earlier = (
-                LotteryWheelSpinLog.objects.filter(customer=dto.customer, request_id=dto.request_id)
-                .select_related("prize")
-                .first()
-            )
-            if earlier:
-                prize = earlier.prize
-                if prize and prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
-                    prize.prize_amount = prize.prize_amount * earlier.multiplier
-                return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
         if mine >= wheel.max_spins_per_customer:
             raise ValidationError(_("You have reached your maximum spins for this wheel"))
         # A cash prize needs the player's cash account: refuse before charging, rather than roll a
@@ -212,6 +219,7 @@ class LotteryWheelService:
             cost=int(dto.lottery_wheel.cost_per_spin),
             multiplier=multiplier,
             prize=selected_prize if selected_prize.pk else None,
+            paid_amount=selected_prize.prize_amount if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY else 0,
             request_id=dto.request_id or None,
         )
 

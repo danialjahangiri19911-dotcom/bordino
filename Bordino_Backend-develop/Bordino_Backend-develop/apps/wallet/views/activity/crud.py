@@ -9,6 +9,17 @@ from apps.wallet.schemas.activity.record_action import record_action_schema
 from apps.wallet.serializers.activity.record_action import RecordActionSerializer
 
 
+# What the app may record by itself: events that pay nothing and prove nothing. Anything that pays
+# is decided by the server (Sudoku board rewards: apps/crash sudoku; ads: ad_reward), never by a
+# request saying it happened — e.g. «game_2048 win_game» after one paid play.
+APP_EVENTS = {
+    ("sudoku", "start_game"),
+    ("sudoku", "hint_used"),
+    ("sudoku", "game_over"),
+    ("sudoku", "max_mistakes_reached"),
+}
+
+
 class RecordActionCRUDView(GenericViewSet):
     serializer_class = RecordActionSerializer
     permission_classes = (IsAuthenticated,)
@@ -18,6 +29,12 @@ class RecordActionCRUDView(GenericViewSet):
     def record_action(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        section = (serializer.validated_data["section"] or "").lower()
+        if (section, serializer.validated_data["action_type"]) not in APP_EVENTS:
+            return Response(
+                {"error": "This action is not recorded from the app."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             result = RecordActionService.record_action(

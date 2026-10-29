@@ -742,3 +742,100 @@ class AuditPhase1Tests(TestCase):
         offer = self.api.get("/api/v1/wallet/ad-reward/offer/").json()
         self.assertFalse((offer.get("result") or offer)["available"])
         self.assertEqual(self.api.post("/api/v1/wallet/ad-reward/sessions/", {}, format="json").status_code, 409)
+
+
+@override_settings(CACHES=LOCMEM)
+class SecurityAuditWalletTests(TestCase):
+    """Codex security audit 2026-10-29 (wallet, money and result APIs)."""
+
+    def setUp(self):
+        self.user = make_customer("9120004201", points=100, rial=500_000)
+
+    def test_an_admin_save_does_not_write_back_a_stale_points_balance(self):
+        from types import SimpleNamespace  # pylint: disable=import-outside-toplevel
+
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+        from django.test import RequestFactory  # pylint: disable=import-outside-toplevel
+
+        stale = TokenWalletAccount.objects.get(pk=balance.points_account(self.user).pk)  # page loaded at 100
+        balance.add_points(balance.points_account(self.user), -30)  # a game charge meanwhile
+        stale.name = "renamed"
+        request = RequestFactory().post("/")
+        request.user = get_user_model().objects.create_superuser(phone_number="9120004299", password="x")
+        form = SimpleNamespace(changed_data=["name"], cleaned_data={"adjust_by": 100})
+        site._registry[TokenWalletAccount].save_model(request, stale, form, True)  # pylint: disable=protected-access
+        fresh = TokenWalletAccount.objects.get(pk=stale.pk)
+        self.assertEqual((fresh.name, int(fresh.amount)), ("renamed", 170))
+
+    def test_an_admin_save_does_not_write_back_a_stale_cash_balance(self):
+        from types import SimpleNamespace  # pylint: disable=import-outside-toplevel
+
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        account = CurrencyWalletAccount.objects.filter(wallet__owner=self.user).first()
+        stale = CurrencyWalletAccount.objects.get(pk=account.pk)
+        CurrencyWalletAccount.objects.filter(pk=account.pk).update(balance=100_000)  # a withdrawal meanwhile
+        stale.name = "renamed"
+        site._registry[CurrencyWalletAccount].save_model(None, stale, SimpleNamespace(changed_data=["name"]), True)  # pylint: disable=protected-access
+        fresh = CurrencyWalletAccount.objects.get(pk=account.pk)
+        self.assertEqual((fresh.name, int(fresh.balance)), ("renamed", 100_000))
+
+    def test_the_app_can_only_record_events_that_pay_nothing(self):
+        from apps.configuration.models import GameConfiguration, ScoreConfiguration  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.update_or_create(game_name="game_2048", defaults={"play_cost": 1})
+        ScoreConfiguration.objects.create(section="game_2048", action_type="win_game", score_value=7)
+        api = APIClient()
+        api.force_authenticate(self.user)
+        api.post("/api/v1/wallet/games/charge/", {"game_name": "game_2048", "request_id": "p1"}, format="json")
+        before = points(self.user)
+        r = api.post("/api/v1/activity/record-action/", {"section": "game_2048", "action_type": "win_game"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(points(self.user), before)
+
+    def make_wheel(self, max_spins=100):
+        sponsor_user = getattr(self, "_sponsor", None) or make_customer("9120004202")
+        self._sponsor = sponsor_user
+        sponsor, _ = Sponsor.objects.get_or_create(user=sponsor_user)
+        wheel = LotteryWheel.objects.create(name="w", owner=sponsor, cost_per_spin=10, max_spins=max_spins, max_spins_per_customer=10)
+        prize = LotteryWheelPrize.objects.create(lottery_wheel=wheel, name="p", prize_amount=5, probability=50, prize_type=LotteryWheelPrize.PrizeType.RECHARGE)
+        LotteryWheelPrize.objects.create(lottery_wheel=wheel, name="empty", prize_amount=0, probability=50, prize_type=LotteryWheelPrize.PrizeType.EMPTY)
+        return wheel, prize
+
+    def spin(self, wheel, request_id, multiplier=1):
+        from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService  # pylint: disable=import-outside-toplevel
+
+        api = APIClient()
+        api.force_authenticate(self.user)
+        # The draw is pinned to the 5-point prize (a fresh copy: the service scales it in memory).
+        draw = lambda prizes, multiplier: LotteryWheelPrize.objects.get(lottery_wheel=wheel, name="p")  # noqa: E731
+        with mock.patch.object(LotteryWheelService, "select_prize", side_effect=draw):
+            return api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(wheel.pk), "request_id": request_id, "multiplier": multiplier}, format="json")
+
+    def test_a_retried_wheel_spin_is_answered_even_at_the_limit_and_with_the_amount_paid(self):
+        wheel, prize = self.make_wheel(max_spins=1)
+        first = self.spin(wheel, "s1")
+        self.assertIn(first.status_code, (200, 201), first.content)
+        after = points(self.user)
+        LotteryWheelPrize.objects.filter(pk=prize.pk).update(prize_amount=500)  # an admin edit since
+        again = self.spin(wheel, "s1")  # the wheel is full now; a retry is still the same spin
+        self.assertIn(again.status_code, (200, 201), again.content)
+        self.assertEqual(points(self.user), after)
+        # The replay reports what was paid then (5), not the prize as edited since (500).
+        from apps.lottery.models import LotteryWheelSpinLog  # pylint: disable=import-outside-toplevel
+        from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(int(LotteryWheelSpinLog.objects.get(request_id="s1").paid_amount), 5)
+        prize_back, _ = LotteryWheelService().spin_wheel(
+            LotteryWheelService.SpinWheelDTO(
+                customer=self.user.customer, lottery_wheel=wheel, token_wallet_account=balance.points_account(self.user), request_id="s1"
+            )
+        )
+        self.assertEqual(int(prize_back.prize_amount), 5)
+
+    def test_a_request_id_reused_for_another_wheel_or_multiplier_is_refused(self):
+        wheel, _ = self.make_wheel()
+        other, _ = self.make_wheel()
+        self.assertIn(self.spin(wheel, "s2").status_code, (200, 201))
+        self.assertEqual(self.spin(other, "s2").status_code, 400)
+        self.assertEqual(self.spin(wheel, "s2", multiplier=2).status_code, 400)
