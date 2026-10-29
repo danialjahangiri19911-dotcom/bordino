@@ -455,6 +455,14 @@ class ChickenRoundTests(TestCase):
         round_.refresh_from_db()
         self.assertFalse(chicken.round_payload(round_)["ends_at_cap"])
 
+    def test_the_hit_chance_is_used_as_stored(self):
+        config = ChickenConfiguration.current()
+        config.difficulties = {**config.difficulties, "hard": {"lanes": 16, "hit": "0.44004"}}
+        config.save()
+        round_ = self.bet(10, "hard")
+        self.assertEqual(round_.hit_chance, D("0.4400"))
+        self.assertEqual(round_.lanes, chicken.road_length(10, D("0.44"), D("0.02"), 100000))
+
     def test_cash_out_before_the_first_lane_is_refused(self):
         round_ = self.bet()
         with self.assertRaises(rounds.CrashError):

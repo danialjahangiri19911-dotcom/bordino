@@ -75,7 +75,9 @@ def road_length(bet: int, hit: Decimal, house_edge: Decimal, max_payout: int) ->
 def ends_at_cap(round_: ChickenRound) -> bool:
     """Whether the road ends because one more lane would pass the payout cap (not MAX_LANES, nor a
     fixed road from before)."""
-    following = lane_multipliers(round_.lanes + 1, round_.hit_chance, round_.house_edge)[-1]
+    # Unrounded: one lane past an extreme road may be too big to round to cents.
+    survive = Decimal(1) - Decimal(round_.hit_chance)
+    following = (Decimal(1) - Decimal(round_.house_edge)) / survive ** (round_.lanes + 1)
     return round_.bet * following > round_.max_payout
 
 
@@ -98,6 +100,8 @@ def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, 
     if bet >= config.max_payout:
         raise CrashError("این شرط از سقف برد بیشتر است.")
     _preview_lanes, hit = config.level(difficulty)
+    # As the round stores it (4 decimals), so the road, the hit lane and the payouts agree.
+    hit = Decimal(hit).quantize(Decimal("0.0001"))
     lanes = road_length(bet, hit, config.house_edge, config.max_payout)
     if lanes == 0:
         raise CrashError("با این شرط، برد همان خط اول از سقف برد بیشتر می‌شود؛ شرط را کمتر کن.")
