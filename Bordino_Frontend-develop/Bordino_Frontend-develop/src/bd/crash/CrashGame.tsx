@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
-import { barClass, useAutoHideBar } from "../autoHide";
+import { GameBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
@@ -358,9 +358,8 @@ export default function CrashGame() {
 	useBrowserBackGuard(inPlay, () => setPanel("exit"));
 	const panelBox = useRef<HTMLElement>(null);
 	useDismissOutside(!!panel, panelBox, () => setPanel(""));
-	// The top bar slides away while a round flies (or auto-play runs); a downward swipe brings it back.
+	// The top bar is out of the way while a round flies or auto-play runs (GameBar).
 	const barPlaying = (flying || autoRunning) && !panel;
-	const barHidden = useAutoHideBar(barPlaying);
 
 	if (!allowed) return null;
 
@@ -406,7 +405,7 @@ export default function CrashGame() {
 			}}
 		>
 			<article className={`cr cr-brutal ${scheme === "dark" ? "cr-dark" : ""}`} data-style-name="brutal" dir="rtl" aria-label="بازی انفجار">
-				<div className={barClass(barPlaying, barHidden)}>
+				<GameBar playing={barPlaying}>
 				<header className="cr-header">
 					<div className="cr-brand">
 						<span className="cr-mark cr-logo">
@@ -445,7 +444,7 @@ export default function CrashGame() {
 						</button>
 					</div>
 				</header>
-				</div>
+				</GameBar>
 
 				{panel === "help" ? (
 					<section ref={panelBox} className="cr-help">

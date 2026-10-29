@@ -18,6 +18,15 @@ function capacitorApp(): CapacitorApp | null {
 	return app && typeof app.addListener === "function" ? app : null;
 }
 
+/**
+ * The app's download address for an update from inside the app. Not on lottery.bordino.co: the
+ * app keeps that host inside itself (where a download does nothing), while another address is
+ * handed to the phone's browser, which downloads and installs the APK.
+ */
+const APK_URL = "http://194.60.230.57:8097/download/bordino.apk";
+/** «Later» on the update notice keeps it away this long. */
+const UPDATE_SNOOZE_MS = 3 * 24 * 3600 * 1000;
+
 /** Screens where Back leaves the app (asks first). */
 const ROOTS = new Set<string>([R.home, R.landing, "/pwa", R.login, R.otp]);
 /** The bottom-navigation tabs: Back from one goes to the home tab. */
@@ -66,6 +75,8 @@ export default function BackButton() {
 	const path = useRef(pathname);
 	path.current = pathname;
 	const [question, setQuestion] = useState<(LeaveQuestion & { onYes: () => void }) | null>(null);
+	// The Android app 1.0 (before the Back plugin): hardware Back closes it, so it asks for 1.1+.
+	const [oldApp, setOldApp] = useState(false);
 
 	useBackHandler(!!question, () => setQuestion(null));
 
@@ -75,8 +86,29 @@ export default function BackButton() {
 		return () => setLeaveAsker(null);
 	}, []);
 
+	// The bridge can come up a moment after the page: wait for the App plugin before deciding that
+	// this is the old app (or a browser) without one.
+	const [app, setApp] = useState<CapacitorApp | null>(null);
 	useEffect(() => {
-		const app = capacitorApp();
+		if (!/BordinoApp\//.test(navigator.userAgent)) return undefined;
+		let tries = 0;
+		const look = () => {
+			const found = capacitorApp();
+			if (found) return setApp(found);
+			if (++tries < 20) return void (timer = window.setTimeout(look, 250));
+			let snoozed = false;
+			try {
+				snoozed = Date.now() - Number(localStorage.getItem("bd-app-update-later") || 0) < UPDATE_SNOOZE_MS;
+			} catch {
+				// no storage: ask
+			}
+			if (!snoozed) setOldApp(true);
+		};
+		let timer = window.setTimeout(look, 0);
+		return () => window.clearTimeout(timer);
+	}, []);
+
+	useEffect(() => {
 		if (!app) return;
 		let canGoBackNow = false;
 		// The previous page, or (opened directly, nothing before it) the page above this one.
@@ -108,8 +140,40 @@ export default function BackButton() {
 			setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()) }));
 			void Promise.resolve(handle).then((h) => h?.remove?.());
 		};
-	}, [router]);
+	}, [router, app]);
 
+	if (oldApp && !question) {
+		return (
+			<div className="bd-sheet-backdrop" role="presentation">
+				<div className="bd-product st-brutal bd-sheet bd-leave" role="alertdialog" aria-modal="true" aria-labelledby="app-update-title">
+					<p className="bd-leave-title" id="app-update-title">
+						نسخهٔ تازهٔ اپ بردینو
+					</p>
+					<p className="bd-leave-text">
+						در نسخه‌ای که نصب کرده‌ای، دکمهٔ برگشت گوشی برنامه را می‌بندد. نسخهٔ تازه را نصب کن؛ روی همین نسخه نصب می‌شود و حساب و
+						امتیازهایت سر جایشان می‌مانند. اگر دانلود شروع نشد، این نشانی را در مرورگر باز کن: lottery.bordino.co/download/bordino.apk
+					</p>
+					<a className="bd-sheet-item bd-sheet-danger" href={APK_URL}>
+						دانلود نسخهٔ تازه
+					</a>
+					<button
+						type="button"
+						className="bd-sheet-item bd-sheet-cancel"
+						onClick={() => {
+							try {
+								localStorage.setItem("bd-app-update-later", String(Date.now()));
+							} catch {
+								// shown again next time
+							}
+							setOldApp(false);
+						}}
+					>
+						بعداً
+					</button>
+				</div>
+			</div>
+		);
+	}
 	if (!question) return null;
 	return (
 		<div className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && setQuestion(null)}>
