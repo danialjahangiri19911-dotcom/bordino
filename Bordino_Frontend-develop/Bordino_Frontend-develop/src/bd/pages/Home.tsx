@@ -91,18 +91,19 @@ export default function Home() {
 					</div>
 					<div className="bd-mission-list">
 						{GAMES.map((game) => (
-							<div className="bd-mission" key={game.id}>
+							// The whole row opens the game (not only its arrow).
+							<Link className="bd-mission bd-mission-link" key={game.id} href={game.href} aria-label={`بازی ${game.name}: ${game.blurb}`}>
 								<span className={`bd-mission-icon ${game.logo ? "bd-mission-logo" : ""}`}>
 									{game.logo ? <img src={game.logo} alt="" width={36} height={36} /> : <Icon name={game.icon} />}
 								</span>
-								<div className="bd-mission-copy">
+								<span className="bd-mission-copy">
 									<b>{game.name}</b>
 									<small>{game.blurb}</small>
-								</div>
-								<Link href={game.href} aria-label={`بازی ${game.name}`}>
+								</span>
+								<span className="bd-mission-go" aria-hidden="true">
 									<Icon name="arrow-left" />
-								</Link>
-							</div>
+								</span>
+							</Link>
 						))}
 					</div>
 					<Link className="bd-text-btn" href={R.games}>
