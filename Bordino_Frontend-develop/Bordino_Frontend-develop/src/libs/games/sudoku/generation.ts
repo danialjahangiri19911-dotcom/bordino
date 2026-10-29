@@ -1,5 +1,5 @@
 import { CELL_COUNT, SIZE } from "./constants";
-import type { Board, CellValue, Coordinate, Index } from "./types";
+import type { Board, CellValue, Coordinate } from "./types";
 
 /**
  * Returns an array [0, 1, ..., n-1]
@@ -77,111 +77,124 @@ export function isPeer(a: Coordinate, b: Coordinate): boolean {
 	return a.x === b.x || a.y === b.y || squareA === squareB;
 }
 
-// ----------------------------------------------------------------------
-//  pluck() and its helper canBeA() – behaviour preserved exactly,
-//  including the known indexing bug. Do NOT change without explicit approval.
-// ----------------------------------------------------------------------
-
 /**
- * Checks whether cell (i,j) can legally contain the value found at linear index `cellIndex`.
- *
- * ⚠️ BEHAVIOUR CHANGE NOTICE – 2026-02-12
- * The original implementation contained an accidental comma‑operator bug that caused
- * incorrect peer comparisons. This has been fixed. The puzzle generation algorithm now
- * correctly checks row, column and square peers. As a result, `pluck` will now remove
- * different cells than before, producing different puzzles for the same input.
- *
- * This change was made at the explicit request of the maintainer.
+ * How many solutions `board` (0 = empty) has, counting no further than `limit`: 0 (none or the
+ * givens conflict), 1 (a proper Sudoku) or `limit` (more than one). Bitmasks per row/column/box
+ * and the cell with the fewest candidates first, so it is quick even on sparse boards.
  */
-function canBeA(puzzle: Board, i: Index, j: Index, cellIndex: number): boolean {
-	const x = Math.floor(cellIndex / 9) as Index;
-	const y = (cellIndex % 9) as Index;
-	const value = puzzle[x][y];
-
-	// If the cell is the same as the one we're comparing to, it's fine.
-	if (puzzle[i][j] === value) return true;
-	// If the cell already has a different non‑zero value, it cannot be changed.
-	if (puzzle[i][j] > 0) return false;
-
-	// Check all 9 peers in the row, column and square.
-	for (let m = 0; m < 9; m++) {
-		// Row peer: same row, different column
-		if (m !== x) {
-			const rowPeerValue = puzzle[m][j];
-			if (rowPeerValue === value) return false;
-		}
-		// Column peer: same column, different row
-		if (m !== y) {
-			const colPeerValue = puzzle[i][m];
-			if (colPeerValue === value) return false;
-		}
-		// Square peer: inside the same 3x3 block, not the cell itself
-		const sx = (Math.floor(i / 3) * 3 + Math.floor(m / 3)) as Index;
-		const sy = (Math.floor(j / 3) * 3 + (m % 3)) as Index;
-		if (sx !== x || sy !== y) {
-			const squarePeerValue = puzzle[sx][sy];
-			if (squarePeerValue === value) return false;
-		}
+export function countSolutions(board: Board, limit = 2, first?: { board: Board | null }): number {
+	const cells = board.flat() as number[];
+	const rows = new Array<number>(9).fill(0);
+	const cols = new Array<number>(9).fill(0);
+	const boxes = new Array<number>(9).fill(0);
+	const box = (r: number, c: number) => Math.floor(r / 3) * 3 + Math.floor(c / 3);
+	for (let i = 0; i < 81; i++) {
+		const v = cells[i];
+		if (!v) continue;
+		const r = Math.floor(i / 9);
+		const c = i % 9;
+		const bit = 1 << v;
+		if (rows[r] & bit || cols[c] & bit || boxes[box(r, c)] & bit) return 0;
+		rows[r] |= bit;
+		cols[c] |= bit;
+		boxes[box(r, c)] |= bit;
 	}
-	return true;
+	let found = 0;
+	const search = (): void => {
+		let best = -1;
+		let bestMask = 0;
+		let bestCount = 10;
+		for (let i = 0; i < 81; i++) {
+			if (cells[i]) continue;
+			const r = Math.floor(i / 9);
+			const c = i % 9;
+			const mask = ~(rows[r] | cols[c] | boxes[box(r, c)]) & 0x3fe;
+			let n = 0;
+			for (let m = mask; m; m &= m - 1) n++;
+			if (n === 0) return; // dead end
+			if (n < bestCount) {
+				best = i;
+				bestMask = mask;
+				bestCount = n;
+				if (n === 1) break;
+			}
+		}
+		if (best < 0) {
+			if (first && !first.board) first.board = Array.from({ length: 9 }, (_, r) => cells.slice(r * 9, r * 9 + 9)) as Board;
+			found++;
+			return;
+		}
+		const r = Math.floor(best / 9);
+		const c = best % 9;
+		const b = box(r, c);
+		for (let v = 1; v <= 9; v++) {
+			const bit = 1 << v;
+			if (!(bestMask & bit)) continue;
+			cells[best] = v;
+			rows[r] |= bit;
+			cols[c] |= bit;
+			boxes[b] |= bit;
+			search();
+			cells[best] = 0;
+			rows[r] &= ~bit;
+			cols[c] &= ~bit;
+			boxes[b] &= ~bit;
+			if (found >= limit) return;
+		}
+	};
+	search();
+	return found;
 }
 
+/** A full solution that keeps every number already on `board` (0 = empty), or null if none does. */
+export function solveBoard(board: Board): Board | null {
+	const first: { board: Board | null } = { board: null };
+	countSolutions(board, 1, first);
+	return first.board;
+}
+
+function shuffled(n: number): number[] {
+	const a = range(n);
+	for (let i = n - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[a[i], a[j]] = [a[j], a[i]];
+	}
+	return a;
+}
+
+/** Tries per board to get down to the difficulty's clue count (each pass removes in a new order). */
+const PLUCK_ATTEMPTS = 6;
+
 /**
- * Attempts to remove cells from a full solution while preserving uniqueness
- * (using a heuristic – actual uniqueness is not guaranteed).
+ * Removes numbers from a full solution down to `targetCells` givens, keeping each removal only
+ * if the board still has exactly ONE solution — so the stored solution is the only right answer
+ * and a correct number is never judged a mistake. (The earlier heuristic left almost every board
+ * with several solutions.) If no order reaches the target, the board with the fewest givens is
+ * used: a few more clues, never an ambiguous board.
  *
  * @param fullPuzzle A complete, solved Sudoku board.
  * @param targetCells Desired number of remaining prefilled cells.
  * @returns The reduced puzzle and the final count of filled cells.
  */
-export function pluck(
-	fullPuzzle: Board,
-	targetCells = 0,
-): { puzzle: Board; size: number } {
-	// Deep clone the board
-	const puzzle: Board = JSON.parse(JSON.stringify(fullPuzzle));
-	const cells = new Set<number>(range(CELL_COUNT));
-	const cellsLeft = new Set(cells);
-
-	while (cellsLeft.size > 0 && cells.size > targetCells) {
-		const cell = Array.from(cells)[Math.floor(Math.random() * cells.size)];
-		const x = Math.floor(cell / 9) as Index;
-		const y = (cell % 9) as Index;
-
-		cellsLeft.delete(cell);
-
-		let rowOk = false;
-		let colOk = false;
-		let squareOk = false;
-
-		for (let i = 0; i < 9; i++) {
-			const rowPeer = { x: i as Index, y };
-			const colPeer = { x, y: i as Index };
-			const squarePeer = {
-				x: (Math.floor(x / 3) * 3 + Math.floor(i / 3)) as Index,
-				y: ((x % 3) * 3 + (i % 3)) as Index,
-			};
-
-			if (rowPeer.x !== x) {
-				rowOk = canBeA(puzzle, rowPeer.x, rowPeer.y, cell);
-			}
-			if (colPeer.y !== y) {
-				colOk = canBeA(puzzle, colPeer.x, colPeer.y, cell);
-			}
-			if (squarePeer.x !== x && squarePeer.y !== y) {
-				squareOk = canBeA(puzzle, squarePeer.x, squarePeer.y, cell);
-			}
-		}
-
-		if (rowOk && colOk && squareOk) {
-			// Not pluckable – skip
-			continue;
-		} else {
-			// Pluck this cell
+export function pluck(fullPuzzle: Board, targetCells = 0): { puzzle: Board; size: number } {
+	let best: Board = fullPuzzle.map((row) => [...row]);
+	let bestSize = CELL_COUNT;
+	for (let attempt = 0; attempt < PLUCK_ATTEMPTS && bestSize > targetCells; attempt++) {
+		const puzzle: Board = fullPuzzle.map((row) => [...row]);
+		let size = CELL_COUNT;
+		for (const cell of shuffled(CELL_COUNT)) {
+			if (size <= targetCells) break;
+			const x = Math.floor(cell / 9);
+			const y = cell % 9;
+			const value = puzzle[x][y];
 			puzzle[x][y] = 0;
-			cells.delete(cell);
+			if (countSolutions(puzzle, 2) === 1) size--;
+			else puzzle[x][y] = value;
+		}
+		if (size < bestSize) {
+			best = puzzle;
+			bestSize = size;
 		}
 	}
-
-	return { puzzle, size: cells.size };
+	return { puzzle: best, size: bestSize };
 }

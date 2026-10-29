@@ -454,7 +454,9 @@ export default function SudokuGame() {
 							</div>
 						) : null}
 					</div>
-					<p className="sd-selection">{selectionText}</p>
+					<p className="sd-selection" aria-live="polite">
+						{game.hintBlocked ? "با عددهایی که گذاشته‌ای هیچ جواب درستی ممکن نیست؛ یکی را پاک کن، بعد دوباره «کمک» بزن." : selectionText}
+					</p>
 					<div className="sd-toolbox" aria-label="ابزار بازی" {...inertIf(!!modal)}>
 						<button type="button" disabled={!playing || !game.canUndo} onClick={game.undo}>
 							<Icon name="undo-2" />

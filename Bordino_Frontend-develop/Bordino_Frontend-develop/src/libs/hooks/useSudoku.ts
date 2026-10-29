@@ -30,6 +30,40 @@ import { currentUserId } from "@/libs/stores/authStore";
 
 // new import
 
+/** A full, valid 9×9 Sudoku grid of 1-9. */
+function isValidSolution(solution: unknown): boolean {
+	if (!Array.isArray(solution) || solution.length !== 9) return false;
+	const ok = (cells: unknown[]) => cells.length === 9 && [...cells].sort().join("") === "123456789";
+	for (let i = 0; i < 9; i++) {
+		const row = solution[i];
+		if (!Array.isArray(row) || !ok(row)) return false;
+		if (!ok(solution.map((r: unknown[]) => r[i]))) return false;
+		const r0 = Math.floor(i / 3) * 3;
+		const c0 = (i % 3) * 3;
+		if (!ok([0, 1, 2].flatMap((dr) => [0, 1, 2].map((dc) => solution[r0 + dr][c0 + dc])))) return false;
+	}
+	return true;
+}
+
+/** The save's solution is a real Sudoku and its board agrees with it (givens = the solution). */
+function isConsistentSave(game: { solution?: unknown; board?: unknown }): boolean {
+	if (!isValidSolution(game.solution)) return false;
+	const solution = game.solution as number[][];
+	const board = game.board as { value: number | null; prefilled: boolean }[][] | undefined;
+	if (!Array.isArray(board) || board.length !== 9) return false;
+	return board.every(
+		(row, x) =>
+			Array.isArray(row) &&
+			row.length === 9 &&
+			row.every(
+				(cell, y) =>
+					!!cell &&
+					(cell.value === null || (Number.isInteger(cell.value) && cell.value >= 1 && cell.value <= 9)) &&
+					(!cell.prefilled || cell.value === solution[x][y]),
+			),
+	);
+}
+
 export function useSudoku() {
 	const hydrated = useHydration();
 	const {
@@ -83,12 +117,19 @@ export function useSudoku() {
 	// ----------------------------------------------------------------------
 	useEffect(() => {
 		if (!hydrated) return;
-		if (!persistedGame) return;
 		if (state.status !== "menu") return;
-		// Only this account's save (ensureOwner clears another's in the same render).
-		if (useSudokuStore.getState().owner !== currentUserId()) return;
+		// Only this account's save, read from the store as it is NOW: ensureOwner may just have
+		// cleared another account's save that this render still holds in `persistedGame`.
+		const { owner, gameState: saved } = useSudokuStore.getState();
+		if (!saved || owner !== currentUserId()) return;
 
-		const deserialized = deserializeGameState(persistedGame);
+		const deserialized = deserializeGameState(saved);
+		// A save that is not a consistent game (damaged, or from an incompatible build) is dropped.
+		if (!isConsistentSave(deserialized)) {
+			clearGame();
+			return;
+		}
+		const persistedGame = saved;
 
 		// Adjust time only if the original game had a positive time limit and was not paused
 		// (a paused game's clock was stopped while the player was away).
@@ -109,7 +150,7 @@ export function useSudoku() {
 		}
 
 		dispatch({ type: "RESTORE_GAME", payload: { savedState: deserialized } });
-	}, [hydrated, persistedGame, state.status, dispatch]);
+	}, [hydrated, persistedGame, state.status, dispatch, clearGame]);
 
 	// ----------------------------------------------------------------------
 	// NEW GAME CONFIG FETCH
@@ -353,6 +394,7 @@ export function useSudoku() {
 		canRedo: state.historyIndex < state.history.length - 1,
 		isLoadingConfig: newGameQuery.isLoading || resumeQuery.isLoading,
 		remainingHints: state.remainingHints,
+		hintBlocked: !!state.hintBlocked,
 		maxHints: state.maxHints,
 		generateGame,
 		startWithConfig,

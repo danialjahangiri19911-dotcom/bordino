@@ -50,6 +50,8 @@ export interface GameState {
 	// New: hint limits from config
 	maxHints: number;
 	remainingHints: number;
+	/** The last «کمک» found no answer that fits the numbers on the board (nothing was filled). */
+	hintBlocked?: boolean;
 
 	// Derived data
 	conflicts: boolean[][];

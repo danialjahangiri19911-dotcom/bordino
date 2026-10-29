@@ -8,6 +8,8 @@ import type { Board, BoardWithMeta, CellValue, GameAction, GameState } from "./t
 
 import { enableMapSet } from "immer";
 
+import { solveBoard } from "./generation";
+
 // Cell notes are Sets: immer can only draft them with its Map/Set plugin (without it, the first
 // move after a note threw and the board went blank).
 enableMapSet();
@@ -23,6 +25,8 @@ const BLOCKED_WHILE_PAUSED = new Set<GameAction["type"]>(["FILL_CELL", "ERASE_CE
 
 export function gameReducer(draft: GameState, action: GameAction): void {
 	if (draft.paused && BLOCKED_WHILE_PAUSED.has(action.type)) return;
+	// The «no answer fits» note is about the last hint only.
+	if (action.type !== "TICK" && action.type !== "SELECT_CELL") draft.hintBlocked = false;
 	switch (action.type) {
 		case "PAUSE": {
 			if (draft.status === "playing") draft.paused = true;
@@ -219,7 +223,17 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			const cell = draft.board[x][y];
 			if (cell.prefilled || cell.value) break;
 
-			const solutionValue = draft.solution[x][y] as CellValue;
+			// The answer that fits what is on the board now (with the player's own numbers), not
+			// only the stored one: an older board may have more than one answer, and a hint must
+			// never put a clashing number on a board the player is solving correctly. If no answer
+			// fits, nothing is filled and nothing is charged.
+			const current = draft.board.map((row) => row.map((c) => c.value ?? 0)) as Board;
+			const completion = solveBoard(current);
+			if (!completion) {
+				draft.hintBlocked = true;
+				break;
+			}
+			const solutionValue = completion[x][y] as CellValue;
 			const oldConflict = draft.conflicts[x][y];
 
 			if (cell.value) {
@@ -390,6 +404,12 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			draft.maxMistakes = savedState.maxMistakes;
 			draft.maxHints = savedState.maxHints;
 			draft.remainingHints = savedState.remainingHints;
+			// The counts come from the cells themselves, never from the save (a stale count would
+			// make conflicts, hints and the win check wrong).
+			const counts = initializeBoard(draft.board.map((row) => row.map((cell) => cell.value ?? 0)) as Board);
+			draft.rowCounts = counts.rowCounts;
+			draft.colCounts = counts.colCounts;
+			draft.squareCounts = counts.squareCounts;
 			draft.conflicts = computeConflicts(
 				draft.board,
 				draft.rowCounts,
