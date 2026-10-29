@@ -8,6 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { useBackHandler } from "../back";
+import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
 import "./sudoku.css";
@@ -80,6 +81,17 @@ export default function SudokuGame() {
 	// header's exit button does).
 	// A charge on its way (start/continue) holds Back: leaving now would lose what is being paid for.
 	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
+	// A tap outside the box: a question is answered «stay» (as its second button), a pause ends.
+	// The start, win and loss boxes stay: each needs a choice.
+	useDismissOutside(!!confirm || modal === "pause", dialogRef, () => {
+		if (confirm) {
+			setPendingLevel(null);
+			setConfirm("");
+		} else {
+			interacted.current = true;
+			game.resume();
+		}
+	});
 
 	// ── music: one switch for music and effects; never in a hidden tab or behind a dialog ──
 	useEffect(() => {

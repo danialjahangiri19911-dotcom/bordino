@@ -8,6 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { useBackHandler } from "../back";
+import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { inertIf } from "./SudokuGame";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -55,6 +56,8 @@ function View() {
 	// A charge on its way holds Back: leaving now would lose the game being paid for.
 	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
+	// A tap outside a question answers «stay» (its second button); start, win and loss need a choice.
+	useDismissOutside(!!confirm, dialogRef, () => setConfirm(""));
 
 	useEffect(() => {
 		music.current = createSoundtrack();

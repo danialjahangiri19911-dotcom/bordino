@@ -1,12 +1,13 @@
 "use client";
 
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "./Icon";
 import { confirmLeave } from "./back";
+import { useDismissOutside } from "./dismiss";
 import { fa } from "./format";
 import { reconcilePushOwner } from "./push";
 import useGetCustomerProfile from "@api/customer/hooks/useGetCustomerProfile";
@@ -297,6 +298,8 @@ export function GameShell({
 }) {
 	const allowed = useRequireLogin();
 	const [open, setOpen] = useState(false);
+	const helpBox = useRef<HTMLElement>(null);
+	useDismissOutside(open, helpBox, () => setOpen(false));
 	const helpId = useId();
 	const { push } = useRouter();
 	useEffect(() => {
@@ -337,7 +340,7 @@ export function GameShell({
 					</button>
 				</div>
 			</header>
-			<section className="gf-help" id={helpId} hidden={!open} aria-label="اطلاعات بازی">
+			<section ref={helpBox} className="gf-help" id={helpId} hidden={!open} aria-label="اطلاعات بازی">
 				<h3>اطلاعات {title}</h3>
 				{help}
 			</section>

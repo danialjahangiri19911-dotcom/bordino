@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
+import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import type { AdPlayerProps } from "./players";
 
@@ -25,6 +26,9 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 	const done = useRef(false);
 
 	useBackHandler(true, () => (leaving ? setLeaving(false) : setLeaving(true)));
+	// A tap outside the «close?» question keeps watching (its first button).
+	const leaveBox = useRef<HTMLDivElement>(null);
+	useDismissOutside(leaving, leaveBox, () => setLeaving(false));
 
 	useEffect(() => {
 		const v = video.current;
@@ -123,7 +127,7 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 					</div>
 				</div>
 			) : leaving ? (
-				<div className="bd-ad-sheet" role="alertdialog" aria-label="بستن ویدیو">
+				<div ref={leaveBox} className="bd-ad-sheet" role="alertdialog" aria-label="بستن ویدیو">
 					<b>ویدیو را می‌بندی؟</b>
 					<p>اگر الان ببندی، {fa(session.reward_points)} امتیاز را نمی‌گیری.</p>
 					<div className="bd-actions">

@@ -8,6 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { useBackHandler } from "../back";
+import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import "./chicken.css";
 import { type ChickenMesh, createChickenMesh } from "./mesh";
@@ -285,6 +286,8 @@ export default function ChickenGame() {
 	// header's exit button does).
 	const inRound = (round?.status === "active" && round.id !== acknowledged.current) || view.phase === "jumping" || view.phase === "colliding" || game.busy;
 	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? setDialog("exit") : leave()));
+	const dialogBox = useRef<HTMLDivElement>(null);
+	useDismissOutside(!!dialog, dialogBox, () => setDialog(""));
 
 	if (!allowed) return null;
 
@@ -355,7 +358,7 @@ export default function ChickenGame() {
 						</button>
 					</div>
 				</header>
-				<div className="ck-dialog" hidden={!dialog} role="dialog" aria-modal="false" aria-label={dialog === "exit" ? "خروج از بازی" : "اطلاعات بازی"}>
+				<div ref={dialogBox} className="ck-dialog" hidden={!dialog} role="dialog" aria-modal="false" aria-label={dialog === "exit" ? "خروج از بازی" : "اطلاعات بازی"}>
 					{dialog === "fair" ? (
 						<>
 							<div className="ck-dialog-head">

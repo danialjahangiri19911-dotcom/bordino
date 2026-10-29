@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { useBackHandler } from "../back";
+import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
 import "./crash.css";
@@ -354,6 +355,8 @@ export default function CrashGame() {
 	const inPlay = flying || autoRunning || busy;
 	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? setPanel("exit") : leave()));
 	useBrowserBackGuard(inPlay, () => setPanel("exit"));
+	const panelBox = useRef<HTMLElement>(null);
+	useDismissOutside(!!panel, panelBox, () => setPanel(""));
 
 	if (!allowed) return null;
 
@@ -439,7 +442,7 @@ export default function CrashGame() {
 				</header>
 
 				{panel === "help" ? (
-					<section className="cr-help">
+					<section ref={panelBox} className="cr-help">
 						<b>ضریب و برداشت</b>
 						<p>پیش از شروع دور امتیاز شرط را انتخاب کن. ضریب از ۱٫۰۰ بالا می‌رود؛ قبل از انفجار برداشت کن تا شرط × ضریب را ببری. اگر پیش از برداشت منفجر شود، امتیاز همان دور از دست می‌رود.</p>
 						<p>با «برداشت در ضریب» روشن، سرور در همان ضریب خودکار برداشت می‌کند. در حالت خودکار، دورها پشت سر هم با قوانینی که تعیین می‌کنی بازی می‌شوند.</p>
@@ -450,7 +453,7 @@ export default function CrashGame() {
 					</section>
 				) : null}
 				{panel === "exit" ? (
-					<section className="cr-help" role="alertdialog" aria-label="خروج از بازی">
+					<section ref={panelBox} className="cr-help" role="alertdialog" aria-label="خروج از بازی">
 						<b>از بازی خارج می‌شوی؟</b>
 						<p>
 							{flying
@@ -503,7 +506,7 @@ export default function CrashGame() {
 					</div>
 
 					{panel === "fair" ? (
-						<section className="cr-fair-panel">
+						<section ref={panelBox} className="cr-fair-panel">
 							<b>شفافیت و بررسی دور</b>
 							<p>نقطهٔ انفجار هر دور پیش از شرط با «بذر سرور» تعیین می‌شود و هش آن از همان لحظه دیده می‌شود. پس از پایان دور خود بذر نمایش داده می‌شود تا نتیجه را دوباره حساب کنی:</p>
 							<p className="cr-formula">

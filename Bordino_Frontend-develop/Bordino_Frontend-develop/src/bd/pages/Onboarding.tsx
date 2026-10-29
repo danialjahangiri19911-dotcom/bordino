@@ -55,8 +55,37 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 	}, [step]);
 	const item = INTRO[step];
 	const last = step === INTRO.length - 1;
+	// Swipe between the slides. Right to left like the app: «ادامه» points left, so the next slide
+	// comes by swiping to the right and the previous one by swiping to the left. A swipe on the
+	// last slide stays there (leaving is the button's job, not an accidental flick).
+	const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+	const [enter, setEnter] = useState<"" | "next" | "prev">("");
+	const go = (to: number) => {
+		if (to < 0 || to >= INTRO.length || to === step) return;
+		setEnter(to > step ? "next" : "prev");
+		setStep(to);
+	};
 	return (
-		<div className="au-onboarding au-layout-1">
+		<div
+			className="au-onboarding au-layout-1 au-swipeable"
+			onPointerDown={(e) => {
+				if (e.pointerType === "mouse" && e.button !== 0) return;
+				swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+			}}
+			onPointerUp={(e) => {
+				const start = swipe.current;
+				swipe.current = null;
+				if (!start || start.id !== e.pointerId) return;
+				const dx = e.clientX - start.x;
+				const dy = e.clientY - start.y;
+				// A clear sideways move: far enough, and more sideways than up/down (a scroll).
+				if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+				go(dx > 0 ? step + 1 : step - 1);
+			}}
+			onPointerCancel={() => {
+				swipe.current = null;
+			}}
+		>
 			<div className="au-onboarding-top">
 				<span className="au-eyebrow">آشنایی با بردینو</span>
 				<button type="button" className="bd-text-btn" onClick={onDone}>
@@ -64,7 +93,7 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 				</button>
 			</div>
 			{welcome ? <Notice tone="ok">{welcome}</Notice> : null}
-			<div className="au-step-layout">
+			<div className={`au-step-layout ${enter ? `au-enter-${enter}` : ""}`} key={step}>
 				<section className="au-intro-art">
 					<div className="au-image-art" aria-hidden="true">
 						<img
@@ -93,18 +122,18 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 					<div className="au-intro-footer">
 						<div className="au-step-dots" aria-label={`مرحلهٔ ${fa(step + 1)} از سه`}>
 							{INTRO.map((_, i) => (
-								<button key={i} type="button" aria-label={`رفتن به مرحلهٔ ${fa(i + 1)}`} aria-pressed={i === step} onClick={() => setStep(i)}>
+								<button key={i} type="button" aria-label={`رفتن به مرحلهٔ ${fa(i + 1)}`} aria-pressed={i === step} onClick={() => go(i)}>
 									<span />
 								</button>
 							))}
 						</div>
 						<div className="bd-actions">
-							<button type="button" className="bd-action" onClick={() => (last ? onDone() : setStep(step + 1))}>
+							<button type="button" className="bd-action" onClick={() => (last ? onDone() : go(step + 1))}>
 								{last ? "ورود به خانه" : "ادامه"}
 								<Icon name="arrow-left" />
 							</button>
 							{step > 0 ? (
-								<button type="button" className="bd-secondary" onClick={() => setStep(step - 1)}>
+								<button type="button" className="bd-secondary" onClick={() => go(step - 1)}>
 									<Icon name="arrow-right" />
 									قبلی
 								</button>
