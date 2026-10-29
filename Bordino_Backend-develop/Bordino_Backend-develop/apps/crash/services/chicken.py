@@ -7,7 +7,8 @@ Provably fair, decided entirely at bet time:
     m_i      = floor((1 - edge) / (1 - hit)^i, 2 decimals)
 
 so cashing out after any lane returns (1 - edge) on average.  The road has no fixed end: it runs
-until the lane whose win reaches max_payout (that lane cashes out by itself), at most MAX_LANES.  Money handling mirrors
+to the last lane whose win still fits under max_payout (crossing it cashes out by itself), so every
+lane pays its full multiplier; at most MAX_LANES.  Money handling mirrors
 services/rounds.py: server-picked points account, row locks, F() balance updates, one settlement.
 """
 
@@ -60,14 +61,14 @@ def multipliers_for(round_: ChickenRound) -> list[Decimal]:
 
 
 def road_length(bet: int, hit: Decimal, house_edge: Decimal, max_payout: int) -> int:
-    """Lanes in a round: up to the first lane whose win reaches max_payout (at most MAX_LANES, and
-    never past a multiplier of MAX_MULTIPLIER)."""
+    """Lanes in a round: the last lane whose win fits under max_payout and whose multiplier fits
+    under MAX_MULTIPLIER (at least 1, at most MAX_LANES)."""
     survive = Decimal(1) - Decimal(hit)
     keep = Decimal(1) - Decimal(house_edge)
     for lane in range(1, MAX_LANES + 1):
         multiplier = fair.floor_cents(keep / survive**lane)
-        if bet * multiplier >= max_payout or multiplier >= MAX_MULTIPLIER:
-            return lane
+        if bet * multiplier > max_payout or multiplier >= MAX_MULTIPLIER:
+            return max(lane - 1, 1)
     return MAX_LANES
 
 

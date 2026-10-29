@@ -369,26 +369,44 @@ class ChickenRoundTests(TestCase):
         self.assertEqual((round_.step, round_.status), (6, "won"))
         self.assertEqual(round_.cashout_multiplier, chicken.multipliers_for(round_)[5])
 
-    def test_go_max_crosses_everything_when_nothing_hits(self):
+    def test_jump_to_a_lane_cashes_out_there(self):
         round_ = self.bet(10, "easy", hit=None)
         round_ = chicken.step(self.user, round_.pk, to=24)
         self.assertEqual((round_.step, round_.status, round_.cashout_multiplier), (24, "won", D("3.35")))
         self.assertEqual(self.balance(), 990 + 33)
 
+    def test_go_max_crosses_everything_when_nothing_hits(self):
+        round_ = self.bet(10, "easy", hit=None)
+        last = chicken.multipliers_for(round_)[-1]
+        round_ = chicken.step(self.user, round_.pk, to=round_.lanes)
+        self.assertEqual((round_.step, round_.status, round_.cashout_multiplier), (round_.lanes, "won", last))
+        self.assertEqual(round_.payout, int(10 * last))
+        self.assertLessEqual(round_.payout, 100000)
+        self.assertEqual(self.balance(), 990 + round_.payout)
+
+    def test_a_car_can_hit_past_the_old_end_of_the_road(self):
+        round_ = self.bet(10, "easy", hit=40)
+        round_ = chicken.step(self.user, round_.pk, to=round_.lanes)
+        self.assertEqual((round_.step, round_.status, round_.payout), (40, "lost", 0))
+        self.assertEqual(self.balance(), 990)
+
     def test_last_lane_cashes_out_by_itself(self):
-        round_ = self.bet(10, "hard", hit=None)  # lane 16 pays ×10478: the 100,000 cap
-        self.assertEqual(round_.lanes, 16)
-        for _ in range(16):
+        # Hard, bet 10: lane 15 pays ×5866 (58,660); lane 16 (×10478) would pass the 100,000 cap.
+        round_ = self.bet(10, "hard", hit=None)
+        self.assertEqual(round_.lanes, 15)
+        for _ in range(15):
             round_ = chicken.step(self.user, round_.pk)
-        self.assertEqual((round_.step, round_.status, round_.payout), (16, "won", 100000))
+        last = chicken.multipliers_for(round_)[-1]
+        self.assertEqual((round_.step, round_.status, round_.payout), (15, "won", int(10 * last)))
 
     def test_the_road_goes_on_until_the_payout_cap(self):
-        # Easy used to stop at lane 24 (×3.35); now it goes on until the win reaches the cap.
+        # Easy used to stop at lane 24 (×3.35); now it goes on to the last lane under the cap,
+        # and that lane pays its full multiplier.
         round_ = self.bet(100, "easy", hit=None)
-        multipliers = chicken.multipliers_for(round_)
+        longer = chicken.lane_multipliers(round_.lanes + 1, D("0.05"), D("0.02"))
         self.assertGreater(round_.lanes, 24)
-        self.assertGreaterEqual(100 * multipliers[-1], 100000)
-        self.assertLess(100 * multipliers[-2], 100000)
+        self.assertLessEqual(100 * longer[-2], 100000)
+        self.assertGreater(100 * longer[-1], 100000)
         for _ in range(30):
             round_ = chicken.step(self.user, round_.pk)
         self.assertEqual((round_.step, round_.status), (30, "active"))
@@ -396,18 +414,30 @@ class ChickenRoundTests(TestCase):
     def test_the_road_is_never_longer_than_max_lanes(self):
         self.assertEqual(chicken.road_length(1, D("0.0001"), D("0.02"), 100000), chicken.MAX_LANES)
         # Even with an enormous cap, no lane's multiplier outgrows the multiplier column.
-        lanes = chicken.road_length(1, D("0.9"), D("0.02"), 2_000_000_000)
-        self.assertLess(chicken.lane_multipliers(lanes, D("0.9"), D("0.02"))[-1], D("10000000000"))
+        for hit, edge in ((D("0.9"), D("0.02")), (D("0.99"), D("0")), (D("0.9999"), D("0.02"))):
+            lanes = chicken.road_length(1, hit, edge, 2_000_000_000)
+            self.assertLess(chicken.lane_multipliers(lanes, hit, edge)[-1], chicken.MAX_MULTIPLIER, msg=str(hit))
 
+    def test_an_extreme_level_still_settles_on_its_last_lane(self):
+        config = ChickenConfiguration.current()
+        config.max_payout = 2_000_000_000
+        config.difficulties = {**config.difficulties, "hard": {"lanes": 2, "hit": "0.9999"}}
+        config.save()
+        round_ = self.bet(1, "hard", hit=None)
+        self.assertEqual(round_.lanes, 2)  # lane 3 would be ×980,000,000,000
+        round_ = chicken.step(self.user, round_.pk, to=round_.lanes)
+        round_.refresh_from_db()
+        self.assertEqual((round_.status, round_.payout), ("won", 98_000_000))
+        self.assertEqual(self.balance(), 999 + 98_000_000)
     def test_payout_cap_cashes_out(self):
         config = ChickenConfiguration.current()
         config.max_payout = 500
         config.save()
-        round_ = self.bet(100, "hard", hit=None)  # 1.75, 3.12, 5.57…: lane 3 reaches 500
-        self.assertEqual(round_.lanes, 3)
+        round_ = self.bet(100, "hard", hit=None)  # 1.75, 3.12, 5.58…: lane 3 would pay 558 > 500
+        self.assertEqual(round_.lanes, 2)
         for _ in range(3):
             round_ = chicken.step(self.user, round_.pk)
-        self.assertEqual((round_.step, round_.status, round_.payout), (3, "won", 500))
+        self.assertEqual((round_.step, round_.status, round_.payout), (2, "won", 312))
 
     def test_cash_out_before_the_first_lane_is_refused(self):
         round_ = self.bet()

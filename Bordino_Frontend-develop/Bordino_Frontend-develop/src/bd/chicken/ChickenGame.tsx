@@ -303,6 +303,10 @@ export default function ChickenGame() {
 	const current = jump ? view.target : view.lane;
 	const reachedValue = view.lane ? values[view.lane - 1] : 1;
 	const lanes = Array.from({ length: count + (jump ? 1 : 0) }, (_, i) => view.lane + i);
+	// The road ends at the last lane under the payout cap (a round from before that change, or one
+	// cut at the longest road, just ends).
+	const lastValue = values[values.length - 1] ?? 0;
+	const endsAtCap = !!round && round.bet * (lastValue / (1 - Number(round.hit_chance))) > round.max_payout;
 	const finished = view.phase === "won" || lost;
 	const active = view.phase === "playing" || jump || hit;
 	const lowBalance = !!config && balance < minBet;
@@ -420,7 +424,7 @@ export default function ChickenGame() {
 										if (n > values.length)
 											return (
 												<div key={`end-${n}`} className="ck-lane ck-road-end" aria-hidden="true">
-													{n === values.length + 1 ? <span className="ck-finish">سقف برد</span> : null}
+													{n === values.length + 1 ? <span className="ck-finish">{endsAtCap ? "سقف برد" : "پایان جاده"}</span> : null}
 												</div>
 											);
 										const safe = n > 0 && n <= view.secured;
@@ -485,7 +489,7 @@ export default function ChickenGame() {
 								{view.phase === "won" && round ? (
 									<div className="ck-result">
 										<strong>
-											{round.payout >= round.max_payout ? "سقف برد! " : ""}
+											{round.step === round.lanes ? (endsAtCap ? "سقف برد! " : "پایان جاده! ") : ""}
 											توقف در {mult(round.cashout_multiplier ?? reachedValue)}
 										</strong>
 										<p>{fa(round.payout)} امتیاز به کیف امتیاز رفت</p>
