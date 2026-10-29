@@ -529,3 +529,139 @@ class ReviewFixTests(TestCase):
         body = r.json().get("result", r.json())
         self.assertEqual((body["round"]["status"], body["round"]["payout"]), ("won", 101))
         self.assertIsNone(body["round"]["crash_point"])
+
+
+# ── Sudoku judged on the server (user: «build server side check too») ──
+from apps.crash.models import SudokuRound  # noqa: E402
+from apps.crash.services import sudoku  # noqa: E402
+
+
+def _grid(cells):
+    return [cells[r * 9 : r * 9 + 9] for r in range(9)]
+
+
+class SudokuGenerationTests(TestCase):
+    def test_every_level_has_exactly_one_solution_at_its_clue_count(self):
+        import random  # pylint: disable=import-outside-toplevel
+
+        rng = random.Random(20261029)
+        slowest = 0.0
+        for difficulty, clues in sudoku.CLUES.items():
+            for _ in range(3):
+                started = time.monotonic()
+                puzzle, solution = sudoku.make_puzzle(difficulty, rng)
+                slowest = max(slowest, time.monotonic() - started)
+                self.assertEqual(sudoku.count_solutions(solution), 1)
+                self.assertEqual(sudoku.count_solutions(puzzle, 2), 1)
+                self.assertTrue(all(p == 0 or p == s for p, s in zip(puzzle, solution)))
+                self.assertLessEqual(sum(1 for v in puzzle if v), clues + 3)
+        self.assertLess(slowest, 8, f"slowest board took {slowest:.1f}s")
+
+    def test_the_solver_tells_none_one_and_many_apart(self):
+        import random  # pylint: disable=import-outside-toplevel
+
+        solution = sudoku.make_solution(random.Random(1))
+        self.assertEqual(sudoku.count_solutions(solution), 1)
+        self.assertEqual(sudoku.count_solutions([0] * 81), 2)
+        broken = list(solution)
+        broken[1] = broken[0]
+        self.assertEqual(sudoku.count_solutions(broken), 0)
+
+
+@override_settings(CACHES=LOCMEM)
+class SudokuServerTests(TestCase):
+    def setUp(self):
+        from apps.configuration.models import GameConfiguration, ScoreConfiguration  # pylint: disable=import-outside-toplevel
+
+        self.user = RoundTests.make_player("9120000501", 1000)
+        self.other = RoundTests.make_player("9120000502", 1000)
+        for level in ("easy", "medium", "hard"):
+            GameConfiguration.objects.create(game_name="sudoku", difficulty_level=level, timer=0, play_cost=5)
+        for action, value in {"row_completed": 1, "box_completed": 1, "win_game": 10, "easy_level_completed": 5, "medium_level_completed": 8, "hard_level_completed": 12}.items():
+            ScoreConfiguration.objects.create(section="sudoku", action_type=action, score_value=value)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def points(self, user=None):
+        return int(TokenWalletAccount.objects.get(wallet__owner=user or self.user).amount)
+
+    def start(self, difficulty="easy", request_id="s-1"):
+        return self.api.post("/api/v1/games/sudoku/rounds/", {"difficulty": difficulty, "request_id": request_id}, format="json")
+
+    def report(self, round_id, board):
+        return self.api.post(f"/api/v1/games/sudoku/rounds/{round_id}/report/", {"board": board}, format="json")
+
+    def body(self, r):
+        return r.json().get("result", r.json())
+
+    def test_start_charges_once_and_sends_the_puzzle_not_the_solution(self):
+        first = self.start()
+        self.assertEqual(first.status_code, 201, first.content)
+        again = self.start()  # a retry whose answer was lost
+        self.assertEqual(self.body(again)["round"]["id"], self.body(first)["round"]["id"])
+        self.assertEqual(self.points(), 995)
+        self.assertNotIn("solution", first.content.decode())
+        puzzle = self.body(first)["round"]["puzzle"]
+        self.assertEqual(sudoku.count_solutions([v for row in puzzle for v in row], 2), 1)
+
+    def test_rewards_only_for_the_right_board_and_the_win_only_after_the_minimum_time(self):
+        rid = self.body(self.start())["round"]["id"]
+        round_ = SudokuRound.objects.get(pk=rid)
+        solution = round_.solution
+        before = self.points()
+        # A full board that is wrong (a valid-looking claim): nothing.
+        wrong = list(round_.puzzle)
+        for i in range(81):
+            if not wrong[i]:
+                wrong[i] = 1
+        self.assertEqual(self.body(self.report(rid, _grid(wrong)))["awarded"], [])
+        # One right row: the row reward only.
+        row = list(round_.puzzle)
+        empty_row = next(r for r in range(9) if any(not row[r * 9 + c] for c in range(9)))
+        for c in range(9):
+            row[empty_row * 9 + c] = solution[empty_row * 9 + c]
+        awarded = self.body(self.report(rid, _grid(row)))["awarded"]
+        self.assertEqual([a["action"] for a in awarded], ["row_completed"])
+        # The whole board at once, too fast: rows/boxes yes, the win no.
+        r = self.body(self.report(rid, _grid(solution)))
+        self.assertNotIn("win_game", [a["action"] for a in r["awarded"]])
+        self.assertTrue(r["note"])
+        # After the minimum time: the win and the level, once.
+        SudokuRound.objects.filter(pk=rid).update(create_time=timezone.now() - timedelta(seconds=61))
+        r = self.body(self.report(rid, _grid(solution)))
+        self.assertEqual(sorted(a["action"] for a in r["awarded"]), ["easy_level_completed", "win_game"])
+        self.assertEqual(r["round"]["status"], "won")
+        self.assertEqual(self.points(), before + 1 + 1 + 10 + 5)
+        self.assertEqual(self.body(self.report(rid, _grid(solution)))["awarded"], [])
+
+    def test_a_board_that_changes_the_givens_is_refused(self):
+        rid = self.body(self.start())["round"]["id"]
+        round_ = SudokuRound.objects.get(pk=rid)
+        cells = list(round_.solution)
+        i = next(i for i in range(81) if round_.puzzle[i])
+        cells[i] = cells[i] % 9 + 1
+        self.assertEqual(self.report(rid, _grid(cells)).status_code, 400)
+
+    def test_another_players_round_is_not_found(self):
+        rid = self.body(self.start())["round"]["id"]
+        api = APIClient()
+        api.force_authenticate(self.other)
+        solution = SudokuRound.objects.get(pk=rid).solution
+        self.assertEqual(api.post(f"/api/v1/games/sudoku/rounds/{rid}/report/", {"board": _grid(solution)}, format="json").status_code, 404)
+
+    def test_medium_and_hard_open_only_after_real_wins(self):
+        self.assertEqual(self.start("medium", "m-1").status_code, 400)
+        self.assertEqual(self.points(), 1000)  # refused before any charge
+        rid = self.body(self.start("easy", "e-1"))["round"]["id"]
+        SudokuRound.objects.filter(pk=rid).update(create_time=timezone.now() - timedelta(minutes=5))
+        self.report(rid, _grid(SudokuRound.objects.get(pk=rid).solution))
+        self.assertEqual(self.start("medium", "m-2").status_code, 201)
+        self.assertEqual(self.start("hard", "h-1").status_code, 400)
+
+    def test_the_browser_can_no_longer_claim_the_board_rewards(self):
+        from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
+
+        self.start()
+        for action in sudoku.VERIFIED_ACTIONS:
+            with self.assertRaises(ValueError):
+                RecordActionService.record_action(self.user, "sudoku", action, metadata={"difficulty": "easy"})

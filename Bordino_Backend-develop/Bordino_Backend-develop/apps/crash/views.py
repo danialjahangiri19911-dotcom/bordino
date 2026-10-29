@@ -2,6 +2,7 @@ import asyncio
 import re
 
 from asgiref.sync import sync_to_async
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
@@ -22,7 +23,7 @@ from apps.crash.models import (
     CrashConfiguration,
     CrashRound,
 )
-from apps.crash.services import chicken, fair, rounds
+from apps.crash.services import chicken, fair, rounds, sudoku
 from apps.django_helper.drf.responses.standard import StandardResponse
 from apps.user_management.authentication import RevocableJWTAuthentication
 
@@ -373,3 +374,61 @@ class ChickenCashoutView(APIView):
         except rounds.CrashError as exc:
             return _error(exc)
         return Response(_chicken_state(request, round_))
+
+
+class SudokuStartSerializer(serializers.Serializer):
+    difficulty = serializers.ChoiceField(choices=list(sudoku.CLUES))
+    # One id per game the app starts: a retry whose answer was lost gets the same board, one charge.
+    request_id = serializers.CharField(max_length=64)
+
+
+class SudokuReportSerializer(serializers.Serializer):
+    board = serializers.ListField(
+        child=serializers.ListField(child=serializers.IntegerField(min_value=0, max_value=9), min_length=9, max_length=9),
+        min_length=9,
+        max_length=9,
+    )
+
+
+class SudokuRoundsView(APIView):
+    """Start a paid Sudoku game: the server charges it and issues the puzzle (never the solution)."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (CrashThrottle,)
+
+    @extend_schema(tags=["sudoku"], summary="Start a game (charge + server-made puzzle)", request=SudokuStartSerializer)
+    def post(self, request):
+        serializer = SudokuStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            round_, balance = sudoku.start(
+                request.user, serializer.validated_data["difficulty"], serializer.validated_data["request_id"]
+            )
+        except rounds.CrashError as exc:
+            return _error(exc)
+        except DjangoValidationError as exc:
+            return Response({"error": " ".join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"round": sudoku.round_payload(round_), "balance": balance}, status=status.HTTP_201_CREATED)
+
+
+class SudokuReportView(APIView):
+    """The board as the player has it: the server pays the board rewards it really shows."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (CrashThrottle,)
+
+    @extend_schema(tags=["sudoku"], summary="Report the board; pays finished rows/boxes and the win", request=SudokuReportSerializer)
+    def post(self, request, round_id):
+        serializer = SudokuReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            round_, awarded, note = sudoku.report(request.user, round_id, serializer.validated_data["board"])
+        except rounds.CrashError as exc:
+            return _error(exc)
+        return Response(
+            {
+                "round": sudoku.round_payload(round_),
+                "awarded": [{"action": a.action, "points": a.points} for a in awarded],
+                "note": note,
+            }
+        )

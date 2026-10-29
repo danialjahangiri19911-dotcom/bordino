@@ -265,3 +265,30 @@ class ChickenRound(AbstractBaseModel):
 
     def __str__(self):
         return f"{self.customer} {self.bet} {self.difficulty} lane {self.step} ({self.status})"
+
+
+class SudokuRound(AbstractBaseModel):
+    """One paid Sudoku game: the puzzle the server issued and its only solution. The board rewards
+    (rows, boxes, the win, the level) are paid against this, never on the browser's word."""
+
+    class Meta(AbstractBaseModel.Meta):
+        verbose_name = _("دست سودوکو")
+        verbose_name_plural = _("دست‌های سودوکو")
+        indexes = [models.Index(fields=["customer", "difficulty", "status"], name="sudoku_customer_level")]
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", _("در حال بازی")
+        WON = "won", _("برد")
+
+    customer = models.ForeignKey("users.Customer", on_delete=models.PROTECT, related_name="sudoku_rounds")
+    # The paid play this board belongs to (one board per charge; a retried start finds it).
+    charge = models.OneToOneField("wallet.GamePlayCharge", on_delete=models.PROTECT, related_name="sudoku_round")
+    difficulty = models.CharField(max_length=10, verbose_name=_("سطح"))
+    # 81 cells, row by row; 0 = empty. The solution never leaves the server.
+    puzzle = models.JSONField()
+    solution = models.JSONField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE, verbose_name=_("وضعیت"))
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.customer} sudoku {self.difficulty} ({self.status})"

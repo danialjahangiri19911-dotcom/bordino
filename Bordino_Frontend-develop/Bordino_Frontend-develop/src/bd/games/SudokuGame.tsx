@@ -14,6 +14,7 @@ import { type Soundtrack, createSoundtrack } from "./soundtrack";
 import "./sudoku.css";
 
 import { gameErrorMessage } from "@/api/games/request";
+import { sudokuApi } from "@/api/games/sudoku/api";
 import useChargeGamePlay from "@/api/games/useChargeGamePlay";
 import useGetPlayCost from "@/api/games/useGetPlayCost";
 import { GAME_URLS } from "@/api/urls";
@@ -145,12 +146,14 @@ export default function SudokuGame() {
 			}
 			setPaying(true);
 			try {
-				await chargeAsync({ game_name: "sudoku" });
+				// The server charges the game and issues its board (one solution); the rewards are
+				// paid there against it. The level must be unlocked on the server too.
+				const { round } = await sudokuApi.start(difficulty);
 				void refetchCost();
 				setNoteMode(false);
 				setConfirm("");
 				// The configuration checked before paying: no second request after the charge.
-				game.startWithConfig(difficulty, config);
+				game.startServerRound(difficulty, config, round.puzzle, round.id);
 			} catch (e) {
 				setProblem(gameErrorMessage(e));
 			} finally {

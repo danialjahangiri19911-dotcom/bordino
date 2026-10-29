@@ -283,18 +283,19 @@ class HistoryTests(TestCase):
         self.assertIn("T", rows[0]["date"])  # a moment, not just a day
 
     def test_activity_reward_needs_a_paid_play_and_shows_in_history(self):
+        # 2048: the Sudoku board rewards are paid by the server's board check (apps/crash sudoku).
         from apps.configuration.models import ScoreConfiguration  # pylint: disable=import-outside-toplevel
         from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
         from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
             GamePlayChargeService,
         )
 
-        ScoreConfiguration.objects.create(section="sudoku", action_type="win_game", score_value=7)
+        ScoreConfiguration.objects.create(section="game_2048", action_type="win_game", score_value=7)
         with self.assertRaises(ValueError):
-            RecordActionService.record_action(self.user, "sudoku", "win_game")
-        GamePlayChargeService().charge(self.user, "sudoku")
+            RecordActionService.record_action(self.user, "game_2048", "win_game")
+        GamePlayChargeService().charge(self.user, "game_2048")
         before = points(self.user)
-        RecordActionService.record_action(self.user, "sudoku", "win_game")
+        RecordActionService.record_action(self.user, "game_2048", "win_game")
         self.assertEqual(points(self.user), before + 7)
         self.assertIn("activity_reward", {r["type"] for r in self.rows("points")})
 
@@ -418,15 +419,15 @@ class Phase5Tests(TestCase):
         from apps.configuration.models import GameConfiguration, ScoreConfiguration  # pylint: disable=import-outside-toplevel
 
         self.user = make_customer("9120000771", points=100)
-        GameConfiguration.objects.update_or_create(game_name="sudoku", defaults={"play_cost": 5})
-        ScoreConfiguration.objects.create(section="sudoku", action_type="win_game", score_value=7)
+        GameConfiguration.objects.update_or_create(game_name="game_2048", defaults={"play_cost": 5})
+        ScoreConfiguration.objects.create(section="game_2048", action_type="win_game", score_value=7)
 
     def play(self):
         from apps.wallet.services.game_play.charge import (  # pylint: disable=import-outside-toplevel
             GamePlayChargeService,
         )
 
-        GamePlayChargeService().charge(self.user, "sudoku")
+        GamePlayChargeService().charge(self.user, "game_2048")
 
     def test_an_unknown_difficulty_is_refused(self):
         from apps.configuration.services.scoring import RecordActionService  # pylint: disable=import-outside-toplevel
@@ -435,7 +436,7 @@ class Phase5Tests(TestCase):
         before = points(self.user)
         with self.assertRaises(ValueError):
             RecordActionService.record_action(
-                self.user, "sudoku", "win_game", metadata={"difficulty": "not-a-level"}
+                self.user, "game_2048", "win_game", metadata={"difficulty": "not-a-level"}
             )
         self.assertEqual(points(self.user), before)
 
@@ -450,7 +451,7 @@ class Phase5Tests(TestCase):
         self.play()
         GamePlayCharge.objects.update(create_time=timezone.now() - timedelta(hours=4))
         with self.assertRaises(ValueError):
-            RecordActionService.record_action(self.user, "sudoku", "win_game")
+            RecordActionService.record_action(self.user, "game_2048", "win_game")
 
     def make_wheel(self, prizes, status="active"):
         sponsor = Sponsor.objects.create(user=make_customer("9120000772"))

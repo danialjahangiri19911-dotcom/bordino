@@ -50,6 +50,8 @@ export interface GameState {
 	// New: hint limits from config
 	maxHints: number;
 	remainingHints: number;
+	/** The server's round this board belongs to (null: a board from before server-judged games). */
+	roundId?: string | null;
 	/** The last «کمک» found no answer that fits the numbers on the board (nothing was filled). */
 	hintBlocked?: boolean;
 
@@ -66,6 +68,8 @@ export type GameAction =
 				solution: Board;
 				difficulty: Difficulty;
 				config: GameConfig;
+				/** The server's round for this board (its rewards are paid against it). */
+				roundId?: string | null;
 			};
 	  }
 	| { type: "SELECT_CELL"; payload: { x: Index; y: Index } }

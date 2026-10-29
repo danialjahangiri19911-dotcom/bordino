@@ -13,13 +13,14 @@ import {
 	SIZE,
 	TARGET_CELLS_BY_DIFFICULTY,
 } from "@/libs/games/sudoku/constants";
-import { makePuzzle, pluck } from "@/libs/games/sudoku/generation";
+import { makePuzzle, pluck, solveBoard } from "@/libs/games/sudoku/generation";
 import { gameReducer } from "@/libs/games/sudoku/reducer";
 import {
 	deserializeGameState,
 	useSudokuStore,
 } from "@/libs/games/sudoku/storage";
 import type {
+	Board,
 	CellValue,
 	Difficulty,
 	GameConfig,
@@ -289,6 +290,8 @@ export function useSudoku() {
 	// ACTION RECORDING HOOK
 	// ----------------------------------------------------------------------
 	useRecordSudokuActions({
+		roundId: state.roundId ?? null,
+		board: state.board,
 		status: state.status,
 		difficulty: state.difficulty,
 		mistakes: state.mistakes,
@@ -319,6 +322,21 @@ export function useSudoku() {
 			const solution = makePuzzle();
 			const { puzzle } = pluck(solution, TARGET_CELLS_BY_DIFFICULTY[difficulty]);
 			dispatch({ type: "START_GAME", payload: { puzzle, solution, difficulty, config } });
+		},
+		[dispatch],
+	);
+
+	/**
+	 * Starts the board the server issued for a paid game (`roundId`): its rewards are paid by the
+	 * server against that board. The puzzle has one solution, worked out here for hints.
+	 */
+	const startServerRound = useCallback(
+		(difficulty: Difficulty, config: GameConfig, puzzle: Board, roundId: string) => {
+			const solution = solveBoard(puzzle);
+			if (!solution) throw new Error("unsolvable puzzle");
+			setIsResumeCheckDone(false);
+			isFreshGame.current = true;
+			dispatch({ type: "START_GAME", payload: { puzzle, solution, difficulty, config, roundId } });
 		},
 		[dispatch],
 	);
@@ -398,6 +416,7 @@ export function useSudoku() {
 		maxHints: state.maxHints,
 		generateGame,
 		startWithConfig,
+		startServerRound,
 		selectCell,
 		fillCell,
 		eraseCell,

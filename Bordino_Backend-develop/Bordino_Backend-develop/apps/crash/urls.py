@@ -9,6 +9,8 @@ from apps.crash.views import (
     CrashConfigView,
     CrashRoundsView,
     CrashSeedView,
+    SudokuReportView,
+    SudokuRoundsView,
     round_wait_view,
 )
 
@@ -34,5 +36,11 @@ urlpatterns = [
         "api/v1/games/chicken/rounds/<uuid:round_id>/cashout/",
         ChickenCashoutView.as_view(),
         name="chicken_cashout",
+    ),
+    path("api/v1/games/sudoku/rounds/", SudokuRoundsView.as_view(), name="sudoku_rounds"),
+    path(
+        "api/v1/games/sudoku/rounds/<uuid:round_id>/report/",
+        SudokuReportView.as_view(),
+        name="sudoku_report",
     ),
 ]

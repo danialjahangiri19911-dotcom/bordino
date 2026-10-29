@@ -34,6 +34,13 @@ class RecordActionService:
         customer = user.customer
         section = section.lower() if section else section
 
+        from apps.crash.services import sudoku  # pylint: disable=import-outside-toplevel
+
+        if section == sudoku.SECTION and action_type in sudoku.VERIFIED_ACTIONS:
+            # The board rewards are paid by the server against the board it issued
+            # (games/sudoku/rounds/<id>/report/), never on the browser's word.
+            raise ValueError("This Sudoku reward is given by the server after it checks the board.")
+
         existing_transaction = ActivityTransactionQueryRepository.get_by_customer_section_action(
             customer=customer,
             section=section,

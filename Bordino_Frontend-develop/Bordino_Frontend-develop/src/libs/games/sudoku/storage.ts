@@ -45,6 +45,9 @@ export interface PersistedGameState {
 	maxHints: number;
 	remainingHints: number;
 
+	/** The server's round (rewards are paid against it); absent in saves from before. */
+	roundId?: string | null;
+
 	// Unlock progress
 	completions: {
 		easy: number;
@@ -98,6 +101,7 @@ export function serializeGameState(state: any): PersistedGameState {
 		maxMistakes: state.maxMistakes,
 		maxHints: state.maxHints,
 		remainingHints: state.remainingHints,
+		roundId: state.roundId ?? null,
 		completions: {
 			easy: state.completions?.easy ?? 0,
 			medium: state.completions?.medium ?? 0,
@@ -136,6 +140,7 @@ export function deserializeGameState(persisted: PersistedGameState): any {
 		maxMistakes: persisted.maxMistakes,
 		maxHints: persisted.maxHints ?? 0, // fallback for old saves
 		remainingHints: persisted.remainingHints ?? 0,
+		roundId: persisted.roundId ?? null,
 		completions: persisted.completions,
 	};
 }

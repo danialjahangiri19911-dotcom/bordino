@@ -39,7 +39,8 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 		}
 
 		case "START_GAME": {
-			const { puzzle, solution, difficulty, config } = action.payload;
+			const { puzzle, solution, difficulty, config, roundId } = action.payload;
+			draft.roundId = roundId ?? null;
 			const { board, rowCounts, colCounts, squareCounts } =
 				initializeBoard(puzzle);
 			draft.solution = solution;
@@ -404,6 +405,7 @@ export function gameReducer(draft: GameState, action: GameAction): void {
 			draft.maxMistakes = savedState.maxMistakes;
 			draft.maxHints = savedState.maxHints;
 			draft.remainingHints = savedState.remainingHints;
+			draft.roundId = savedState.roundId ?? null;
 			// The counts come from the cells themselves, never from the save (a stale count would
 			// make conflicts, hints and the win check wrong).
 			const counts = initializeBoard(draft.board.map((row) => row.map((cell) => cell.value ?? 0)) as Board);
