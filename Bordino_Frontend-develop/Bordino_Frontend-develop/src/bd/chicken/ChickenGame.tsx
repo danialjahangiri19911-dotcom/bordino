@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { barClass, useAutoHideBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -288,6 +289,9 @@ export default function ChickenGame() {
 	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? setDialog("exit") : leave()));
 	const dialogBox = useRef<HTMLDivElement>(null);
 	useDismissOutside(!!dialog, dialogBox, () => setDialog(""));
+	// The top bar slides away while a round is in play; a downward swipe off the road brings it back.
+	const barPlaying = (view.phase === "playing" || view.phase === "jumping" || view.phase === "colliding") && !dialog;
+	const barHidden = useAutoHideBar(barPlaying);
 
 	if (!allowed) return null;
 
@@ -341,6 +345,7 @@ export default function ChickenGame() {
 					if (e.key === "Escape" && dialog) setDialog("");
 				}}
 			>
+				<div className={barClass(barPlaying, barHidden)}>
 				<header className="ck-top">
 					<div className="ck-heading">
 						<img src={ART} alt="" width={48} height={56} />
@@ -358,6 +363,7 @@ export default function ChickenGame() {
 						</button>
 					</div>
 				</header>
+				</div>
 				<div ref={dialogBox} className="ck-dialog" hidden={!dialog} role="dialog" aria-modal="false" aria-label={dialog === "exit" ? "خروج از بازی" : "اطلاعات بازی"}>
 					{dialog === "fair" ? (
 						<>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { barClass, useAutoHideBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -58,6 +59,9 @@ function View() {
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 	// A tap outside a question answers «stay» (its second button); start, win and loss need a choice.
 	useDismissOutside(!!confirm, dialogRef, () => setConfirm(""));
+	// The top bar slides away while playing; a downward swipe off the board brings it back.
+	const barPlaying = playing && !modal;
+	const barHidden = useAutoHideBar(barPlaying);
 
 	useEffect(() => {
 		music.current = createSoundtrack();
@@ -172,6 +176,7 @@ function View() {
 	return (
 		<div className="bd-game-page">
 			<article className={`g48 g48-brutal ${scheme === "dark" ? "g48-dark" : ""}`} dir="rtl" aria-label="بازی ۲۰۴۸" onKeyDown={onKey}>
+				<div className={barClass(barPlaying, barHidden)}>
 				<header className="g48-header" {...inertIf(!!modal)}>
 					<div className="g48-brand">
 						<span className="g48-mark" aria-hidden="true">
@@ -197,6 +202,7 @@ function View() {
 						</button>
 					</div>
 				</header>
+				</div>
 				<section className="g48-help" hidden={!help}>
 					<b>یک حرکت، یک ترکیب</b>
 					<p>عددهای یکسان را با کشیدن روی صفحه یا کلیدهای جهت‌نما به هم برسان. هر ترکیب به امتیاز بازی اضافه می‌شود. هدف، ساختن کاشی ۲۰۴۸ است؛ زمان محدودی ندارد.</p>

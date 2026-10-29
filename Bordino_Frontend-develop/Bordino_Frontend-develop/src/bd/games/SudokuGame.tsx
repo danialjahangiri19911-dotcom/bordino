@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
+import { barClass, useAutoHideBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -84,6 +85,9 @@ export default function SudokuGame() {
 	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
 	// A tap outside the box: a question is answered «stay» (as its second button), a pause ends.
 	// The start, win and loss boxes stay: each needs a choice.
+	// The top bar slides away while a board is in play; a downward swipe brings it back.
+	const barPlaying = playing && !modal;
+	const barHidden = useAutoHideBar(barPlaying);
 	useDismissOutside(!!confirm || modal === "pause", dialogRef, () => {
 		if (confirm) {
 			setPendingLevel(null);
@@ -299,6 +303,7 @@ export default function SudokuGame() {
 	return (
 		<div className="bd-game-page">
 			<article className={`sd sd-brutal ${scheme === "dark" ? "sd-dark" : ""} ${game.paused ? "sd-paused" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
+				<div className={barClass(barPlaying, barHidden)}>
 				<header className="sd-header" {...inertIf(!!modal && modal !== "pause")}>
 					<div className="sd-brand">
 						<span className="sd-mark" aria-hidden="true">
@@ -325,6 +330,7 @@ export default function SudokuGame() {
 						</button>
 					</div>
 				</header>
+				</div>
 				<section className="sd-help" hidden={!help}>
 					<b>هر عدد، فقط یک‌بار</b>
 					<p>هر سطر، ستون و مربع ۳×۳ باید عددهای ۱ تا ۹ را بدون تکرار داشته باشد. یک خانه را انتخاب کن و عدد را بزن. در حالت یادداشت، عددهای احتمالی را علامت بزن.</p>

@@ -322,3 +322,14 @@ body { margin: 0; }
 #bordino-directions a.bd-mission-link:focus-visible .bd-mission-copy b { text-decoration: underline; text-underline-offset: 4px; }
 #bordino-directions a.bd-mission-link:active { background: color-mix(in srgb, var(--bd-accent) 8%, transparent); }
 #bordino-directions .bd-mission-go { color: var(--bd-accent); width: 35px; min-height: 37px; display: grid; place-items: center; flex: none; }
+
+/* Games: while a round is in play the top bar floats (it never pushes the board down) and slides
+   away; a downward swipe brings it back (bd/autoHide.ts). */
+#bordino-directions .bd-bar-floating { position: sticky; top: 0; height: 0; z-index: 40; }
+#bordino-directions .bd-bar-floating > header { position: absolute; top: 0; left: 0; right: 0; margin: 0 !important; padding: 10px 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); transition: transform .25s ease, opacity .25s ease; }
+#bordino-directions .sd .bd-bar-floating > header { background: var(--s-bg); }
+#bordino-directions .g48 .bd-bar-floating > header { background: var(--g-bg); }
+#bordino-directions .ck-game .bd-bar-floating > header { background: var(--ck-bg); }
+#bordino-directions .cr .bd-bar-floating > header { background: var(--c-bg); }
+#bordino-directions .bd-bar-hidden > header { transform: translateY(-115%); opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { #bordino-directions .bd-bar-floating > header { transition: none; } }
