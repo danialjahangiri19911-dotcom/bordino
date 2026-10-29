@@ -108,21 +108,44 @@ export interface Plot {
 	line: string;
 	area: string;
 	tip: [number, number];
-	grid: number[];
-	labels: { x: number; y: number; text: string; anchor: "end" | "middle" }[];
+	/** Horizontal grid lines at round multipliers (they slide down as the chart zooms out). */
+	grid: { y: number; label: string }[];
+	/** Seconds along the bottom, at round values. */
+	ticks: { x: number; label: string }[];
+	/** Where the player cashed out, once the curve has passed it. */
+	mark: [number, number] | null;
+	left: number;
+	right: number;
 }
 
 /**
- * The design's chart (plot() in crash.js) for the server's curve m(t) = e^(k·t): `endSec` seconds of
- * flight drawn so far, `k` per second, inside a `width` × `height` stage.
+ * A 1/2/5×10^n step giving at most `maxTicks` ticks over `span`, so the grid stays readable (and
+ * bounded) however far the chart zooms out.
  */
-export function plot(endSec: number, k: number, multiplier: number, width: number, height: number): Plot {
+export function niceStep(span: number, maxTicks: number, min: number) {
+	if (!Number.isFinite(span) || span <= 0) return min;
+	const raw = span / maxTicks;
+	const magnitude = 10 ** Math.floor(Math.log10(raw));
+	const step = [1, 2, 5, 10].map((m) => m * magnitude).find((v) => v >= raw) ?? 10 * magnitude;
+	return Math.max(min, step);
+}
+
+/**
+ * The chart for the server's curve m(t) = e^(k·t): `endSec` seconds of flight drawn so far, `k`
+ * per second, inside a `width` × `height` stage. Both axes grow with the round (time and
+ * multiplier keep ~15% headroom), so the chart zooms out as the multiplier climbs, with grid
+ * lines at round values that slide as it does (as the earlier crash board did). `cashAt` = the
+ * cash-out multiplier, marked on the curve once reached.
+ */
+export function plot(endSec: number, k: number, multiplier: number, width: number, height: number, cashAt: number | null = null): Plot {
 	const left = 35;
 	const right = width - 32;
-	const top = 95;
+	// Below the big multiplier and its caption (they end ~140 px down), so the climbing tip never
+	// runs into them.
+	const top = 145;
 	const bottom = height - 28;
-	const maxT = Math.max(10, endSec * 1.15);
-	const maxY = Math.max(2, Math.ceil(multiplier * 1.18 * 2) / 2);
+	const maxT = Math.max(8, endSec * 1.15);
+	const maxY = Math.max(2, 1 + (multiplier - 1) * 1.15);
 	const x = (t: number) => left + ((right - left) * t) / maxT;
 	const y = (v: number) => bottom - ((bottom - top) * (v - 1)) / (maxY - 1);
 	const points = Array.from({ length: 61 }, (_, i) => {
@@ -131,9 +154,22 @@ export function plot(endSec: number, k: number, multiplier: number, width: numbe
 	});
 	const line = points.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(2)} ${py.toFixed(2)}`).join(" ");
 	const tip = points[points.length - 1];
-	const grid = [0, 1, 2, 3].map((i) => top + ((bottom - top) * i) / 3);
-	const labels: Plot["labels"] = [];
-	for (let i = 0; i < 3; i++) labels.push({ x: left - 6, y: grid[i] + 4, text: `${fa(maxY - ((maxY - 1) * i) / 3, 1)}×`, anchor: "end" });
-	for (let i = 1; i <= 3; i++) labels.push({ x: x((maxT * i) / 3), y: height - 9, text: `${fa(Math.round((maxT * i) / 3))}ث`, anchor: "middle" });
-	return { line, area: `${line} L${tip[0]} ${bottom} L${left} ${bottom} Z`, tip, grid, labels };
+	const yStep = niceStep(maxY - 1, 4, 0.1);
+	// The 1× baseline, then round multiples of the step (5×, 10×, not 6×, 11×).
+	const grid: Plot["grid"] = [{ y: y(1), label: `${fa(1)}×` }];
+	for (let i = Math.floor(1 / yStep + 1e-9) + 1; i <= Math.floor(1 / yStep) + 40; i++) {
+		const v = Math.round(i * yStep * 100) / 100;
+		if (v > maxY + 1e-9) break;
+		grid.push({ y: y(v), label: `${fa(v, yStep < 1 ? 1 : 0)}×` });
+	}
+	const tStep = niceStep(maxT, 5, 1);
+	const ticks: Plot["ticks"] = [];
+	for (let i = 1; i <= 40; i++) {
+		const t = i * tStep;
+		if (t > maxT + 1e-9) break;
+		ticks.push({ x: x(t), label: `${fa(t)}ث` });
+	}
+	const cashSec = cashAt && cashAt >= 1 ? Math.log(cashAt) / k : null;
+	const mark = cashSec !== null && cashSec <= endSec + 0.001 ? ([x(cashSec), y(cashAt!)] as [number, number]) : null;
+	return { line, area: `${line} L${tip[0]} ${bottom} L${left} ${bottom} Z`, tip, grid, ticks, mark, left, right };
 }

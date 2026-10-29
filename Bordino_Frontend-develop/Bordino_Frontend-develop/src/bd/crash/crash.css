@@ -177,6 +177,14 @@ to{transform:translate(-50%,-50%) scale(1.1)}
 .cr-brutal .cr-seed input,.cr-brutal .cr-seed button,.cr-brutal .cr-panel-actions button,.cr-brutal .cr-fair-panel .cr-verify{border:2px solid var(--c-ink);border-radius:3px}
 .cr-pause p{margin:0;font-size:13px;color:var(--c-muted)}
 .cr-stage[data-phase=waiting] .cr-multiplier strong{opacity:.55}
+/* Where the player cashed out: a pin on the curve (the earlier crash board's marker), the curve
+   flies on past it. */
+.cr-cash-mark{position:absolute;width:16px;height:16px;transform:translate(-50%,-50%);border-radius:50%;background:var(--c-good);border:3px solid var(--c-panel);box-shadow:0 0 0 2px var(--c-good);z-index:2;pointer-events:none}
+.cr-cash-mark b{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:700;line-height:1.4;padding:1px 7px;border-radius:20px;background:var(--c-good);color:#fff;direction:ltr}
+.cr-brutal .cr-cash-mark{border-radius:3px;border:2px solid var(--c-ink);box-shadow:2px 2px 0 var(--c-ink)}
+.cr-brutal .cr-cash-mark b{border-radius:3px;border:2px solid var(--c-ink);box-shadow:2px 2px 0 var(--c-ink)}
+.cr-dark .cr-cash-mark b{color:#142c25}
+.cr-axis text,.cr-grid line{transition:none}
 /* The game's logo (public/bd/games/crash-logo.svg) carries its own tile, border and shadow. */
 .cr .cr-mark.cr-logo{border:0;box-shadow:none;border-radius:0;background:none}
 .cr .cr-mark.cr-logo img{width:48px;height:48px;display:block}

@@ -189,7 +189,7 @@ export default function CrashGame() {
 	const flying = phase === "waiting" || phase === "running";
 	const flightSec =
 		phase === "running" ? elapsed / 1000 : phase === "crashed" && crashPoint ? Math.log(crashPoint) / (growth * 1000) : 0;
-	const chart = plot(flightSec, growth * 1000, multiplier, size.width, size.height);
+	const chart = plot(flightSec, growth * 1000, multiplier, size.width, size.height, cashedAt || null);
 
 	const limits = useMemo(
 		() => ({
@@ -594,16 +594,21 @@ export default function CrashGame() {
 							aria-label={`نمودار ضریب؛ ضریب ${fa2(multiplier)}؛ زمان ${fa(flightSec, 1)} ثانیه`}
 						>
 							<g className="cr-grid">
-								{chart.grid.map((y) => (
-									<line key={y} x1={35} x2={size.width - 32} y1={y} y2={y} />
+								{chart.grid.map((g) => (
+									<line key={g.label} x1={chart.left} x2={chart.right} y1={g.y} y2={g.y} />
 								))}
 							</g>
 							<path className="cr-area" d={chart.area} />
 							<path className="cr-line" fill="none" d={chart.line} />
 							<g className="cr-axis">
-								{chart.labels.map((l) => (
-									<text key={`${l.anchor}${l.x}${l.y}`} x={l.x} y={l.y} textAnchor={l.anchor}>
-										{l.text}
+								{chart.grid.map((g) => (
+									<text key={`y${g.label}`} x={chart.left - 6} y={g.y + 4} textAnchor="end">
+										{g.label}
+									</text>
+								))}
+								{chart.ticks.map((t) => (
+									<text key={`x${t.label}`} x={t.x} y={size.height - 9} textAnchor="middle">
+										{t.label}
 									</text>
 								))}
 							</g>
@@ -614,7 +619,18 @@ export default function CrashGame() {
 						<span className="cr-burst" aria-hidden="true" style={{ left: `${(chart.tip[0] / size.width) * 100}%`, top: `${(chart.tip[1] / size.height) * 100}%` }}>
 							<Icon name="zap" />
 						</span>
-						<span className="cr-result">{resultText}</span>
+						{chart.mark && round ? (
+							<span
+								className="cr-cash-mark"
+								style={{ left: `${(chart.mark[0] / size.width) * 100}%`, top: `${(chart.mark[1] / size.height) * 100}%` }}
+								role="img"
+								aria-label={`برداشت در ${fa2(cashedAt)}×: ${fa(round.payout)} امتیاز`}
+							>
+								<b>+{fa(round.payout)}</b>
+							</span>
+						) : null}
+						{/* The pin already says what a cash-out paid; the chip is for the other results. */}
+						<span className="cr-result">{chart.mark ? "" : resultText}</span>
 						{reconnecting || (!online && live) ? (
 							<div className="cr-pause">
 								<span>در حال اتصال دوباره…</span>

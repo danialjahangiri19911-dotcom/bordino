@@ -61,12 +61,41 @@ describe("chart", () => {
 		expect(p.tip[0]).toBeGreaterThan(35);
 		expect(p.tip[0]).toBeLessThan(600 - 32);
 		expect(p.tip[1]).toBeLessThan(292);
-		expect(p.tip[1]).toBeGreaterThan(95 - 1);
-		expect(p.grid).toHaveLength(4);
+		expect(p.tip[1]).toBeGreaterThan(145 - 1);
 	});
 
 	it("draws nothing before the round flies", () => {
 		const p = plot(0, 0.06, 1, 600, 320);
 		expect(p.tip).toEqual([35, 292]);
+		expect(p.mark).toBeNull();
+	});
+
+	it("zooms out as the multiplier climbs: the same grid value slides down, steps grow, the tip stays in view", () => {
+		const k = 0.06;
+		const at = (sec: number) => plot(sec, k, Math.exp(k * sec), 600, 320);
+		const early = at(8); // ≈ 1.6×
+		const mid = at(20); // ≈ 3.3×
+		const late = at(40); // ≈ 11×
+		const lineFor = (p: ReturnType<typeof plot>, label: string) => p.grid.find((g) => g.label === label)?.y;
+		expect(lineFor(mid, "۲×") ?? 0).toBeGreaterThan(lineFor(early, "۲×") ?? Infinity); // lower = zoomed out
+		expect(late.grid.length).toBeLessThanOrEqual(6); // bounded: the step grows instead
+		expect(late.grid.map((g) => g.label)).toEqual(["۱×", "۵×", "۱۰×"]);
+		for (const p of [early, late]) {
+			expect(p.tip[1]).toBeGreaterThanOrEqual(145 - 1);
+			expect(p.tip[0]).toBeLessThanOrEqual(600 - 32);
+		}
+		expect(late.ticks.length).toBeLessThanOrEqual(5);
+	});
+
+	it("pins the cash-out point on the curve once the curve has passed it", () => {
+		const k = 0.06;
+		const cash = 1.5;
+		const before = plot(Math.log(1.4) / k, k, 1.4, 600, 320, cash);
+		expect(before.mark).toBeNull();
+		const after = plot(Math.log(2) / k, k, 2, 600, 320, cash);
+		expect(after.mark).not.toBeNull();
+		// On the curve, behind the tip.
+		expect(after.mark![0]).toBeLessThan(after.tip[0]);
+		expect(after.mark![1]).toBeGreaterThan(after.tip[1]);
 	});
 });
