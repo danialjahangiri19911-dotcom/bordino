@@ -55,6 +55,10 @@ class UserRegistrationService:
                 self._send_sms(user.phone_number, otp_code)
                 self._create_customer_for_user(user)
                 self._create_wallet_for_user(user)
+            elif not self.otp_command_repository.get_otp(dto.phone_number):
+                # A known number gets its code here too (same limits), so registering a known
+                # number looks exactly like registering a new one. A code still valid is not resent.
+                self.otp_service.resend_otp(self.otp_service.ResendDTO(dto.phone_number))
 
         return user, created
 

@@ -7,6 +7,7 @@ from rest_framework.serializers import SerializerMetaclass
 from apps.user_management.repositories.otp.command import OTPCommandRepository
 from apps.user_management.repositories.user.query import UserQueryRepository
 from apps.user_management.services.otp.attempts import OtpAttempts
+from apps.users.models.user import canonical_phone
 
 User = get_user_model()
 
@@ -16,15 +17,9 @@ class OtpValidateSerializerMixin(metaclass=SerializerMetaclass):
         super().__init__(*args, **kwargs)
         self.otp_command_repository = OTPCommandRepository()
 
-    phone_number = serializers.SlugRelatedField(
-        source="user",
-        write_only=True,
-        queryset=UserQueryRepository.all(),
-        slug_field="phone_number",
-        error_messages={
-            "does_not_exist": _("The phone number provided does not registered yet."),
-        },
-    )
+    # Looked up in validate(): an unknown number gets the same answer as a known one without a
+    # valid code, so the login endpoint does not tell which numbers have accounts.
+    phone_number = serializers.CharField(write_only=True)
     otp = serializers.CharField(max_length=settings.OTP_LENGTH)
 
     class Meta:
@@ -35,10 +30,11 @@ class OtpValidateSerializerMixin(metaclass=SerializerMetaclass):
         Perform validation of OTP and its state.
         """
 
-        if "user" not in validated_data:
-            raise serializers.ValidationError(_("User data is missing."))
-
-        user = validated_data["user"]
+        phone = canonical_phone(validated_data.pop("phone_number", ""))
+        user = UserQueryRepository.all().filter(phone_number=phone).first() if phone else None
+        if user is None:
+            raise serializers.ValidationError(_("OTP not found or expired."))
+        validated_data["user"] = user
         otp_code = validated_data["otp"]
         attempts = OtpAttempts(user.phone_number)
 

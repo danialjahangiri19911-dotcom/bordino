@@ -7,6 +7,7 @@ from rest_framework.serializers import SerializerMetaclass
 
 from apps.user_management.repositories.otp.command import OTPCommandRepository
 from apps.user_management.repositories.user.query import UserQueryRepository
+from apps.users.models.user import canonical_phone
 
 User = get_user_model()
 
@@ -17,30 +18,25 @@ class OtpExistSerializerMixin(metaclass=SerializerMetaclass):
         self.otp_command_repository = OTPCommandRepository()
         self.cache_key_prefix = settings.CACHE_KEY_PREFIX
 
-    phone_number = serializers.SlugRelatedField(
-        source="user",
-        write_only=True,
-        queryset=UserQueryRepository.all(),
-        slug_field="phone_number",
-        error_messages={
-            "does_not_exist": _("The phone number provided does not registered yet."),
-        },
-    )
+    # Looked up in validate(): an unknown number is answered like a known one (no code is sent),
+    # so resend does not tell which numbers have accounts.
+    phone_number = serializers.CharField(write_only=True)
 
     class Meta:
         fields = ("phone_number",)
 
     def validate(self, validated_data):
-        if "user" not in validated_data:
-            raise serializers.ValidationError(_("User data is missing."))
-
-        user = validated_data["user"]
+        phone = canonical_phone(validated_data.pop("phone_number", ""))
+        user = UserQueryRepository.all().filter(phone_number=phone).first() if phone else None
+        validated_data["user"] = user
+        if user is None:
+            return validated_data
 
         otp_data = self.otp_command_repository.get_otp(user.phone_number)
 
-        ttl = cache.ttl(f"{self.cache_key_prefix}{user.phone_number}")
-
         if otp_data:
+            ttl_of = getattr(cache, "ttl", None)  # Redis only
+            ttl = ttl_of(f"{self.cache_key_prefix}{user.phone_number}") if ttl_of else ""
             raise serializers.ValidationError(
                 _(
                     "OTP already exists. Please wait {ttl} seconds for the current OTP to expire."

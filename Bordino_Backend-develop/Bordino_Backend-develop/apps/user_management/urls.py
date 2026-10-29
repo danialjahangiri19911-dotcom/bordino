@@ -3,6 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
+from apps.user_management.services.user.sessions import SessionTokenRefreshSerializer
+
 from apps.user_management.views.category.list import CategoryListView
 from apps.user_management.views.customer.customer_profile import CustomerProfileView
 from apps.user_management.views.customer.profile_image import CustomerProfileImageView
@@ -88,6 +90,7 @@ urlpatterns = [
 ]
 
 urlpatterns += [
-    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # Refresh within a login session: refused once that session is logged out (sessions.py).
+    path("token/refresh/", TokenRefreshView.as_view(serializer_class=SessionTokenRefreshSerializer), name="token_refresh"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
 ]

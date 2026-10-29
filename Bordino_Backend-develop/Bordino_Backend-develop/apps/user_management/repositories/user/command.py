@@ -4,8 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from rest_framework_simplejwt.tokens import RefreshToken
-
+from apps.user_management.services.user.sessions import SessionRefreshToken
 from apps.users.models.user import User
 
 
@@ -28,7 +27,8 @@ class UserCommandRepository:
     @staticmethod
     def issue_token(user: User):
         try:
-            refresh = RefreshToken.for_user(user)
+            # A new login session: every token rotated from this one carries its id (logout ends them all).
+            refresh = SessionRefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             return {
                 "access_token": access_token,

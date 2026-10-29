@@ -17,6 +17,8 @@ class OTPResendSerializer(OtpExistSerializerMixin, serializers.Serializer):
         fields = OtpExistSerializerMixin.Meta.fields
 
     def create(self, validated_data):
+        if validated_data["user"] is None:
+            return {}  # an unknown number: the same answer as for a known one, no SMS
         try:
             user = self.otp_service.resend_otp(
                 self.otp_service.ResendDTO(

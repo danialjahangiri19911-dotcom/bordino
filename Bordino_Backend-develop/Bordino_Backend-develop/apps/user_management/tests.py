@@ -467,3 +467,78 @@ class AuditPhase3Tests(TestCase):
         self.assertEqual(self.user.customer.registration_step, Customer.Step.INTEREST_SELECTION)
         r = self.api.patch(INTERESTS, {}, format="json")  # the retry completes and pays
         self.assertEqual(r.status_code, 200, r.content)
+
+
+@override_settings(CACHES=LOCMEM)
+class SecurityAuditLoginTests(TestCase):
+    """Codex security audit 2026-10-29 (login and accounts)."""
+
+    def setUp(self):
+        cache.clear()
+        self.api = APIClient()
+        self.user = make_customer("9120004101")
+
+    def tokens(self):
+        from apps.user_management.repositories.user.command import UserCommandRepository  # pylint: disable=import-outside-toplevel
+
+        t = UserCommandRepository.issue_token(self.user)
+        return t["access_token"], t["refresh_token"]
+
+    def test_logout_ends_the_whole_session_also_a_copy_rotated_elsewhere(self):
+        a0, r0 = self.tokens()
+        # The attacker (with a copy of r0) refreshes first: r0 is rotated into a1/r1.
+        stolen = self.api.post("/token/refresh/", {"refresh": r0}, format="json")
+        self.assertEqual(stolen.status_code, 200, stolen.content)
+        body = stolen.json().get("result", stolen.json())
+        a1, r1 = body["access"], body["refresh"]
+        # The player logs out with what they have.
+        player = APIClient()
+        player.credentials(HTTP_AUTHORIZATION=f"Bearer {a0}")
+        self.assertIn(player.post(LOGOUT, {"refresh": r0}, format="json").status_code, (200, 201, 204))
+        attacker = APIClient()
+        attacker.credentials(HTTP_AUTHORIZATION=f"Bearer {a1}")
+        self.assertEqual(attacker.get("/api/v1/customer/profile/me/").status_code, 401)
+        self.assertEqual(self.api.post("/token/refresh/", {"refresh": r1}, format="json").status_code, 401)
+
+    def test_a_token_from_before_sessions_gets_one_at_its_next_refresh(self):
+        from rest_framework_simplejwt.state import token_backend  # pylint: disable=import-outside-toplevel
+        from rest_framework_simplejwt.tokens import RefreshToken  # pylint: disable=import-outside-toplevel
+
+        legacy = str(RefreshToken.for_user(self.user))
+        r = self.api.post("/token/refresh/", {"refresh": legacy}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        new = r.json().get("result", r.json())["refresh"]
+        self.assertTrue(token_backend.decode(new, verify=True).get("sid"))
+
+    def test_login_does_not_tell_which_numbers_have_accounts(self):
+        unknown = self.api.post(LOGIN, {"phone_number": "9129999999", "otp": "0000"}, format="json")
+        known = self.api.post(LOGIN, {"phone_number": self.user.phone_number, "otp": "0000"}, format="json")
+        self.assertEqual((unknown.status_code, unknown.json()), (known.status_code, known.json()))
+
+    @mock.patch("apps.user_management.services.otp.otp.SMSService.send_sms", return_value="ok")
+    def test_registration_answers_the_same_for_a_known_number_and_sends_its_code(self, send):
+        new = self.api.post("/api/v1/registration/", {"phone_number": "9120004199"}, format="json")
+        known = self.api.post("/api/v1/registration/", {"phone_number": self.user.phone_number}, format="json")
+        self.assertEqual(new.status_code, known.status_code)
+        self.assertEqual(result(new), result(known))
+        self.assertEqual(send.call_count, 2)  # the known number got its code too
+
+    @mock.patch("apps.user_management.services.otp.otp.SMSService.send_sms", return_value="ok")
+    def test_resend_does_not_tell_either(self, send):
+        unknown = self.api.post(RESEND, {"phone_number": "9129999998"}, format="json")
+        known = self.api.post(RESEND, {"phone_number": self.user.phone_number}, format="json")
+        self.assertEqual((unknown.status_code, result(unknown)), (known.status_code, result(known)))
+        self.assertEqual(send.call_count, 1)  # no SMS to a number without an account
+
+    @mock.patch("apps.user_management.services.otp.otp.SMSService.send_sms", return_value="ok")
+    def test_persian_digits_and_prefixes_are_the_same_number(self, send):
+        from apps.users.models.user import canonical_phone  # pylint: disable=import-outside-toplevel
+
+        for spelling in ("۹۱۲۰۰۰۴۱۰۱", "09120004101", "+989120004101", "00989120004101", "٩١٢٠٠٠٤١٠١"):
+            self.assertEqual(canonical_phone(spelling), "9120004101")
+        before = get_user_model().objects.count()
+        self.api.post("/api/v1/registration/", {"phone_number": "۹۱۲۰۰۰۴۱۰۱"}, format="json")
+        self.assertEqual(get_user_model().objects.count(), before)  # no second account for the same SIM
+        OTPCommandRepository.create(self.user.phone_number, "4321")
+        r = self.api.post(LOGIN, {"phone_number": "۰۹۱۲۰۰۰۴۱۰۱", "otp": "4321"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)

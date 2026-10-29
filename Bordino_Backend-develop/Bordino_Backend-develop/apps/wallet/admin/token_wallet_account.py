@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.django_helper.admin.base import BaseAdmin
 from apps.wallet.models.token_wallet_account import TokenWalletAccount
+from apps.wallet.admin.safe_save import save_changed_fields
 from apps.wallet.services.adjust import adjust_points
 
 
@@ -59,7 +60,12 @@ class TokenWalletAccountAdmin(BaseAdmin):
     )
 
     def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+        if change:
+            # Only the fields the form changed, never the balance: a full save would write back the
+            # balance as it was when the page loaded, undoing a game charge or a win made meanwhile.
+            save_changed_fields(obj, form, protected={"amount"})
+        else:
+            super().save_model(request, obj, form, change)
         delta = form.cleaned_data.get("adjust_by")
         if delta:
             adjust_points(obj, delta, request.user)

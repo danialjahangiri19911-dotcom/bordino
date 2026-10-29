@@ -10,10 +10,27 @@ from apps.users.models.user_manager import UserManager
 
 username_validator = UnicodeUsernameValidator()
 
+_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
+def canonical_phone(text) -> str:
+    """The one form a mobile number is stored and looked up in: ASCII digits, without the country
+    or trunk prefix («+98 912…», «0098…», «0912…», «۹۱۲…» → «912…»). Without this, «۹۱۲…» and
+    «912…» were two accounts (and two sets of per-phone limits and rewards) for one SIM."""
+    digits = "".join(ch for ch in str(text or "").translate(_DIGITS) if ch in "0123456789")
+    if digits.startswith("0098"):
+        digits = digits[4:]
+    elif digits.startswith("98") and len(digits) == 12:
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = digits[1:]
+    return digits
+
 
 @deconstructible
 class PhoneNumberValidator(validators.RegexValidator):
-    regex = r"^(9\d*)$"
+    # ASCII digits only (\d would also accept Persian digits: another spelling of the same number).
+    regex = r"^(9[0-9]*)$"
     message = _("Use a digit number starting with 9.")
     flags = 0
 
@@ -70,7 +87,7 @@ class User(AbstractBaseModel, AbstractBaseUser, PermissionsMixin):
 
     def normalize_phone_number(self):
         if self.phone_number:
-            self.phone_number = "".join(filter(str.isdigit, self.phone_number))
+            self.phone_number = canonical_phone(self.phone_number)
 
     def save(self, *args, **kwargs):
         self.normalize_phone_number()
