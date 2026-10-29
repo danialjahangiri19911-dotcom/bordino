@@ -320,7 +320,7 @@ class ChickenRoundTests(TestCase):
         payload = chicken.round_payload(round_)
         self.assertIsNone(payload["hit_lane"])
         self.assertIsNone(payload["server_seed"])
-        self.assertEqual(payload["lanes"], 19)
+        self.assertEqual(payload["lanes"], chicken.road_length(100, D("0.13"), D("0.02"), 100000))
         self.assertEqual(round_.server_seed_hash, fair.hash_seed(round_.server_seed))
 
     def test_bad_bets_are_refused(self):
@@ -376,17 +376,34 @@ class ChickenRoundTests(TestCase):
         self.assertEqual(self.balance(), 990 + 33)
 
     def test_last_lane_cashes_out_by_itself(self):
-        round_ = self.bet(10, "hard", hit=None)
+        round_ = self.bet(10, "hard", hit=None)  # lane 16 pays ×10478: the 100,000 cap
+        self.assertEqual(round_.lanes, 16)
         for _ in range(16):
             round_ = chicken.step(self.user, round_.pk)
-        self.assertEqual((round_.step, round_.status), (16, "won"))
+        self.assertEqual((round_.step, round_.status, round_.payout), (16, "won", 100000))
+
+    def test_the_road_goes_on_until_the_payout_cap(self):
+        # Easy used to stop at lane 24 (×3.35); now it goes on until the win reaches the cap.
+        round_ = self.bet(100, "easy", hit=None)
+        multipliers = chicken.multipliers_for(round_)
+        self.assertGreater(round_.lanes, 24)
+        self.assertGreaterEqual(100 * multipliers[-1], 100000)
+        self.assertLess(100 * multipliers[-2], 100000)
+        for _ in range(30):
+            round_ = chicken.step(self.user, round_.pk)
+        self.assertEqual((round_.step, round_.status), (30, "active"))
+
+    def test_the_road_is_never_longer_than_max_lanes(self):
+        self.assertEqual(chicken.road_length(1, D("0.0001"), D("0.02"), 100000), chicken.MAX_LANES)
 
     def test_payout_cap_cashes_out(self):
         config = ChickenConfiguration.current()
         config.max_payout = 500
         config.save()
         round_ = self.bet(100, "hard", hit=None)  # 1.75, 3.12, 5.57…: lane 3 reaches 500
-        round_ = chicken.step(self.user, round_.pk, to=10)
+        self.assertEqual(round_.lanes, 3)
+        for _ in range(3):
+            round_ = chicken.step(self.user, round_.pk)
         self.assertEqual((round_.step, round_.status, round_.payout), (3, "won", 500))
 
     def test_cash_out_before_the_first_lane_is_refused(self):
@@ -397,7 +414,7 @@ class ChickenRoundTests(TestCase):
     def test_bad_jump_target_is_refused(self):
         round_ = self.bet(100, "easy", hit=None)
         with self.assertRaises(rounds.CrashError):
-            chicken.step(self.user, round_.pk, to=25)
+            chicken.step(self.user, round_.pk, to=round_.lanes + 1)
 
 
 @override_settings(CACHES=LOCMEM)

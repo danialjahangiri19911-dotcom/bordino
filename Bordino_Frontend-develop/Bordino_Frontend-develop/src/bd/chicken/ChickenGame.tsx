@@ -374,7 +374,7 @@ export default function ChickenGame() {
 							</div>
 							<p>مرغ از پیاده‌رو روی دایرهٔ خط بعد می‌پرد. هر خط که سالم رد شود، ضریب آن خط به دست می‌آید؛ «توقف و دریافت» شرط × همان ضریب را به کیف امتیاز می‌برد. برخورد با خودرو یعنی باخت شرط.</p>
 							<p>
-								سطح‌ها: {LEVELS.map(([key, name]) => `${name} ${fa(config?.difficulties[key]?.lanes ?? 0)} خط`).join(" · ")}. حداکثر برد هر دور {fa(config?.max_payout ?? 0)} امتیاز.
+								جاده تا وقتی خودرویی نزند ادامه دارد؛ هر سطح خطرِ هر خط و رشد ضریب خودش را دارد. وقتی برد به سقف {fa(config?.max_payout ?? 0)} امتیاز برسد، همان‌جا خودکار دریافت می‌شود.
 							</p>
 							<p>
 								خط برخورد پیش از شروع دور با سید سرور تعیین می‌شود و هش آن از قبل نمایش داده می‌شود: <bdi dir="ltr" className="ck-hash">{(round?.server_seed_hash ?? "—").slice(0, 24)}…</bdi>
@@ -416,7 +416,13 @@ export default function ChickenGame() {
 							<div className={`ck-board ${motion ? "ck-moving" : ""}`} style={{ "--ck-count": count } as CSSProperties}>
 								<div className={`ck-roadgrid ${jump ? "ck-camera-hop" : ""}`} style={{ "--ck-track-count": lanes.length } as CSSProperties}>
 									{lanes.map((n) => {
-										if (n > values.length) return <div key={`end-${n}`} className="ck-lane ck-road-end" aria-hidden="true" />;
+										// Past the last lane (the one whose win reaches the payout cap): the finish.
+										if (n > values.length)
+											return (
+												<div key={`end-${n}`} className="ck-lane ck-road-end" aria-hidden="true">
+													{n === values.length + 1 ? <span className="ck-finish">سقف برد</span> : null}
+												</div>
+											);
 										const safe = n > 0 && n <= view.secured;
 										const reached = n > 0 && n <= view.lane;
 										const type = VEHICLES[(n - 1 + VEHICLES.length) % VEHICLES.length];
@@ -478,7 +484,10 @@ export default function ChickenGame() {
 								</div>
 								{view.phase === "won" && round ? (
 									<div className="ck-result">
-										<strong>توقف در {mult(round.cashout_multiplier ?? reachedValue)}</strong>
+										<strong>
+											{round.payout >= round.max_payout ? "سقف برد! " : ""}
+											توقف در {mult(round.cashout_multiplier ?? reachedValue)}
+										</strong>
 										<p>{fa(round.payout)} امتیاز به کیف امتیاز رفت</p>
 									</div>
 								) : null}

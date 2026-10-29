@@ -182,7 +182,7 @@ class ChickenConfiguration(AbstractBaseModel):
     difficulties = models.JSONField(
         default=default_chicken_difficulties,
         verbose_name=_("سطح‌ها"),
-        help_text=_('برای هر سطح: lanes = تعداد خط‌ها، hit = احتمال برخورد در هر خط (مثلاً "0.05").'),
+        help_text=_('برای هر سطح: lanes = خط‌های پیش‌نمایش پیش از شروع (جادهٔ هر دست تا سقف برد ادامه دارد)، hit = احتمال برخورد در هر خط (مثلاً "0.05").'),
     )
 
     def clean(self):

@@ -283,3 +283,6 @@
 @container(max-width:600px){.ck-game .ck-sprite{width:min(100%,82px)}}
 
 .ck-game .ck-flattened .ck-original-art{top:14%;bottom:2%}
+/* The finish past the last lane: the win there reaches the payout cap. */
+.ck-game .ck-road-end:has(.ck-finish){background:repeating-conic-gradient(var(--ck-ink) 0 25%,var(--ck-panel) 0 50%) 0 0/18px 18px;opacity:.9}
+.ck-game .ck-finish{position:absolute;top:var(--ck-ground,280px);left:50%;transform:translate(-50%,-50%);background:var(--ck-accent);color:var(--ck-on);border:3px solid var(--ck-line);box-shadow:3px 3px 0 var(--ck-line);padding:6px 8px;font:800 13px/1.3 Vazirmatn,Tahoma,sans-serif;white-space:nowrap;border-radius:3px}

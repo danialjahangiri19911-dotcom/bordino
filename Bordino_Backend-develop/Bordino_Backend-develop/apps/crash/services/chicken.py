@@ -6,7 +6,8 @@ Provably fair, decided entirely at bet time:
     hit_lane = first lane i (1-based) with u_i < hit, or none
     m_i      = floor((1 - edge) / (1 - hit)^i, 2 decimals)
 
-so cashing out after any lane returns (1 - edge) on average.  Money handling mirrors
+so cashing out after any lane returns (1 - edge) on average.  The road has no fixed end: it runs
+until the lane whose win reaches max_payout (that lane cashes out by itself), at most MAX_LANES.  Money handling mirrors
 services/rounds.py: server-picked points account, row locks, F() balance updates, one settlement.
 """
 
@@ -31,6 +32,8 @@ from apps.crash.services.rounds import (
 from apps.wallet.models import TokenWalletAccount
 
 _TWO_32 = 2**32
+# The longest road (only reached when the payout cap is far away, e.g. a tiny bet on easy).
+MAX_LANES = 300
 
 
 def lane_multipliers(lanes: int, hit: Decimal, house_edge: Decimal) -> list[Decimal]:
@@ -54,6 +57,16 @@ def multipliers_for(round_: ChickenRound) -> list[Decimal]:
     return lane_multipliers(round_.lanes, round_.hit_chance, round_.house_edge)
 
 
+def road_length(bet: int, hit: Decimal, house_edge: Decimal, max_payout: int) -> int:
+    """Lanes in a round: up to the first lane whose win reaches max_payout (at most MAX_LANES)."""
+    survive = Decimal(1) - Decimal(hit)
+    keep = Decimal(1) - Decimal(house_edge)
+    for lane in range(1, MAX_LANES + 1):
+        if bet * fair.floor_cents(keep / survive**lane) >= max_payout:
+            return lane
+    return MAX_LANES
+
+
 def payout_cap_lane(round_: ChickenRound, multipliers) -> int | None:
     """First lane whose win would reach max_payout: the round cashes out there by itself."""
     for lane, multiplier in enumerate(multipliers, start=1):
@@ -72,7 +85,8 @@ def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, 
         raise CrashError(f"مبلغ شرط باید بین {config.min_bet} و {config.max_bet} امتیاز باشد.")
     if bet >= config.max_payout:
         raise CrashError("این شرط از سقف برد بیشتر است.")
-    lanes, hit = config.level(difficulty)
+    _preview_lanes, hit = config.level(difficulty)
+    lanes = road_length(bet, hit, config.house_edge, config.max_payout)
 
     customer = customer_for(user)
     account = points_account(user)
