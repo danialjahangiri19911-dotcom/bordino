@@ -1,26 +1,39 @@
+import { currentUserId } from "@/libs/stores/authStore";
+
 /**
  * One id per money action (a game charge, a wheel spin, a withdrawal), kept while its outcome is
  * unknown (no answer, or a server error): sending again reuses it and the server returns the first
- * result instead of charging, spinning or withdrawing a second time. A clear answer — success or a
- * 4xx refusal — ends it, so the next action gets a new id.
+ * result instead of charging, spinning or withdrawing a second time. Only an answer ends it —
+ * success or a refusal (4xx; a 409 means the server already has the first one) — so the next
+ * action gets a new id.
  *
- * The pending ids are also kept in this browser for a while, so a reload after a lost answer still
- * sends the same id (the server saw it, the page did not).
+ * Kept in this browser, per account, until answered: a reload, another tab or a later visit still
+ * sends the same id (the server saw it, the page did not). There is no expiry on purpose: if the
+ * first request never arrived, the same id simply makes it once; if it did, the server answers
+ * with it. A key names the action AND its details (game, wheel and multiplier), so a different
+ * action never reuses another's id.
  */
 const STORE_KEY = "bd-pending-requests";
-/** After this long an unanswered action is history: a new tap is a new action. */
-const KEEP_MS = 15 * 60 * 1000;
 
-type Stored = Record<string, { id: string; at: number }>;
+type Stored = Record<string, string>;
 const memory = new Map<string, string>();
 
-function load(): Stored {
+function scoped(key: string) {
+	return `${currentUserId()}|${key}`;
+}
+
+function load(): Stored | null {
 	try {
-		const all = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}") as Stored;
-		const now = Date.now();
-		return Object.fromEntries(Object.entries(all).filter(([, v]) => v && typeof v.id === "string" && now - v.at < KEEP_MS));
+		const all = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}") as unknown;
+		if (!all || typeof all !== "object") return {};
+		// Only id strings (older builds stored {id, at}: those are taken over as they are).
+		return Object.fromEntries(
+			Object.entries(all as Record<string, unknown>)
+				.map(([k, v]) => [k, typeof v === "string" ? v : (v as { id?: unknown })?.id])
+				.filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+		);
 	} catch {
-		return {};
+		return null; // no storage here: memory stands in
 	}
 }
 
@@ -32,54 +45,48 @@ function save(all: Stored) {
 	}
 }
 
-function storageWorks() {
-	try {
-		localStorage.setItem(`${STORE_KEY}-probe`, "1");
-		localStorage.removeItem(`${STORE_KEY}-probe`);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
 function newRequestId() {
 	return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/** The id for `key`: the pending one (this page, or a reload within KEEP_MS), else a new one. */
+/** The id for `key` (this account): the pending one if there is one, else a new one. */
 export function requestIdFor(key: string): string {
+	const k = scoped(key);
 	const all = load();
-	// The stored id rules (it expires, and another tab may have settled it); memory only stands in
-	// where this browser cannot store anything.
-	const id = all[key]?.id ?? (storageWorks() ? undefined : memory.get(key)) ?? newRequestId();
-	memory.set(key, id);
-	save({ ...all, [key]: { id, at: all[key]?.at ?? Date.now() } });
+	const id = (all ? all[k] : memory.get(k)) ?? newRequestId();
+	memory.set(k, id);
+	if (all && all[k] !== id) save({ ...all, [k]: id });
 	return id;
 }
 
-/** The action got a clear answer: the next one gets a new id. */
-export function settleRequestId(key: string) {
-	memory.delete(key);
+/**
+ * The action sent with `id` got an answer. Only that id is cleared: another tab (or a later tap)
+ * may already be waiting on a newer one under the same key.
+ */
+export function settleRequestId(key: string, id: string) {
+	const k = scoped(key);
+	if (memory.get(k) === id) memory.delete(k);
 	const all = load();
-	delete all[key];
-	save(all);
+	if (all && all[k] === id) {
+		delete all[k];
+		save(all);
+	}
 }
 
-/** True when a failure leaves the outcome unknown (no answer, a server error, or a conflict). */
+/** True when a failure leaves the outcome unknown: no answer, or a server error. */
 export function isUncertain(e: unknown) {
 	const status = (e as { response?: { status?: number } })?.response?.status;
-	return !status || status >= 500 || status === 409;
+	return !status || status >= 500;
 }
 
 export async function withRequestId<T>(key: string, send: (requestId: string) => Promise<T>): Promise<T> {
 	const requestId = requestIdFor(key);
 	try {
 		const result = await send(requestId);
-		settleRequestId(key);
+		settleRequestId(key, requestId);
 		return result;
 	} catch (e) {
-		const status = (e as { response?: { status?: number } })?.response?.status;
-		if (status && status < 500) settleRequestId(key);
+		if (!isUncertain(e)) settleRequestId(key, requestId);
 		throw e;
 	}
 }

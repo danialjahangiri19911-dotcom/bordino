@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 
@@ -124,6 +124,8 @@ export default function Withdraw() {
 	const [amountText, setAmountText] = useState("");
 	const [accountId, setAccountId] = useState("");
 	const [step, setStep] = useState<"form" | "review" | "done">("form");
+	/** The id the last withdrawal went out with (only that one is settled by its answer). */
+	const sentId = useRef("");
 	const [serverError, setServerError] = useState<string | null>(null);
 
 	const balance = cash.balance ?? 0;
@@ -150,7 +152,7 @@ export default function Withdraw() {
 		onSuccess: () => {
 			setStep("done");
 			setServerError(null);
-			settleRequestId(WITHDRAW_KEY);
+			settleRequestId(WITHDRAW_KEY, sentId.current);
 			queryClient.invalidateQueries();
 		},
 		// The same request id goes with a retry: if the first one did reach the server, the server
@@ -159,7 +161,8 @@ export default function Withdraw() {
 			setServerError(gameErrorMessage(e));
 			// No answer, or a server error: the withdrawal may have been made. Its id must stay, so
 			// whatever is sent next is recognised as the same request (or refused as a conflict).
-			if (!isUncertain(e)) settleRequestId(WITHDRAW_KEY);
+			// A 409 (the same id with other details) also ends it: the server has the first one.
+			if (!isUncertain(e)) settleRequestId(WITHDRAW_KEY, sentId.current);
 			cash.refetch();
 		},
 	});
@@ -234,7 +237,10 @@ export default function Withdraw() {
 								type="button"
 								className="bd-action"
 								disabled={isSending}
-								onClick={() => submitHandler({ amount, bank_account_id: accountId, request_id: requestIdFor(WITHDRAW_KEY) })}
+								onClick={() => {
+									sentId.current = requestIdFor(WITHDRAW_KEY);
+									submitHandler({ amount, bank_account_id: accountId, request_id: sentId.current });
+								}}
 							>
 								{isSending ? "در حال ثبت…" : serverError ? "تلاش دوباره" : "تأیید و ثبت برداشت"}
 							</button>

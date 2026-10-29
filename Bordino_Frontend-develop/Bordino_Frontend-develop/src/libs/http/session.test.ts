@@ -33,6 +33,19 @@ describe("session end", () => {
 		expect(useAuthStore.getState().refreshToken).toBeNull();
 	});
 
+	it("a refused refresh does not log out a newer session that started meanwhile", async () => {
+		let release!: () => void;
+		forget.mockImplementation(() => new Promise<undefined>((r) => (release = () => r(undefined))));
+		jest.spyOn(axios, "post").mockRejectedValueOnce({ response: { status: 401 } });
+		const refusing = refreshAccessToken(jwt("a"));
+		await new Promise((r) => setTimeout(r, 0));
+		await new Promise((r) => setTimeout(r, 0));
+		useAuthStore.setState({ isLoggedIn: true, accessToken: jwt("b"), refreshToken: jwt("b") }); // another tab
+		release();
+		await expect(refusing).rejects.toBeTruthy();
+		expect(useAuthStore.getState().refreshToken).toBe(jwt("b"));
+	});
+
 	it("logout clears the device even while a hung refresh holds the session lock", async () => {
 		jest.useFakeTimers();
 		// The lock is held (a refresh that never answers): request() never runs the task.

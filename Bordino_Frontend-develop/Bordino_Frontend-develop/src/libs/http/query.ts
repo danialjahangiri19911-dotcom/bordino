@@ -88,8 +88,11 @@ async function refreshAccessToken(refreshToken: string) {
 					import("@/bd/push").then((push) => push.forgetOnThisDevice()),
 					new Promise((resolve) => setTimeout(resolve, 3000)),
 				]).catch(() => undefined);
-				useAuthStore.getState().logout();
-				useUserStore.getState().clearUser();
+				// Still the same session after that wait? (Another tab may have signed in.)
+				if (useAuthStore.getState().refreshToken === stored.refreshToken) {
+					useAuthStore.getState().logout();
+					useUserStore.getState().clearUser();
+				}
 			}
 			throw error;
 		}

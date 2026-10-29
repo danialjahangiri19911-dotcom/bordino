@@ -34,6 +34,17 @@ describe("push owner", () => {
 		expect(localStorage.getItem("bd-push-owner")).toBeNull();
 	});
 
+	it("a teardown that failed keeps the earlier owner's mark, so the next sign-in tries again", async () => {
+		localStorage.setItem("bd-push-owner", "a");
+		useAuthStore.setState({ isLoggedIn: true, accessToken: jwt("b"), refreshToken: jwt("b") });
+		unsubscribe.mockResolvedValueOnce(false);
+		await reconcilePushOwner();
+		expect(localStorage.getItem("bd-push-owner")).toBe("a");
+		await reconcilePushOwner(); // the next try works
+		expect(unsubscribe).toHaveBeenCalledTimes(2);
+		expect(localStorage.getItem("bd-push-owner")).toBeNull();
+	});
+
 	it("the same account keeps its notifications", async () => {
 		localStorage.setItem("bd-push-owner", "a");
 		useAuthStore.setState({ isLoggedIn: true, accessToken: jwt("a"), refreshToken: jwt("a") });

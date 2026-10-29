@@ -120,19 +120,27 @@ export async function disableAppPush() {
 	const plugin = appPush();
 	if (!plugin) return;
 	// The phone first (shows nothing more, whatever the network does), then the server.
-	const { deviceId } = await plugin.disable().catch(() => ({ deviceId: null as string | null }));
+	const { deviceId, ok } = await plugin
+		.disable()
+		.then((r) => ({ ...r, ok: true }))
+		.catch(() => ({ deviceId: null as string | null, ok: false }));
+	// The owner mark stays until the phone really stopped: the next sign-in retries otherwise.
+	if (ok) setOwner(null);
 	if (deviceId) await call("post", "notifications/app-devices/remove/", { provider: "pushe", device_id: deviceId }).catch(() => undefined);
 }
 
 export async function disableOnThisDevice() {
-	setOwner(null);
 	if (appPush()) return disableAppPush();
 	const sub = await currentSubscription();
-	if (!sub) return;
+	if (!sub) {
+		setOwner(null);
+		return;
+	}
 	const { endpoint } = sub;
 	// The browser first: once unsubscribed, nothing for this account can show here, whatever the
 	// network does. Then the server forgets the device (a dead endpoint would be dropped anyway).
-	await sub.unsubscribe().catch(() => undefined);
+	// The owner mark stays until that worked: the next sign-in retries otherwise.
+	if (await sub.unsubscribe().catch(() => false)) setOwner(null);
 	await call("post", "notifications/push-subscriptions/remove/", { endpoint }).catch(() => undefined);
 }
 
@@ -147,13 +155,19 @@ export const sendTest = () => call<{ delivered: number }>("post", "notifications
  * its next send, and a phone re-registers under whoever turns notifications on next).
  */
 export async function forgetOnThisDevice() {
-	setOwner(null);
 	try {
 		const plugin = appPush();
+		let stopped = true;
 		if (plugin) await plugin.disable();
-		else await (await currentSubscription())?.unsubscribe();
+		else {
+			const sub = await currentSubscription();
+			if (sub) stopped = await sub.unsubscribe();
+		}
+		// Only once it really stopped: a failure keeps the earlier owner's mark, so the next
+		// sign-in (reconcilePushOwner) tries again.
+		if (stopped) setOwner(null);
 	} catch {
-		// nothing more can be done here
+		// the mark stays; reconcilePushOwner retries
 	}
 }
 
