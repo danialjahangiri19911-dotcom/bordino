@@ -439,6 +439,22 @@ class ChickenRoundTests(TestCase):
             round_ = chicken.step(self.user, round_.pk)
         self.assertEqual((round_.step, round_.status, round_.payout), (2, "won", 312))
 
+    def test_a_bet_whose_first_lane_passes_the_cap_is_refused(self):
+        config = ChickenConfiguration.current()
+        config.max_payout = 500
+        config.save()
+        with self.assertRaises(rounds.CrashError):
+            chicken.place_bet(self.user, 400, "hard")  # ×1.75 → 700 > 500
+        self.assertEqual(self.balance(), 1000)
+        self.assertEqual(self.bet(400, "easy").lanes, 4)  # ×1.20 → 480 fits, ×1.26 → 504 does not
+
+    def test_the_payload_says_why_the_road_ends(self):
+        self.assertTrue(chicken.round_payload(self.bet(100, "easy"))["ends_at_cap"])
+        round_ = ChickenRound.objects.get(customer__user=self.user, status="active")
+        ChickenRound.objects.filter(pk=round_.pk).update(lanes=24)  # a fixed road from before
+        round_.refresh_from_db()
+        self.assertFalse(chicken.round_payload(round_)["ends_at_cap"])
+
     def test_cash_out_before_the_first_lane_is_refused(self):
         round_ = self.bet()
         with self.assertRaises(rounds.CrashError):
@@ -659,11 +675,12 @@ class SudokuServerTests(TestCase):
         round_ = SudokuRound.objects.get(pk=rid)
         solution = round_.solution
         before = self.points()
-        # A full board that is wrong (a valid-looking claim): nothing.
+        # A full board that is wrong (a valid-looking claim): nothing. Every empty cell gets a wrong
+        # number (a fixed 1 is sometimes right and can complete a row by chance).
         wrong = list(round_.puzzle)
         for i in range(81):
             if not wrong[i]:
-                wrong[i] = 1
+                wrong[i] = solution[i] % 9 + 1
         self.assertEqual(self.body(self.report(rid, _grid(wrong)))["awarded"], [])
         # One right row: the row reward only.
         row = list(round_.puzzle)

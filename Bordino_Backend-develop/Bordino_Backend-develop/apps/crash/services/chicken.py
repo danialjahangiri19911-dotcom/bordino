@@ -62,14 +62,21 @@ def multipliers_for(round_: ChickenRound) -> list[Decimal]:
 
 def road_length(bet: int, hit: Decimal, house_edge: Decimal, max_payout: int) -> int:
     """Lanes in a round: the last lane whose win fits under max_payout and whose multiplier fits
-    under MAX_MULTIPLIER (at least 1, at most MAX_LANES)."""
+    under MAX_MULTIPLIER (at most MAX_LANES; 0 = even lane 1 would pass the cap)."""
     survive = Decimal(1) - Decimal(hit)
     keep = Decimal(1) - Decimal(house_edge)
     for lane in range(1, MAX_LANES + 1):
         multiplier = fair.floor_cents(keep / survive**lane)
         if bet * multiplier > max_payout or multiplier >= MAX_MULTIPLIER:
-            return max(lane - 1, 1)
+            return lane - 1
     return MAX_LANES
+
+
+def ends_at_cap(round_: ChickenRound) -> bool:
+    """Whether the road ends because one more lane would pass the payout cap (not MAX_LANES, nor a
+    fixed road from before)."""
+    following = lane_multipliers(round_.lanes + 1, round_.hit_chance, round_.house_edge)[-1]
+    return round_.bet * following > round_.max_payout
 
 
 def payout_cap_lane(round_: ChickenRound, multipliers) -> int | None:
@@ -92,6 +99,8 @@ def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, 
         raise CrashError("این شرط از سقف برد بیشتر است.")
     _preview_lanes, hit = config.level(difficulty)
     lanes = road_length(bet, hit, config.house_edge, config.max_payout)
+    if lanes == 0:
+        raise CrashError("با این شرط، برد همان خط اول از سقف برد بیشتر می‌شود؛ شرط را کمتر کن.")
 
     customer = customer_for(user)
     account = points_account(user)
@@ -228,6 +237,7 @@ def round_payload(round_: ChickenRound) -> dict:
         ),
         "payout": round_.payout,
         "max_payout": round_.max_payout,
+        "ends_at_cap": ends_at_cap(round_),
         "server_seed_hash": round_.server_seed_hash,
         "client_seed": round_.client_seed,
         "nonce": round_.nonce,

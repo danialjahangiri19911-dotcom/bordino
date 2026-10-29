@@ -16,6 +16,8 @@ export interface ChickenRound {
 	cashout_multiplier: string | null;
 	payout: number;
 	max_payout: number;
+	/** The road ends because one more lane would pass max_payout (else: a fixed road from before). */
+	ends_at_cap: boolean;
 	server_seed_hash: string;
 	client_seed: string;
 	nonce: number;

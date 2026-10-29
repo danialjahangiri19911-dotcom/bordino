@@ -303,10 +303,9 @@ export default function ChickenGame() {
 	const current = jump ? view.target : view.lane;
 	const reachedValue = view.lane ? values[view.lane - 1] : 1;
 	const lanes = Array.from({ length: count + (jump ? 1 : 0) }, (_, i) => view.lane + i);
-	// The road ends at the last lane under the payout cap (a round from before that change, or one
-	// cut at the longest road, just ends).
-	const lastValue = values[values.length - 1] ?? 0;
-	const endsAtCap = !!round && round.bet * (lastValue / (1 - Number(round.hit_chance))) > round.max_payout;
+	// The road ends at the last lane under the payout cap (the server says so; a round from before
+	// that change, or one cut at the longest road, just ends).
+	const endsAtCap = !!round?.ends_at_cap;
 	const finished = view.phase === "won" || lost;
 	const active = view.phase === "playing" || jump || hit;
 	const lowBalance = !!config && balance < minBet;
