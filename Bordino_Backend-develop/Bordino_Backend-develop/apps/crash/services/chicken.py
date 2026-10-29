@@ -34,6 +34,8 @@ from apps.wallet.models import TokenWalletAccount
 _TWO_32 = 2**32
 # The longest road (only reached when the payout cap is far away, e.g. a tiny bet on easy).
 MAX_LANES = 300
+# A lane multiplier past this would not fit ChickenRound.cashout_multiplier (12 digits, 2 decimals).
+MAX_MULTIPLIER = Decimal("1000000000")
 
 
 def lane_multipliers(lanes: int, hit: Decimal, house_edge: Decimal) -> list[Decimal]:
@@ -58,11 +60,13 @@ def multipliers_for(round_: ChickenRound) -> list[Decimal]:
 
 
 def road_length(bet: int, hit: Decimal, house_edge: Decimal, max_payout: int) -> int:
-    """Lanes in a round: up to the first lane whose win reaches max_payout (at most MAX_LANES)."""
+    """Lanes in a round: up to the first lane whose win reaches max_payout (at most MAX_LANES, and
+    never past a multiplier of MAX_MULTIPLIER)."""
     survive = Decimal(1) - Decimal(hit)
     keep = Decimal(1) - Decimal(house_edge)
     for lane in range(1, MAX_LANES + 1):
-        if bet * fair.floor_cents(keep / survive**lane) >= max_payout:
+        multiplier = fair.floor_cents(keep / survive**lane)
+        if bet * multiplier >= max_payout or multiplier >= MAX_MULTIPLIER:
             return lane
     return MAX_LANES
 

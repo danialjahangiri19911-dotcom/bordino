@@ -395,6 +395,9 @@ class ChickenRoundTests(TestCase):
 
     def test_the_road_is_never_longer_than_max_lanes(self):
         self.assertEqual(chicken.road_length(1, D("0.0001"), D("0.02"), 100000), chicken.MAX_LANES)
+        # Even with an enormous cap, no lane's multiplier outgrows the multiplier column.
+        lanes = chicken.road_length(1, D("0.9"), D("0.02"), 2_000_000_000)
+        self.assertLess(chicken.lane_multipliers(lanes, D("0.9"), D("0.02"))[-1], D("10000000000"))
 
     def test_payout_cap_cashes_out(self):
         config = ChickenConfiguration.current()
