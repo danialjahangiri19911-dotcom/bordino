@@ -37,8 +37,8 @@ def private_storage():
 
 
 def proof_path(instance, filename):
-    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "jpg").lower()[:5]
-    return f"mission-proofs/{uuid.uuid4().hex}.{ext}"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    return f"mission-proofs/{uuid.uuid4().hex}.{ext if ext in ('jpg', 'png', 'webp') else 'jpg'}"
 
 
 def new_qr_token():

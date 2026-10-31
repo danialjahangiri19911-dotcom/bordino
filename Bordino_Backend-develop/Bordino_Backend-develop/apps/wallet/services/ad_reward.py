@@ -13,6 +13,7 @@ callback; switching is the AD_REWARD_PROVIDER setting.
 
 from dataclasses import dataclass
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from django.db import transaction
 from django.utils import timezone
@@ -86,8 +87,16 @@ def provider() -> AdProvider | None:
     return PROVIDERS.get(str(setting("AD_REWARD_PROVIDER")))
 
 
+# The players' day (the server's clock is UTC): limits reset at midnight in Tehran.
+DAY_ZONE = ZoneInfo("Asia/Tehran")
+
+
+def today():
+    return timezone.localtime(timezone=DAY_ZONE).date()
+
+
 def _rewarded_today(customer: Customer) -> int:
-    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    start = timezone.localtime(timezone=DAY_ZONE).replace(hour=0, minute=0, second=0, microsecond=0)
     return AdRewardSession.objects.filter(
         customer=customer, status=AdRewardSession.Status.REWARDED, completed_at__gte=start
     ).count()
@@ -135,7 +144,9 @@ class Claim:
     already: bool
 
 
-def complete(customer: Customer, session_id, evidence: dict | None = None) -> Claim:
+def complete(customer: Customer, session_id, evidence: dict | None = None, mission: bool = False) -> Claim:
+    """`mission`: the call comes from the missions service. A mission's video (its own points and
+    daily limit) is paid only there, never through the plain rewarded-ad endpoint."""
     with transaction.atomic():
         # One claim at a time per player: two sessions claimed together must not both pass the
         # daily limit, and the same session claimed twice pays once.
@@ -147,6 +158,8 @@ def complete(customer: Customer, session_id, evidence: dict | None = None) -> Cl
         )
         if session is None:
             raise AdRewardError("این ویدیو پیدا نشد.")
+        if session.placement.startswith("mission:") and not mission:
+            raise AdRewardError("این ویدیو از بخش «دریافت امتیاز» پرداخت می‌شود.")
         if session.status == AdRewardSession.Status.REWARDED:
             return Claim(session, already=True)
         if timezone.now() - session.create_time > SESSION_TTL:

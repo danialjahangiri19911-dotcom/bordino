@@ -24,7 +24,7 @@ SECTION = "mission"
 # A mission that has ended stays in the list (as «پایان‌یافته») this long.
 SHOW_ENDED_FOR = timedelta(days=14)
 PROOF_MAX_BYTES = 5 * 1024 * 1024
-PROOF_FORMATS = {"JPEG", "PNG", "WEBP"}
+PROOF_FORMATS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
 
 Status = MissionAttempt.Status
 TAKEN = (Status.PENDING, Status.COMPLETED)
@@ -64,7 +64,7 @@ def _used(customer: Customer, mission: Mission) -> int:
     """Tries that use up the limit: completed or waiting for review (today, for a daily mission)."""
     q = MissionAttempt.objects.filter(customer=customer, mission=mission, status__in=TAKEN)
     if mission.repeat == Mission.Repeat.DAILY:
-        q = q.filter(day=timezone.localdate())
+        q = q.filter(day=ad_reward.today())
     return q.count()
 
 
@@ -90,6 +90,9 @@ def unavailable(mission: Mission, now=None, taken_total: int | None = None) -> s
 
 
 def _check_can_take(customer: Customer, mission: Mission):
+    if mission.capacity is not None:
+        # Players are locked one by one; the last free place of the mission is locked here.
+        Mission.objects.select_for_update().filter(pk=mission.pk).first()
     reason = unavailable(mission)
     if reason:
         raise MissionError(UNAVAILABLE[reason], reason)
@@ -118,7 +121,7 @@ class View:
 def listing(customer: Customer) -> list[View]:
     """The missions in the list, each with its state for this player."""
     now = timezone.now()
-    today = timezone.localdate()
+    today = ad_reward.today()
     missions = list(
         Mission.objects.filter(is_visible=True, category__is_active=True)
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now - SHOW_ENDED_FOR))
@@ -234,7 +237,7 @@ def _pay(attempt: MissionAttempt, tx: ActivityTransaction | None = None):
     attempt.activity_transaction = tx
     attempt.status = Status.COMPLETED
     attempt.completed_at = now
-    attempt.day = attempt.day or timezone.localdate()
+    attempt.day = attempt.day or ad_reward.today()
     attempt.save(update_fields=["activity_transaction", "status", "completed_at", "day", "update_time"])
 
 
@@ -259,7 +262,7 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
             if attempt.ad_session_id is None:
                 raise MissionError("ویدیوی این مأموریت پیدا نشد؛ دوباره شروع کن.")
             try:
-                result = ad_reward.complete(customer, attempt.ad_session_id, evidence)
+                result = ad_reward.complete(customer, attempt.ad_session_id, evidence, mission=True)
             except ad_reward.AdRewardError as exc:
                 raise MissionError(str(exc)) from exc
             _pay(attempt, result.session.activity_transaction)
@@ -272,6 +275,8 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
 
 
 def _check_image(image):
+    """A real JPEG / PNG / WEBP; its stored name takes the extension of what it really is (never
+    the name the phone sent), so it is always served as an image."""
     from PIL import Image, UnidentifiedImageError  # pylint: disable=import-outside-toplevel
 
     if image.size > PROOF_MAX_BYTES:
@@ -285,6 +290,7 @@ def _check_image(image):
     if kind not in PROOF_FORMATS:
         raise MissionError("تصویر باید JPG، PNG یا WEBP باشد.")
     image.seek(0)
+    image.name = f"proof.{PROOF_FORMATS[kind]}"
 
 
 def submit_proof(customer: Customer, attempt_id, text: str = "", image=None) -> MissionAttempt:
@@ -315,7 +321,7 @@ def submit_proof(customer: Customer, attempt_id, text: str = "", image=None) -> 
         if image:
             attempt.proof_image = image
         attempt.status = Status.PENDING
-        attempt.day = timezone.localdate()
+        attempt.day = ad_reward.today()
         attempt.submitted_at = timezone.now()
         attempt.save()
         return attempt

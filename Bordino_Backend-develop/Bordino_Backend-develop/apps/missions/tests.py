@@ -5,6 +5,7 @@ from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -41,6 +42,7 @@ def png(size=(4, 4)):
 @override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
 class MissionTests(TestCase):
     def setUp(self):
+        cache.clear()  # settings (the daily video limit) are cached: none from another test
         self.user = make_player("9120007001")
         self.customer = self.user.customer
         self.cat = MissionCategory.objects.create(name="تبلیغات")
@@ -181,6 +183,15 @@ class MissionTests(TestCase):
         with self.assertRaises(services.MissionError):
             services.submit_proof(self.customer, attempt.pk, "0912", big)
 
+    def test_proof_is_stored_by_what_it_really_is(self):
+        m = self.review_mission()
+        attempt = services.start(self.customer, m.pk)
+        disguised = png()
+        disguised.name = "evil.html"
+        services.submit_proof(self.customer, attempt.pk, "0912", disguised)
+        attempt.refresh_from_db()
+        self.assertTrue(attempt.proof_image.name.endswith(".png"), attempt.proof_image.name)
+
     def test_start_continues_an_open_try(self):
         m = self.review_mission()
         self.assertEqual(services.start(self.customer, m.pk).pk, services.start(self.customer, m.pk).pk)
@@ -255,6 +266,18 @@ class MissionTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual(attempt.activity_transaction.section, "rewarded_ad")
 
+    def test_a_mission_video_is_not_paid_through_the_plain_ad_endpoint(self):
+        m = self.mission(title="ویدیو", kind=Mission.Kind.VIDEO, link_url="", points=40, repeat=Mission.Repeat.DAILY, daily_limit=1)
+        attempt = services.start(self.customer, m.pk)
+        AdRewardSession.objects.filter(pk=attempt.ad_session_id).update(create_time=timezone.now() - timedelta(seconds=60))
+        api = APIClient()
+        api.force_authenticate(self.user)
+        refused = api.post(f"/api/v1/wallet/ad-reward/sessions/{attempt.ad_session_id}/complete/", {}, format="json")
+        self.assertGreaterEqual(refused.status_code, 400)
+        self.assertEqual(self.points(), 0)
+        services.claim(self.customer, attempt.pk)
+        self.assertEqual(self.points(), 40)
+
     def test_video_mission_follows_the_daily_video_limit(self):
         from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
 
@@ -328,7 +351,9 @@ class MissionTests(TestCase):
         proof_url = f"/admin/missions/missionattempt/{attempt.pk}/proof/"
         self.assertNotEqual(api.get(proof_url).status_code, 200)
         self.client.force_login(staff)
-        self.assertEqual(self.client.get(proof_url).status_code, 200)
+        shown = self.client.get(proof_url)
+        self.assertEqual((shown.status_code, shown["Content-Type"]), (200, "image/png"))
+        self.assertIn("sandbox", shown["Content-Security-Policy"])
         with mock.patch("apps.notifications.services.queue") as queued:
             response = self.client.post(
                 "/admin/missions/missionattempt/",
@@ -349,3 +374,9 @@ class MissionTests(TestCase):
         page = self.client.get(f"/admin/missions/mission/{m.pk}/change/").content.decode()
         self.assertIn(f"/pwa/earn/qr/{m.qr_token}", page)
         self.assertIn("data:image/svg+xml;base64,", page)
+        old = m.qr_token
+        self.client.post("/admin/missions/mission/", {"action": "new_qr", "_selected_action": [str(m.pk)]})
+        m.refresh_from_db()
+        self.assertNotEqual(m.qr_token, old)
+        with self.assertRaises(services.NotFound):
+            services.claim_qr(self.customer, old)

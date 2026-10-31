@@ -7,7 +7,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from apps.missions import services
-from apps.missions.models import Mission, MissionAttempt, MissionCategory
+from apps.missions.models import Mission, MissionAttempt, MissionCategory, new_qr_token
 
 
 def public_url(path_: str) -> str:
@@ -35,6 +35,15 @@ class MissionAdmin(admin.ModelAdmin):
     list_editable = ("is_active", "is_visible", "order")
     search_fields = ("title", "partner_name")
     readonly_fields = ("qr_code", "partner_callback")
+    actions = ("new_qr",)
+
+    @admin.action(description="ساخت QR تازه (QR قبلی دیگر کار نمی‌کند)")
+    def new_qr(self, request, queryset):
+        done = 0
+        for mission in queryset.filter(kind=Mission.Kind.QR):
+            Mission.objects.filter(pk=mission.pk).update(qr_token=new_qr_token())
+            done += 1
+        self.message_user(request, f"برای {done} مأموریت QR تازه ساخته شد؛ QR جدید را چاپ کنید.", messages.SUCCESS)
     fieldsets = (
         (None, {"fields": ("title", "summary", "description", "category", "kind", "verification", "points")}),
         ("تکرار و زمان", {"fields": ("repeat", "daily_limit", "starts_at", "ends_at", "capacity")}),
@@ -109,7 +118,13 @@ class MissionAttemptAdmin(admin.ModelAdmin):
         attempt = MissionAttempt.objects.filter(pk=pk).first()
         if attempt is None or not attempt.proof_image or not self.has_view_permission(request, attempt):
             raise Http404
-        return FileResponse(attempt.proof_image.open("rb"))
+        ext = attempt.proof_image.name.rsplit(".", 1)[-1].lower()
+        response = FileResponse(
+            attempt.proof_image.open("rb"), content_type={"png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
+        )
+        response["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
     def _proof_url(self, obj):
         return reverse("admin:missions_missionattempt_proof", args=[obj.pk])
