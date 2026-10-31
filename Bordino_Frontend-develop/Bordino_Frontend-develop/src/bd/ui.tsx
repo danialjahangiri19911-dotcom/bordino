@@ -9,6 +9,7 @@ import Icon, { type IconName } from "./Icon";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
 import { fa } from "./format";
+import { takePendingQr } from "./missions/pendingQr";
 import { reconcilePushOwner } from "./push";
 import useGetCustomerProfile from "@api/customer/hooks/useGetCustomerProfile";
 import useGetPointsSummary from "@api/wallet/hooks/useGetPointsSummary";
@@ -20,6 +21,8 @@ export const R = {
 	landing: "/",
 	home: "/pwa/main",
 	games: "/pwa/gameNet",
+	earn: "/pwa/earn",
+	earnQr: (token: string) => `/pwa/earn/qr/${token}`,
 	wallet: "/pwa/wallet",
 	transactions: "/pwa/wallet/transactions",
 	withdraw: "/pwa/wallet/withdraw",
@@ -49,11 +52,12 @@ export const R = {
 	tarot: "/pwa/tarot",
 } as const;
 
-type NavKey = "home" | "games" | "wallet" | "profile";
+type NavKey = "home" | "games" | "earn" | "wallet" | "profile";
 
 const NAV: { key: NavKey; icon: IconName; label: string; href: string }[] = [
 	{ key: "home", icon: "house", label: "خانه", href: R.home },
 	{ key: "games", icon: "gamepad-2", label: "گیمنت", href: R.games },
+	{ key: "earn", icon: "coins", label: "دریافت امتیاز", href: R.earn },
 	{ key: "wallet", icon: "wallet", label: "کیف‌پول", href: R.wallet },
 	{ key: "profile", icon: "user-round", label: "پروفایل", href: R.profile },
 ];
@@ -130,6 +134,15 @@ export function useRequireLogin(allowGuest = false) {
 		if (!isLoggedIn && !allowGuest) replace(R.login);
 	}, [isLoggedIn, allowGuest, replace]);
 	return isLoggedIn;
+}
+
+/** A place's QR scanned before signing in: once signed in, its page opens (and pays). */
+function usePendingQr() {
+	const { push } = useRouter();
+	useEffect(() => {
+		const token = takePendingQr();
+		if (token) push(R.earnQr(token));
+	}, [push]);
 }
 
 /** Keeps the stored user (name, avatar, onboarding step) in step with the server's profile. */
@@ -210,6 +223,7 @@ function SignedInShell({
 	children,
 }: Omit<ShellProps, "allowGuest"> & { username?: string }) {
 	useProfileSync();
+	usePendingQr();
 	return (
 		<article className="bd-product bd-app rt-product st-brutal lay-1 bd-page" aria-label={title}>
 			<header className="bd-app-top">
@@ -511,6 +525,7 @@ export function useNavFromPath(): NavKey {
 	if (path.startsWith(R.wallet) || path.startsWith(R.lotteries)) return "wallet";
 	if (path.startsWith(R.profile) || path.startsWith(R.rules)) return "profile";
 	if (path.startsWith(R.games)) return "games";
+	if (path.startsWith(R.earn)) return "earn";
 	return "home";
 }
 

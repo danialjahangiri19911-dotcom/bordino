@@ -1,0 +1,351 @@
+import io
+import tempfile
+import uuid
+from datetime import timedelta
+from unittest import mock
+
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from apps.missions import services
+from apps.missions.models import Mission, MissionAttempt, MissionCategory
+from apps.user_management.services.user.registration import UserRegistrationService
+from apps.wallet.models import AdRewardSession, TokenWalletAccount
+from apps.wallet.models.transactions.activity import ActivityTransaction
+from apps.wallet.services.history import points_history
+
+LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+MEDIA = tempfile.mkdtemp(prefix="missions-test-")
+
+
+def make_player(phone, points=0):
+    user = get_user_model().objects.create_user(phone_number=phone)
+    service = UserRegistrationService()
+    service._create_customer_for_user(user)
+    service._create_wallet_for_user(user)
+    TokenWalletAccount.objects.filter(wallet__owner=user).update(amount=points)
+    return user
+
+
+def png(size=(4, 4)):
+    from PIL import Image  # pylint: disable=import-outside-toplevel
+
+    data = io.BytesIO()
+    Image.new("RGB", size, "red").save(data, "PNG")
+    return SimpleUploadedFile("proof.png", data.getvalue(), content_type="image/png")
+
+
+@override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
+class MissionTests(TestCase):
+    def setUp(self):
+        self.user = make_player("9120007001")
+        self.customer = self.user.customer
+        self.cat = MissionCategory.objects.create(name="تبلیغات")
+
+    def mission(self, **kw):
+        defaults = {
+            "title": "بنر کافه",
+            "category": self.cat,
+            "kind": Mission.Kind.BANNER,
+            "points": 7,
+            "link_url": "https://example.com/",
+            "min_seconds": 10,
+        }
+        defaults.update(kw)
+        return Mission.objects.create(**defaults)
+
+    def points(self):
+        return TokenWalletAccount.objects.get(wallet__owner=self.user).amount
+
+    def state(self, mission):
+        return next(v for v in services.listing(self.customer) if v.mission.pk == mission.pk).state
+
+    def age(self, attempt, seconds):
+        MissionAttempt.objects.filter(pk=attempt.pk).update(create_time=timezone.now() - timedelta(seconds=seconds))
+
+    # ── kinds and their checks ──
+
+    def test_kind_and_verification_must_match(self):
+        with self.assertRaises(Exception):
+            self.mission(kind=Mission.Kind.SIGNUP, verification=Mission.Verification.AUTO)
+        with self.assertRaises(Exception):
+            self.mission(kind=Mission.Kind.BANNER, verification=Mission.Verification.REVIEW)
+        with self.assertRaises(Exception):
+            self.mission(kind=Mission.Kind.SIGNUP, verification=Mission.Verification.CALLBACK, link_url="https://p.ir/")
+        qr = self.mission(kind=Mission.Kind.QR, link_url="")
+        self.assertTrue(qr.qr_token)
+
+    def test_banner_pays_after_the_wait_once(self):
+        m = self.mission()
+        self.assertEqual(self.state(m), "available")
+        attempt = services.start(self.customer, m.pk)
+        self.assertEqual(self.state(m), "in_progress")
+        with self.assertRaises(services.MissionError) as too_soon:
+            services.claim(self.customer, attempt.pk)
+        self.assertEqual(too_soon.exception.code, "too_soon")
+        self.age(attempt, 11)
+        self.assertFalse(services.claim(self.customer, attempt.pk).already)
+        self.assertTrue(services.claim(self.customer, attempt.pk).already)
+        self.assertEqual(self.points(), 7)
+        self.assertEqual(self.state(m), "done")
+        with self.assertRaises(services.MissionError):
+            services.start(self.customer, m.pk)
+
+    def test_daily_mission_counts_per_day(self):
+        m = self.mission(repeat=Mission.Repeat.DAILY, daily_limit=2)
+        for _ in range(2):
+            attempt = services.start(self.customer, m.pk)
+            self.age(attempt, 11)
+            services.claim(self.customer, attempt.pk)
+        self.assertEqual(self.state(m), "done_today")
+        with self.assertRaises(services.MissionError) as full:
+            services.start(self.customer, m.pk)
+        self.assertEqual(full.exception.code, "done_today")
+        MissionAttempt.objects.update(day=timezone.localdate() - timedelta(days=1))
+        self.assertEqual(self.state(m), "available")
+        self.assertEqual(self.points(), 14)
+
+    def test_states_of_unavailable_missions(self):
+        now = timezone.now()
+        self.assertEqual(self.state(self.mission(is_active=False)), "inactive")
+        self.assertEqual(self.state(self.mission(starts_at=now + timedelta(days=1))), "upcoming")
+        self.assertEqual(self.state(self.mission(starts_at=now - timedelta(days=3), ends_at=now - timedelta(days=1))), "expired")
+        full = self.mission(capacity=1)
+        other = make_player("9120007002").customer
+        attempt = services.start(other, full.pk)
+        self.age(attempt, 11)
+        services.claim(other, attempt.pk)
+        self.assertEqual(self.state(full), "full")
+        with self.assertRaises(services.MissionError):
+            services.start(self.customer, full.pk)
+        hidden = self.mission(is_visible=False)
+        old = self.mission(ends_at=now - timedelta(days=30), starts_at=now - timedelta(days=40))
+        shown = {v.mission.pk for v in services.listing(self.customer)}
+        self.assertNotIn(hidden.pk, shown)
+        self.assertNotIn(old.pk, shown)
+        with self.assertRaises(services.NotFound):
+            services.start(self.customer, hidden.pk)
+
+    def test_inactive_category_hides_its_missions(self):
+        m = self.mission()
+        MissionCategory.objects.filter(pk=self.cat.pk).update(is_active=False)
+        self.assertNotIn(m.pk, {v.mission.pk for v in services.listing(self.customer)})
+
+    # ── review ──
+
+    def review_mission(self, **kw):
+        return self.mission(
+            title="ثبت‌نام در میلی",
+            kind=Mission.Kind.SIGNUP,
+            verification=Mission.Verification.REVIEW,
+            link_url="https://mili.example/",
+            proof_label="شماره موبایلی که ثبت‌نام کردی",
+            points=50,
+            **kw,
+        )
+
+    def test_review_flow_approve_pays_and_reject_allows_a_retry(self):
+        m = self.review_mission(proof_image_required=True)
+        attempt = services.start(self.customer, m.pk)
+        self.assertEqual(services.link_for(attempt), "https://mili.example/")
+        with self.assertRaises(services.MissionError):
+            services.submit_proof(self.customer, attempt.pk, "", png())
+        with self.assertRaises(services.MissionError):
+            services.submit_proof(self.customer, attempt.pk, "09120000000", None)
+        services.submit_proof(self.customer, attempt.pk, "09120000000", png())
+        self.assertEqual(self.state(m), "pending")
+        with self.assertRaises(services.MissionError):
+            services.start(self.customer, m.pk)  # a pending try holds the only slot
+        self.assertTrue(services.reject(attempt.pk, note="شماره پیدا نشد"))
+        self.assertFalse(services.reject(attempt.pk))
+        self.assertEqual(self.state(m), "rejected")
+        self.assertEqual(self.points(), 0)
+        retry = services.start(self.customer, m.pk)
+        self.assertNotEqual(retry.pk, attempt.pk)
+        services.submit_proof(self.customer, retry.pk, "09120000000", png())
+        self.assertTrue(services.approve(retry.pk))
+        self.assertFalse(services.approve(retry.pk))
+        self.assertEqual(self.points(), 50)
+        self.assertEqual(self.state(m), "done")
+
+    def test_proof_must_be_a_real_image(self):
+        m = self.review_mission()
+        attempt = services.start(self.customer, m.pk)
+        fake = SimpleUploadedFile("x.png", b"not an image", content_type="image/png")
+        with self.assertRaises(services.MissionError):
+            services.submit_proof(self.customer, attempt.pk, "0912", fake)
+        big = SimpleUploadedFile("x.png", b"0" * (services.PROOF_MAX_BYTES + 1), content_type="image/png")
+        with self.assertRaises(services.MissionError):
+            services.submit_proof(self.customer, attempt.pk, "0912", big)
+
+    def test_start_continues_an_open_try(self):
+        m = self.review_mission()
+        self.assertEqual(services.start(self.customer, m.pk).pk, services.start(self.customer, m.pk).pk)
+
+    # ── partner callback ──
+
+    def callback_mission(self):
+        return self.mission(
+            title="نصب والکس",
+            kind=Mission.Kind.INSTALL,
+            verification=Mission.Verification.CALLBACK,
+            link_url="https://wallex.example/?ref=bordino&click_id={click_id}",
+            points=30,
+        )
+
+    def test_partner_callback_pays_once_with_the_right_secret(self):
+        m = self.callback_mission()
+        self.assertTrue(m.callback_secret)
+        attempt = services.start(self.customer, m.pk)
+        self.assertIn(str(attempt.click_id), services.link_for(attempt))
+        self.assertEqual(self.state(m), "waiting")
+        with self.assertRaises(services.MissionError) as wrong:
+            services.partner_callback(m.pk, attempt.click_id, "nope")
+        self.assertEqual(wrong.exception.code, "forbidden")
+        with self.assertRaises(services.NotFound):
+            services.partner_callback(m.pk, uuid.uuid4(), m.callback_secret)
+        with self.assertRaises(services.MissionError):
+            services.partner_callback(m.pk, "not-a-uuid", m.callback_secret)
+        self.assertFalse(services.partner_callback(m.pk, attempt.click_id, m.callback_secret).already)
+        self.assertTrue(services.partner_callback(m.pk, attempt.click_id, m.callback_secret).already)
+        self.assertEqual(self.points(), 30)
+        self.assertEqual(self.state(m), "done")
+
+    def test_callback_api(self):
+        m = self.callback_mission()
+        attempt = services.start(self.customer, m.pk)
+        api = APIClient()
+        url = f"/api/v1/missions/callback/{m.pk}/"
+        self.assertEqual(api.get(url, {"click_id": str(attempt.click_id), "secret": "x"}).status_code, 403)
+        self.assertEqual(api.get(url, {"click_id": "bad", "secret": m.callback_secret}).status_code, 400)
+        ok = api.post(url, {"click_id": str(attempt.click_id), "secret": m.callback_secret}, format="json")
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(self.points(), 30)
+
+    # ── QR ──
+
+    def test_qr_pays_once_and_works_while_hidden(self):
+        m = self.mission(title="کافه بردینو", kind=Mission.Kind.QR, link_url="", points=20, is_visible=False)
+        self.assertFalse(services.claim_qr(self.customer, m.qr_token).already)
+        self.assertTrue(services.claim_qr(self.customer, m.qr_token).already)
+        self.assertEqual(self.points(), 20)
+        with self.assertRaises(services.NotFound):
+            services.claim_qr(self.customer, "wrong-token")
+        Mission.objects.filter(pk=m.pk).update(is_active=False)
+        other = make_player("9120007003").customer
+        with self.assertRaises(services.MissionError):
+            services.claim_qr(other, m.qr_token)
+        with self.assertRaises(services.NotFound):
+            services.start(self.customer, m.pk)  # a QR is only claimed by its code
+
+    # ── video ──
+
+    def test_video_mission_pays_its_own_points_after_the_video(self):
+        m = self.mission(title="ویدیو", kind=Mission.Kind.VIDEO, link_url="", points=9, repeat=Mission.Repeat.DAILY, daily_limit=3)
+        attempt = services.start(self.customer, m.pk)
+        self.assertEqual(attempt.ad_session.reward_points, 9)
+        with self.assertRaises(services.MissionError):
+            services.claim(self.customer, attempt.pk)
+        AdRewardSession.objects.filter(pk=attempt.ad_session_id).update(create_time=timezone.now() - timedelta(seconds=60))
+        services.claim(self.customer, attempt.pk)
+        self.assertEqual(self.points(), 9)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.activity_transaction.section, "rewarded_ad")
+
+    def test_video_mission_follows_the_daily_video_limit(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.update_or_create(key="AD_REWARD_DAILY_LIMIT", defaults={"value": "1"})
+        m = self.mission(title="ویدیو", kind=Mission.Kind.VIDEO, link_url="", points=9, repeat=Mission.Repeat.DAILY, daily_limit=3)
+        attempt = services.start(self.customer, m.pk)
+        AdRewardSession.objects.filter(pk=attempt.ad_session_id).update(create_time=timezone.now() - timedelta(seconds=60))
+        services.claim(self.customer, attempt.pk)
+        self.assertEqual(self.state(m), "done_today")
+        with self.assertRaises(services.MissionError):
+            services.start(self.customer, m.pk)
+
+    # ── API and history ──
+
+    def test_api_flow_and_history_title(self):
+        api = APIClient()
+        api.force_authenticate(self.user)
+        m = self.mission()
+        empty = MissionCategory.objects.create(name="خالی")
+        body = api.get("/api/v1/missions/").json()["result"]
+        self.assertEqual([c["id"] for c in body["categories"]], [str(self.cat.pk)])
+        self.assertNotIn(str(empty.pk), [c["id"] for c in body["categories"]])
+        self.assertEqual(body["missions"][0]["state"], "available")
+        self.assertIsNone(body["missions"][0]["attempt"])
+        started = api.post(f"/api/v1/missions/{m.pk}/start/").json()["result"]["mission"]
+        self.assertEqual(started["attempt"]["link"], "https://example.com/")
+        self.assertGreater(started["attempt"]["claim_in"], 0)
+        attempt_id = started["attempt"]["id"]
+        self.assertEqual(api.post(f"/api/v1/missions/attempts/{attempt_id}/claim/").status_code, 409)
+        MissionAttempt.objects.filter(pk=attempt_id).update(create_time=timezone.now() - timedelta(seconds=30))
+        done = api.post(f"/api/v1/missions/attempts/{attempt_id}/claim/").json()["result"]
+        self.assertEqual((done["points"], done["points_balance"], done["mission"]["state"]), (7, 7, "done"))
+        tx = ActivityTransaction.objects.get(section="mission")
+        self.assertEqual(tx.metadata["title"], "بنر کافه")
+        self.assertTrue(any(r["title"] == "مأموریت: بنر کافه" for r in points_history(self.user)))
+
+    def test_proof_api_with_upload_and_another_players_try(self):
+        m = self.review_mission(proof_image_required=True)
+        api = APIClient()
+        api.force_authenticate(self.user)
+        started = api.post(f"/api/v1/missions/{m.pk}/start/").json()["result"]["mission"]
+        attempt_id = started["attempt"]["id"]
+        intruder = APIClient()
+        intruder.force_authenticate(make_player("9120007004"))
+        self.assertEqual(intruder.post(f"/api/v1/missions/attempts/{attempt_id}/proof/", {"text": "x"}).status_code, 404)
+        sent = api.post(f"/api/v1/missions/attempts/{attempt_id}/proof/", {"text": "0912", "image": png()}, format="multipart")
+        self.assertEqual(sent.status_code, 200)
+        self.assertEqual(sent.json()["result"]["mission"]["state"], "pending")
+        attempt = MissionAttempt.objects.get(pk=attempt_id)
+        self.assertTrue(attempt.proof_image.name.startswith("mission-proofs/"))
+        self.assertIn("private", attempt.proof_image.path)
+
+    def test_qr_api(self):
+        m = self.mission(kind=Mission.Kind.QR, link_url="", points=20)
+        api = APIClient()
+        self.assertEqual(api.post(f"/api/v1/missions/qr/{m.qr_token}/").status_code, 401)
+        api.force_authenticate(self.user)
+        first = api.post(f"/api/v1/missions/qr/{m.qr_token}/").json()["result"]
+        self.assertEqual((first["already_rewarded"], first["points"], first["title"]), (False, 20, "بنر کافه"))
+        self.assertTrue(api.post(f"/api/v1/missions/qr/{m.qr_token}/").json()["result"]["already_rewarded"])
+        self.assertEqual(api.post("/api/v1/missions/qr/nope/").status_code, 404)
+
+    # ── admin ──
+
+    def test_admin_approves_and_shows_the_proof_to_staff_only(self):
+        m = self.review_mission(proof_image_required=True)
+        attempt = services.start(self.customer, m.pk)
+        services.submit_proof(self.customer, attempt.pk, "0912", png())
+        staff = get_user_model().objects.create_superuser(phone_number="9120007099", password="x-Pass-123")
+        api = APIClient()
+        proof_url = f"/admin/missions/missionattempt/{attempt.pk}/proof/"
+        self.assertNotEqual(api.get(proof_url).status_code, 200)
+        self.client.force_login(staff)
+        self.assertEqual(self.client.get(proof_url).status_code, 200)
+        with mock.patch("apps.notifications.services.queue") as queued:
+            response = self.client.post(
+                "/admin/missions/missionattempt/",
+                {"action": "approve_selected", "_selected_action": [str(attempt.pk)]},
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.points(), 50)
+        self.assertTrue(queued.called)
+
+    def test_admin_shows_the_qr(self):
+        try:
+            import segno  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+        except ImportError:
+            self.skipTest("segno is installed with the new image")
+        m = self.mission(kind=Mission.Kind.QR, link_url="")
+        staff = get_user_model().objects.create_superuser(phone_number="9120007098", password="x-Pass-123")
+        self.client.force_login(staff)
+        page = self.client.get(f"/admin/missions/mission/{m.pk}/change/").content.decode()
+        self.assertIn(f"/pwa/earn/qr/{m.qr_token}", page)
+        self.assertIn("data:image/svg+xml;base64,", page)

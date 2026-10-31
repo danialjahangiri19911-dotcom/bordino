@@ -49,6 +49,7 @@ LOCAL_APPS = [
     "apps.configuration.apps.ConfigurationConfig",
     "apps.crash.apps.CrashConfig",
     "apps.notifications.apps.NotificationsConfig",
+    "apps.missions.apps.MissionsConfig",
 ]
 
 THIRD_PARTY_APPS = [
@@ -340,6 +341,9 @@ KAVENEGAR_OTP_TEMPLATE = get_env_value("KAVENEGAR_OTP_TEMPLATE", default_value="
 ADMIN_OTP_WHITELIST = [
     p.strip() for p in get_env_value("ADMIN_OTP_WHITELIST", default_value="").split(",") if p.strip()
 ]
+
+# Where the app lives for links made on the server (a place's QR, the partner's callback address).
+MISSIONS_PUBLIC_URL = get_env_value("MISSIONS_PUBLIC_URL", default_value="https://lottery.bordino.co")
 ADMIN_PASSWORD_LOGIN = get_env_value("ADMIN_PASSWORD_LOGIN", default_value="false").lower() in (
     "1",
     "true",

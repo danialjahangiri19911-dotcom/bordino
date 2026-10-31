@@ -24,7 +24,7 @@ from apps.wallet.models import (
 from apps.wallet.services.balance import POINTS_SYMBOL
 
 GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸"}
-ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "admin_adjust": "تنظیم امتیاز توسط پشتیبانی"}
+ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "mission": "جایزهٔ مأموریت", "admin_adjust": "تنظیم امتیاز توسط پشتیبانی"}
 WITHDRAWAL_STATUS = {
     CurrencyTransaction.Status.PENDING: "در انتظار واریز",
     CurrencyTransaction.Status.COMPLETED: "واریز شد",
@@ -101,6 +101,8 @@ def points_history(user, token_account=None):
             customer=customer, status=ActivityTransaction.Status.COMPLETED, score_value__gt=0
         ):
             title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
+            if t.section == "mission" and t.metadata.get("title"):
+                title = f"مأموریت: {t.metadata['title']}"[:120]
             rows.append(_row(t.id, "activity_reward", title, t.score_value, True, t.create_time))
 
         for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):

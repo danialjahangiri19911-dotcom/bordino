@@ -113,7 +113,9 @@ def offer(customer: Customer) -> Offer:
     return Offer(available, points, remaining, p.name, p.creative() if available else {})
 
 
-def start(customer: Customer, placement: str) -> AdRewardSession:
+def start(customer: Customer, placement: str, points: int | None = None) -> AdRewardSession:
+    """`points` overrides the configured reward (a video mission pays its own amount); the daily
+    limit is the same for every rewarded video."""
     o = offer(customer)
     if not o.available:
         raise AdRewardError("فعلاً ویدیوی جایزه‌داری نیست؛ سقف امروز پر شده یا این بخش خاموش است.")
@@ -122,7 +124,7 @@ def start(customer: Customer, placement: str) -> AdRewardSession:
         customer=customer,
         provider=p.name,
         placement=(placement or "")[:50],
-        reward_points=o.reward_points,
+        reward_points=o.reward_points if points is None else points,
         min_watch_seconds=p.watch_seconds(),
     )
 

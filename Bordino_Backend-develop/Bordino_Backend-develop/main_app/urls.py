@@ -24,6 +24,7 @@ urlpatterns += [
     path("", include("apps.configuration.urls")),
     path("", include("apps.crash.urls")),
     path("", include("apps.notifications.urls")),
+    path("", include("apps.missions.urls")),
 ]
 
 if settings.DEBUG:
