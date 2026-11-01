@@ -1,10 +1,11 @@
 from django.contrib import admin
 
 from apps.wallet.models.transactions.activity import ActivityTransaction
+from apps.wallet.admin.safe_save import ReadOnlyLedgerAdmin
 
 
 @admin.register(ActivityTransaction)
-class ActivityTransactionAdmin(admin.ModelAdmin):
+class ActivityTransactionAdmin(ReadOnlyLedgerAdmin, admin.ModelAdmin):
     list_display = (
         "id",
         "customer",

@@ -414,6 +414,19 @@ class AuditPhase2Tests(TestCase):
             self.assertFalse(site._registry[model].has_import_permission(request), model)  # pylint: disable=protected-access
         self.assertTrue(site._registry[Bank].has_import_permission(request))  # pylint: disable=protected-access
 
+    def test_every_ledger_record_is_read_only_in_the_admin(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models import TokenTransaction  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models.transactions.activity import ActivityTransaction  # pylint: disable=import-outside-toplevel
+
+        names = {"LotteryPrizeTransaction", "LotteryWheelPrizeTransaction", "ReferralRewardTransaction", "LotteryTicketTransaction"}
+        models = [m for m in site._registry if m.__name__ in names] + [TokenTransaction, ActivityTransaction]  # pylint: disable=protected-access
+        self.assertEqual(len(models), 6)
+        for model in models:
+            admin = site._registry[model]  # pylint: disable=protected-access
+            self.assertFalse(admin.has_change_permission(None) or admin.has_add_permission(None) or admin.has_delete_permission(None), model)
+
     def test_the_wheel_tells_its_bet_range(self):
         body = self.api.get(f"/api/v1/lotteries/lottery-wheel/{self.wheel.pk}/").json()
         body = body.get("result", body)
