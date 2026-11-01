@@ -62,3 +62,42 @@ export function slicesFor(prizes: WheelPrize[], M: number): Slice[] {
 export function landingRotation(current: number, target: number): number {
 	return current + 360 * 5 + ((((-target - current) % 360) + 360) % 360);
 }
+
+const mod360 = (n: number) => ((n % 360) + 360) % 360;
+const CENTER = 200;
+const RADIUS = 191;
+const LABEL_RADIUS = 139;
+
+/** A point on the 400×400 wheel drawing at `angle` (0 = top, clockwise) and distance `r`. */
+export function wheelPoint(angle: number, r: number): [number, number] {
+	const a = ((angle - 90) * Math.PI) / 180;
+	return [CENTER + r * Math.cos(a), CENTER + r * Math.sin(a)];
+}
+
+/** The SVG path of a slice from `start` to `end` degrees (0 = top, clockwise). */
+export function wedgePath(start: number, end: number): string {
+	const span = end - start;
+	if (span <= 0) return "";
+	if (span >= 359.999) return `M${CENTER} ${CENTER - RADIUS} A${RADIUS} ${RADIUS} 0 1 1 ${CENTER - 0.01} ${CENTER - RADIUS} Z`;
+	const [ax, ay] = wheelPoint(start, RADIUS);
+	const [bx, by] = wheelPoint(end, RADIUS);
+	return `M${CENTER} ${CENTER} L${ax.toFixed(2)} ${ay.toFixed(2)} A${RADIUS} ${RADIUS} 0 ${span > 180 ? 1 : 0} 1 ${bx.toFixed(2)} ${by.toFixed(2)} Z`;
+}
+
+/** Where a slice's label sits (its middle, toward the rim). */
+export function labelPoint(start: number, end: number): [number, number] {
+	return wheelPoint((start + end) / 2, LABEL_RADIUS);
+}
+
+/** The slice under the top pointer when the wheel is turned `rotation` degrees clockwise. */
+export function sliceAt(slices: { start: number; end: number }[], rotation: number): number {
+	const at = mod360(-rotation);
+	const i = slices.findIndex((s) => at >= s.start && at < s.end);
+	return i < 0 ? slices.length - 1 : i;
+}
+
+/** The design's spin: fast start, long soft stop (t from 0 to 1). */
+export function spinEasing(t: number): number {
+	const x = Math.max(0, Math.min(1, t));
+	return 1 - (1 - x) ** 4 * (1 + 4 * x);
+}
