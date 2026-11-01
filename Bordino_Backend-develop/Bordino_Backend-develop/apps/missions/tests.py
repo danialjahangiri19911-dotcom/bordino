@@ -1,5 +1,6 @@
 import io
 import tempfile
+import threading
 import uuid
 from datetime import timedelta
 from unittest import mock
@@ -8,7 +9,8 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.db import connection
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -479,3 +481,78 @@ class MissionTests(TestCase):
         self.assertNotEqual(m.qr_token, old)
         with self.assertRaises(services.NotFound):
             services.claim_qr(self.customer, old)
+
+
+@override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
+class MissionConcurrencyTests(TransactionTestCase):
+    """Two requests at the same moment, each on its own database connection (PostgreSQL locks)."""
+
+    def setUp(self):
+        cache.clear()
+        self.cat = MissionCategory.objects.create(name="حضوری")
+
+    def together(self, *calls):
+        """Runs the calls at once; returns what each returned or raised."""
+        barrier = threading.Barrier(len(calls))
+        results = [None] * len(calls)
+
+        def run(i, call):
+            try:
+                barrier.wait()
+                results[i] = call()
+            except Exception as exc:  # pylint: disable=broad-except
+                results[i] = exc
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=run, args=(i, c)) for i, c in enumerate(calls)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        return results
+
+    def paid(self, mission):
+        return MissionAttempt.objects.filter(mission=mission, status="completed").count()
+
+    def test_a_double_scan_pays_once(self):
+        customer = make_player("9120008001").customer
+        m = Mission.objects.create(title="کافه", category=self.cat, kind=Mission.Kind.QR, points=20)
+        self.together(*[lambda: services.claim_qr(customer, m.qr_token)] * 4)
+        self.assertEqual(self.paid(m), 1)
+        self.assertEqual(ActivityTransaction.objects.filter(section="mission").count(), 1)
+
+    def test_the_last_place_goes_to_one_player(self):
+        players = [make_player(f"912000810{i}").customer for i in range(4)]
+        m = Mission.objects.create(title="کافه", category=self.cat, kind=Mission.Kind.QR, points=20, capacity=1)
+        results = self.together(*[lambda c=c: services.claim_qr(c, m.qr_token) for c in players])
+        self.assertEqual(self.paid(m), 1)
+        self.assertEqual(sum(isinstance(r, services.MissionError) for r in results), 3)
+
+    def test_approve_and_reject_together_settle_once(self):
+        customer = make_player("9120008201").customer
+        m = Mission.objects.create(
+            title="میلی", category=self.cat, kind=Mission.Kind.SIGNUP, verification=Mission.Verification.REVIEW,
+            link_url="https://mili.example/", points=50,
+        )
+        attempt = services.start(customer, m.pk)
+        services.submit_proof(customer, attempt.pk, "0912", None)
+        with mock.patch("apps.notifications.services.queue"):
+            results = self.together(lambda: services.approve(attempt.pk), lambda: services.reject(attempt.pk))
+        self.assertEqual(sorted(results), [False, True], results)  # one wins, no error
+        attempt.refresh_from_db()
+        self.assertIn(attempt.status, ("completed", "rejected"))
+        self.assertEqual(ActivityTransaction.objects.filter(section="mission").count(), 1 if attempt.status == "completed" else 0)
+
+    def test_two_partner_callbacks_for_the_last_place(self):
+        m = Mission.objects.create(
+            title="والکس", category=self.cat, kind=Mission.Kind.INSTALL, verification=Mission.Verification.CALLBACK,
+            link_url="https://w.example/?c={click_id}", points=30, capacity=1,
+        )
+        a = services.start(make_player("9120008301").customer, m.pk)
+        b = services.start(make_player("9120008302").customer, m.pk)
+        self.together(
+            lambda: services.partner_callback(m.pk, a.click_id, m.callback_secret),
+            lambda: services.partner_callback(m.pk, b.click_id, m.callback_secret),
+        )
+        self.assertEqual(self.paid(m), 1)
