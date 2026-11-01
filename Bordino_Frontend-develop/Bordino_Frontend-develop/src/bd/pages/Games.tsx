@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import RewardOffer from "../ads/RewardOffer";
-import { useAdOffer } from "../ads/api";
+import { usePlayableAdOffer } from "../ads/api";
 import { GAMES, type GameEntry } from "../games";
 import { AppShell, Balance, Chips } from "../ui";
 
@@ -37,8 +37,7 @@ export default function Games() {
 	const [group, setGroup] = useState<"all" | GameEntry["group"]>("all");
 	const router = useRouter();
 	// The rewarded-video offer (server decides if one is available today, and for how much).
-	const { data: offerData } = useAdOffer();
-	const offer = offerData?.result;
+	const { offer } = usePlayableAdOffer();
 	const [picked, setPicked] = useState<GameEntry | null>(null);
 	const shown = GAMES.filter((game) => group === "all" || game.group === group);
 	return (

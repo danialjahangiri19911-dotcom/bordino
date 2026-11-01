@@ -23,7 +23,7 @@ function capacitorApp(): CapacitorApp | null {
  * app keeps that host inside itself (where a download does nothing), while another address is
  * handed to the phone's browser, which downloads and installs the APK.
  */
-const APK_URL = "http://194.60.230.57:8097/download/bordino.apk";
+export const APK_URL = "http://194.60.230.57:8097/download/bordino.apk";
 /** «Later» on the update notice keeps it away this long. */
 const UPDATE_SNOOZE_MS = 3 * 24 * 3600 * 1000;
 

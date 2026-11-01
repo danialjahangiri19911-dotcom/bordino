@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 
+import AdiveryAd from "./AdiveryAd";
 import DemoVideoAd from "./DemoVideoAd";
 import type { AdSession } from "./api";
 
@@ -18,4 +19,5 @@ export interface AdPlayerProps {
 
 export const AD_PLAYERS: Record<string, ComponentType<AdPlayerProps>> = {
 	demo: DemoVideoAd,
+	adivery: AdiveryAd,
 };

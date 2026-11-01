@@ -281,7 +281,7 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
             try:
                 result = ad_reward.complete(customer, attempt.ad_session_id, evidence, mission=True)
             except ad_reward.AdRewardError as exc:
-                raise MissionError(str(exc)) from exc
+                raise MissionError(str(exc), exc.code) from exc
             _pay(attempt, result.session.activity_transaction)
         else:
             if attempt.opened_at is None:

@@ -1,5 +1,6 @@
 from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -79,7 +80,7 @@ class AdRewardCompleteView(APIView):
         try:
             claim = ad_reward.complete(customer, session_id, request.data if isinstance(request.data, dict) else {})
         except ad_reward.AdRewardError as e:
-            return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
+            return Response({"error": str(e), "code": e.code}, status=status.HTTP_409_CONFLICT)
         account = points_account(request.user)
         return Response(
             {
@@ -89,3 +90,35 @@ class AdRewardCompleteView(APIView):
                 "points_balance": int(account.amount) if account else None,
             }
         )
+
+
+class AdiveryCallbackThrottle(AnonRateThrottle):
+    scope = "adivery_callback"
+    rate = "300/min"
+
+
+class AdiveryCallbackView(APIView):
+    """Adivery's server: «this view earned its reward» (uid = our session id, pid = placement,
+    eid = its unique event id). The address carries a secret; it is entered in the Adivery panel."""
+
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+    throttle_classes = (AdiveryCallbackThrottle,)
+
+    def _handle(self, request, secret):
+        params = request.query_params
+        try:
+            result = ad_reward.adivery_callback(secret, params.get("uid", ""), params.get("pid", ""), params.get("eid", ""))
+        except ad_reward.AdRewardError as e:
+            code = {"not_found": status.HTTP_404_NOT_FOUND, "conflict": status.HTTP_409_CONFLICT}.get(e.code, status.HTTP_400_BAD_REQUEST)
+            return Response({"ok": False, "error": str(e)}, status=code)
+        # 200 also when verified but not paid (the day's limit): Adivery need not try again.
+        return Response({"ok": True, "paid": result.paid, "already": result.already})
+
+    @extend_schema(tags=["wallet"], summary="Adivery reward confirmation (server to server)")
+    def get(self, request, secret):
+        return self._handle(request, secret)
+
+    @extend_schema(tags=["wallet"], summary="Adivery reward confirmation (server to server)")
+    def post(self, request, secret):
+        return self._handle(request, secret)

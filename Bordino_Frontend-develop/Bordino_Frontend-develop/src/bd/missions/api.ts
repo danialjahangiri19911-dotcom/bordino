@@ -1,4 +1,4 @@
-import type { AdSession } from "../ads/api";
+import { type AdSession, untilConfirmed } from "../ads/api";
 import { call } from "@/api/games/request";
 import type { ResponseApiData } from "@/libs/http/interfaces";
 import useQuery from "@/libs/http/query";
@@ -100,7 +100,9 @@ export const startMission = (id: string) => call<{ mission: Mission }>("post", `
 /** The player opened the try's link (a banner's wait starts then). */
 export const openedMission = (attemptId: string) => call<{ mission: Mission }>("post", `${MISSIONS}attempts/${attemptId}/opened/`, {});
 
-export const claimMission = (attemptId: string) => call<MissionReward>("post", `${MISSIONS}attempts/${attemptId}/claim/`, {});
+// A video waits for the ad network's confirmation (Adivery's server to ours): asked again meanwhile.
+export const claimMission = (attemptId: string) =>
+	untilConfirmed(() => call<MissionReward>("post", `${MISSIONS}attempts/${attemptId}/claim/`, {}));
 
 export function sendProof(attemptId: string, text: string, image: Blob | null) {
 	const form = new FormData();

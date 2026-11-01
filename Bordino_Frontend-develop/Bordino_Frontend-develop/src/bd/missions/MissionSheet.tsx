@@ -3,6 +3,8 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import Icon from "../Icon";
+import { APK_URL } from "../BackButton";
+import { usePlayableAdOffer } from "../ads/api";
 import { AD_PLAYERS } from "../ads/players";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
@@ -44,6 +46,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 	const [preview, setPreview] = useState<string | null>(null);
 	const [now, setNow] = useState(() => Date.now());
 	const claimAt = useRef(0);
+	// A video mission plays the day's ad provider: Adivery only in the Android app (1.2+).
+	const ads = usePlayableAdOffer();
+	const videoHere = m.kind !== "video" || !(ads.needsAppUpdate || ads.appOnly);
 	const file = useRef<HTMLInputElement>(null);
 
 	useEffect(() => setM(mission), [mission]);
@@ -153,7 +158,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 
 	const busy = step.kind === "busy";
 	const open = m.attempt?.status === "started" ? m.attempt : null;
-	const canStart = m.state === "available" || m.state === "rejected" || (m.state === "in_progress" && m.kind === "video");
+	const canStart = videoHere && (m.state === "available" || m.state === "rejected" || (m.state === "in_progress" && m.kind === "video"));
 	const partner = m.partner_name || "سایت همکار";
 	const linkTarget = inApp() ? {} : { target: "_blank", rel: "noopener noreferrer" };
 	const proofReady = (!m.proof_label || text.trim()) && (!m.proof_image_required || image) && (text.trim() || image);
@@ -203,6 +208,18 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						{m.state === "expired" ? <p className="mi-note">زمان این مأموریت تمام شده است.</p> : null}
 						{m.state === "full" ? <p className="mi-note">ظرفیت این مأموریت تکمیل شده است.</p> : null}
 						{m.state === "inactive" ? <p className="mi-note">این مأموریت فعلاً غیرفعال است.</p> : null}
+						{!videoHere && (m.state === "available" || m.state === "in_progress") ? (
+							<p className="mi-note mi-note-wait">
+								{ads.needsAppUpdate ? (
+									<>
+										ویدیوهای جایزه‌دار در نسخهٔ تازهٔ اپ پخش می‌شوند.{" "}
+										<a href={APK_URL}>دریافت نسخهٔ تازه</a>
+									</>
+								) : (
+									"ویدیوهای جایزه‌دار فقط در اپ اندروید بردینو پخش می‌شوند."
+								)}
+							</p>
+						) : null}
 						{m.kind === "qr" && m.state === "available" ? (
 							<p className="mi-note">
 								<Icon name="map-pin" /> به محل برو و QR آن‌جا را با دوربین گوشی اسکن کن؛ امتیاز همان لحظه اضافه می‌شود.

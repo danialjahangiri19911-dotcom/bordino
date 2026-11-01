@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.wallet.views.ad_reward import AdRewardCompleteView, AdRewardOfferView, AdRewardStartView
+from apps.wallet.views.ad_reward import AdiveryCallbackView, AdRewardCompleteView, AdRewardOfferView, AdRewardStartView
 from apps.wallet.views.activity import RecordActionCRUDView, ScoreHistoryView, ScoreStatusViewSet
 from apps.wallet.views.bank.list import BankListView
 from apps.wallet.views.bank_account.views import BankAccountViewSet
@@ -58,6 +58,7 @@ urlpatterns = [
         name="currency_withdraw",
     ),
     path("api/v1/wallet/ad-reward/offer/", AdRewardOfferView.as_view(), name="ad_reward_offer"),
+    path("api/v1/wallet/ad-reward/adivery/<str:secret>/", AdiveryCallbackView.as_view(), name="ad_reward_adivery"),
     path("api/v1/wallet/ad-reward/sessions/", AdRewardStartView.as_view(), name="ad_reward_start"),
     path(
         "api/v1/wallet/ad-reward/sessions/<uuid:session_id>/complete/",

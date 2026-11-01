@@ -6,10 +6,15 @@ paid once per session (ActivityTransaction is unique per customer/section/action
 AD_REWARD_DAILY_LIMIT times a day.
 
 Providers are pluggable. «demo» plays a sample video and can only check time on the server (the
-reward needs at least the video's length between start and claim). The real ad SDK (AdDelivery)
-gets its own provider whose verify() checks the network's signed server-to-server completion
-callback; switching is the AD_REWARD_PROVIDER setting.
+reward needs at least the video's length between start and claim). «adivery» (the Adivery SDK in
+the Android app) is paid only after Adivery's server calls ours for the view (adivery_callback);
+switching is the AD_REWARD_PROVIDER setting.
 """
+
+import hashlib
+import hmac
+import logging
+import uuid
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -34,7 +39,12 @@ DEFAULTS = {
     "AD_REWARD_DAILY_LIMIT": 5,
     "AD_DEMO_VIDEO_URL": "/bd/ads/demo-ad.mp4",
     "AD_DEMO_SECONDS": 15,
+    # Adivery (docs.adivery.com): the app's id and its «جایزه‌ای» (rewarded) placement.
+    "ADIVERY_APP_ID": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee",
+    "ADIVERY_REWARDED_PLACEMENT_ID": "",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def setting(key: str):
@@ -42,7 +52,11 @@ def setting(key: str):
 
 
 class AdRewardError(Exception):
-    """Refused, with a message for the player."""
+    """Refused, with a message for the player. `code` "pending": not confirmed yet, ask again."""
+
+    def __init__(self, message: str = "", code: str = "invalid"):
+        super().__init__(message)
+        self.code = code
 
 
 class AdProvider:
@@ -78,13 +92,36 @@ class DemoVideoProvider(AdProvider):
         return elapsed >= session.min_watch_seconds
 
 
-PROVIDERS: dict[str, AdProvider] = {DemoVideoProvider.name: DemoVideoProvider()}
+class AdiveryProvider(AdProvider):
+    """The Adivery SDK in the Android app. The app tells the SDK this session's id (setUserId);
+    after a full view Adivery's server calls adivery_callback with it, and only that call verifies
+    the session: the app's own «I watched it» is never enough."""
+
+    name = "adivery"
+
+    def watch_seconds(self) -> int:
+        return 1
+
+    def creative(self) -> dict:
+        return {"app_id": setting("ADIVERY_APP_ID"), "placement_id": setting("ADIVERY_REWARDED_PLACEMENT_ID")}
+
+    def ready(self) -> bool:
+        return bool(setting("ADIVERY_APP_ID")) and bool(setting("ADIVERY_REWARDED_PLACEMENT_ID"))
+
+    def verify(self, session, evidence):
+        return session.verified_at is not None
+
+
+PROVIDERS: dict[str, AdProvider] = {DemoVideoProvider.name: DemoVideoProvider(), AdiveryProvider.name: AdiveryProvider()}
 
 
 def provider() -> AdProvider | None:
     # An unknown name (a typo, or the real SDK's provider not deployed yet) offers nothing rather
-    # than quietly paying through the demo.
-    return PROVIDERS.get(str(setting("AD_REWARD_PROVIDER")))
+    # than quietly paying through the demo; so does Adivery before its placement is set.
+    p = PROVIDERS.get(str(setting("AD_REWARD_PROVIDER")))
+    if p is not None and not getattr(p, "ready", lambda: True)():
+        return None
+    return p
 
 
 # The players' day (the server's clock is UTC): limits reset at midnight in Tehran.
@@ -165,6 +202,8 @@ def complete(customer: Customer, session_id, evidence: dict | None = None, missi
         if timezone.now() - session.create_time > SESSION_TTL:
             raise AdRewardError("زمان این ویدیو گذشته است؛ دوباره امتحان کن.")
         if not PROVIDERS[session.provider].verify(session, evidence or {}):
+            if session.provider == AdiveryProvider.name:
+                raise AdRewardError("در انتظار تأیید ادیوری…", "pending")
             raise AdRewardError("جایزه بعد از تماشای کامل ویدیو داده می‌شود.")
         if _rewarded_today(customer) >= int(setting("AD_REWARD_DAILY_LIMIT")):
             raise AdRewardError("سقف ویدیوهای جایزه‌دار امروز پر شده است.")
@@ -183,3 +222,68 @@ def complete(customer: Customer, session_id, evidence: dict | None = None, missi
         session.completed_at = timezone.now()
         session.save(update_fields=["activity_transaction", "status", "completed_at", "update_time"])
         return Claim(session, already=False)
+
+
+# ── Adivery's server-to-server confirmation (docs.adivery.com/server) ──
+
+
+def adivery_callback_secret() -> str:
+    """The secret part of the callback address entered in the Adivery panel (derived from the
+    site's SECRET_KEY: nothing to store, the same on every server process)."""
+    from django.conf import settings  # pylint: disable=import-outside-toplevel
+
+    return hmac.new(settings.SECRET_KEY.encode(), b"adivery-reward-callback", hashlib.sha256).hexdigest()[:40]
+
+
+@dataclass
+class Callback:
+    paid: bool
+    already: bool
+    reason: str = ""
+
+
+def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
+    """Adivery says the view of session `uid` on placement `pid` earned its reward (event `eid`,
+    unique; Adivery may repeat the call). Verifies the session, then pays it — through the
+    mission when the video was a mission's — once."""
+    if not hmac.compare_digest(str(secret or "").encode("utf-8", "replace"), adivery_callback_secret().encode()):
+        raise AdRewardError("not found", "not_found")
+    if not eid or len(eid) > 100:
+        raise AdRewardError("bad event id")
+    if str(pid or "") != str(setting("ADIVERY_REWARDED_PLACEMENT_ID") or "-"):
+        raise AdRewardError("unknown placement")
+    try:
+        session_id = uuid.UUID(str(uid))
+    except ValueError as exc:
+        raise AdRewardError("bad user id") from exc
+    with transaction.atomic():
+        session = (
+            AdRewardSession.objects.select_for_update()
+            .filter(pk=session_id, provider=AdiveryProvider.name)
+            .first()
+        )
+        if session is None:
+            raise AdRewardError("unknown session", "not_found")
+        if session.external_event_id and session.external_event_id != eid:
+            raise AdRewardError("session already confirmed by another event", "conflict")
+        if AdRewardSession.objects.filter(external_event_id=eid).exclude(pk=session.pk).exists():
+            raise AdRewardError("event already used", "conflict")
+        if session.verified_at is None:
+            session.external_event_id = eid
+            session.verified_at = timezone.now()
+            session.save(update_fields=["external_event_id", "verified_at", "update_time"])
+        customer = session.customer
+        mission_attempt = getattr(session, "mission_attempt", None) if session.placement.startswith("mission:") else None
+    # Paid as the app would claim it (each path pays once and keeps its own limits).
+    try:
+        if mission_attempt is not None:
+            from apps.missions import services as missions  # pylint: disable=import-outside-toplevel
+
+            result = missions.claim(customer, mission_attempt.pk)
+            return Callback(paid=True, already=result.already)
+        result = complete(customer, session.pk)
+        return Callback(paid=True, already=result.already)
+    except Exception as exc:  # pylint: disable=broad-except
+        # Verified but not paid (the day's limit, an old session...): recorded, not retried.
+        logger.warning("Adivery reward for session %s not paid: %s", session.pk, exc)
+        return Callback(paid=False, already=False, reason=str(exc))

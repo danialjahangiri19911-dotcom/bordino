@@ -75,6 +75,9 @@ dependencies {
     implementation "co.pushe.plus:core:2.6.4"
     implementation "co.pushe.plus:fcm:2.6.4"
     implementation "co.pushe.plus:notification:2.6.4"
+    // Adivery (rewarded video, docs.adivery.com) and the advertising id it targets with.
+    implementation "com.adivery:sdk:4.9.0"
+    implementation "com.google.android.gms:play-services-ads-identifier:18.0.1"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

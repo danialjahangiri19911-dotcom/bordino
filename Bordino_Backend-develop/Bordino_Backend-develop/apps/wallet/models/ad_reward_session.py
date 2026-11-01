@@ -23,6 +23,10 @@ class AdRewardSession(AbstractBaseModel):
     min_watch_seconds = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.STARTED)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Adivery: its server's confirmation that this view earned the reward (the callback's unique
+    # event id, each paid once) and when it came.
+    external_event_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
     activity_transaction = models.OneToOneField(
         "wallet.ActivityTransaction",
         on_delete=models.PROTECT,
