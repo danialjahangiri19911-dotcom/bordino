@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -38,7 +38,7 @@ const DIGITS = "۱۲۳۴۵۶۷۸۹";
 /** `inert` while a dialog is open (React 18 has no typed prop for it; the DOM attribute works). */
 export const inertIf = (on: boolean) => (on ? ({ inert: true } as Record<string, boolean>) : {});
 
-type Confirm = "" | "new" | "exit" | "level";
+type Confirm = "" | "new" | "level";
 type Modal = "" | "ready" | "won" | "lost" | "pause" | Confirm;
 
 /**
@@ -82,7 +82,27 @@ export default function SudokuGame() {
 	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
 	// header's exit button does).
 	// A charge on its way (start/continue) holds Back: leaving now would lose what is being paid for.
-	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
+	// Leaving mid-game: the time stops while the shared question is open, and runs again on staying.
+	const askExit = () => {
+		const wasPaused = game.paused;
+		if (!wasPaused) game.pause();
+		askLeave(
+			{
+				title: "از بازی خارج می‌شوی؟",
+				text: "بازی متوقف و روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی ادامه می‌دهی.",
+				yes: "خروج",
+				no: "ادامهٔ بازی",
+			},
+			() => {
+				music.current?.stop();
+				push(R.games);
+			},
+			() => {
+				if (!wasPaused) game.resume();
+			},
+		);
+	};
+	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? askExit() : push(R.games)));
 	// A tap outside the box: a question is answered «stay» (as its second button), a pause ends.
 	// The start, win and loss boxes stay: each needs a choice.
 	// The top bar is out of the way while a board is in play (GameBar: handle / pull at the top).
@@ -295,7 +315,6 @@ export default function SudokuGame() {
 		],
 		new: ["یک جدول تازه؟", "پیشرفت این جدول از بین می‌رود و بازی تازه دوباره امتیاز می‌گیرد."],
 		level: ["سطح را عوض کنیم؟", `این جدول کنار گذاشته می‌شود و در سطح ${label(pendingLevel)} بازی تازه شروع می‌کنی.`],
-		exit: ["از بازی خارج شوی؟", "بازی متوقف و روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی ادامه می‌دهی."],
 		pause: ["کمی استراحت", "زمان و موسیقی متوقف شده‌اند؛ جدول تا ادامهٔ بازی پنهان است."],
 	};
 
@@ -324,7 +343,7 @@ export default function SudokuGame() {
 						<button type="button" className="sd-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
+						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? askExit() : push(R.games))}>
 							<Icon name="arrow-right" />
 						</button>
 					</div>
@@ -450,19 +469,12 @@ export default function SudokuGame() {
 													type="button"
 													className="sd-primary"
 													onClick={() => {
-														if (modal === "exit") {
-															music.current?.stop();
-															setConfirm("");
-															game.pause();
-															push(R.games);
-														} else {
-															if (modal === "level" && pendingLevel) setLevel(pendingLevel);
-															setPendingLevel(null);
-															toMenu();
-														}
+														if (modal === "level" && pendingLevel) setLevel(pendingLevel);
+														setPendingLevel(null);
+														toMenu();
 													}}
 												>
-													{modal === "exit" ? "خروج" : modal === "level" ? "تغییر سطح" : "شروع دوباره"}
+													{modal === "level" ? "تغییر سطح" : "شروع دوباره"}
 												</button>
 												<button type="button" className="sd-secondary" onClick={() => { setPendingLevel(null); setConfirm(""); }}>
 													ادامهٔ همین جدول

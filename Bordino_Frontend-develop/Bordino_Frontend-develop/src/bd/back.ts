@@ -36,10 +36,15 @@ export interface LeaveQuestion {
 	title: string;
 	text: string;
 	yes: string;
+	/** The stay button (default «ماندن»). */
+	no?: string;
 }
 
-/** Asks `q`; on «yes» runs `go` (default: leave the page as Back would). Set by BackButton. */
-let ask: ((q: LeaveQuestion, go?: () => void) => void) | null = null;
+/**
+ * Asks `q`; on «yes» runs `go` (default: leave the page as Back would), on staying `stay`. Set by
+ * BackButton.
+ */
+let ask: ((q: LeaveQuestion, go?: () => void, stay?: () => void) => void) | null = null;
 /** The questions of the leave guards now active (newest last). */
 const guards: LeaveQuestion[] = [];
 
@@ -64,6 +69,15 @@ export function useLeaveGuard(active: boolean, question: LeaveQuestion) {
 			if (i >= 0) guards.splice(i, 1);
 		};
 	}, [active]);
+}
+
+/**
+ * A game's «leave now?» (its exit button, Back during a round): the one question sheet every game
+ * shows, the same look and place. `stay` runs when the player stays (a paused timer resumes).
+ */
+export function askLeave(q: LeaveQuestion, go: () => void, stay?: () => void) {
+	if (ask) ask(q, go, stay);
+	else go();
 }
 
 /** Leaving by a button (a game's exit): asks first while a leave guard is active, then runs `go`. */

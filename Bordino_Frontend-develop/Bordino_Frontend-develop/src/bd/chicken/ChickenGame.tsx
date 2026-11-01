@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import "./chicken.css";
@@ -41,6 +41,12 @@ interface View {
 	landed: boolean;
 }
 const READY: View = { phase: "ready", lane: 0, target: 0, secured: 0, landed: false };
+const LEAVE = {
+	title: "از بازی خارج می‌شوی؟",
+	text: "دور تو باز می‌ماند و وقتی برگردی از همین خط ادامه می‌دهی.",
+	yes: "خروج",
+	no: "ادامهٔ بازی",
+};
 
 const mult = (n: number | string) => (
 	<bdi dir="ltr">{Number(n).toFixed(2)}×</bdi>
@@ -87,7 +93,7 @@ export default function ChickenGame() {
 	const [view, setView] = useState<View>({ ...READY, phase: "loading" });
 	const [level, setLevel] = useState<ChickenDifficulty>("easy");
 	const [amountText, setAmountText] = useState("");
-	const [dialog, setDialog] = useState<"" | "fair" | "exit">("");
+	const [dialog, setDialog] = useState<"" | "fair">("");
 	const [sound, setSound] = useState(false);
 	const [motion, setMotion] = useState(true);
 	const [online, setOnline] = useState(true);
@@ -286,7 +292,7 @@ export default function ChickenGame() {
 	// Android Back: closes the open panel, asks before leaving a round in play, else leaves (as the
 	// header's exit button does).
 	const inRound = (round?.status === "active" && round.id !== acknowledged.current) || view.phase === "jumping" || view.phase === "colliding" || game.busy;
-	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? setDialog("exit") : leave()));
+	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? askLeave(LEAVE, leave) : leave()));
 	const dialogBox = useRef<HTMLDivElement>(null);
 	useDismissOutside(!!dialog, dialogBox, () => setDialog(""));
 	// The top bar is out of the way while a round is in play (GameBar: handle / pull at the top).
@@ -357,20 +363,23 @@ export default function ChickenGame() {
 						</div>
 					</div>
 					<div className="ck-tools">
-						<button className="ck-icon-button" type="button" aria-label="اطلاعات بازی" aria-expanded={dialog === "fair"} onClick={() => setDialog(dialog === "fair" ? "" : "fair")}>
-							<Icon name="info" />
+						<button className="ck-icon-button" type="button" aria-label={sound ? "قطع موسیقی و افکت‌ها" : "پخش موسیقی و افکت‌ها"} aria-pressed={sound} onClick={() => setSound(!sound)}>
+							<Icon name={sound ? "volume-2" : "volume-x"} />
 						</button>
-						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? setDialog("exit") : leave())}>
-							<Icon name="log-out" />
+						<button className="ck-icon-button" type="button" aria-label="راهنمای بازی" aria-expanded={dialog === "fair"} onClick={() => setDialog(dialog === "fair" ? "" : "fair")}>
+							<Icon name="circle-help" />
+						</button>
+						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : leave())}>
+							<Icon name="arrow-right" />
 						</button>
 					</div>
 				</header>
 				</GameBar>
-				<div ref={dialogBox} className="ck-dialog" hidden={!dialog} role="dialog" aria-modal="false" aria-label={dialog === "exit" ? "خروج از بازی" : "اطلاعات بازی"}>
+				<div ref={dialogBox} className="ck-dialog" hidden={!dialog} role="dialog" aria-modal="false" aria-label="راهنمای بازی">
 					{dialog === "fair" ? (
 						<>
 							<div className="ck-dialog-head">
-								<h2>اطلاعات بازی</h2>
+								<h2>راهنمای بازی</h2>
 								<button type="button" onClick={() => setDialog("")} autoFocus>
 									بستن
 								</button>
@@ -398,17 +407,6 @@ export default function ChickenGame() {
 							) : null}
 							<button type="button" aria-pressed={motion} onClick={() => setMotion(!motion)}>
 								حرکت‌ها: {motion ? "روشن" : "خاموش"}
-							</button>
-						</>
-					) : dialog === "exit" ? (
-						<>
-							<h2>از بازی خارج می‌شوی؟</h2>
-							<p>دور تو باز می‌ماند و وقتی برگردی از همین خط ادامه می‌دهی.</p>
-							<button type="button" onClick={() => setDialog("")} autoFocus>
-								ادامه
-							</button>
-							<button type="button" onClick={leave}>
-								خروج
 							</button>
 						</>
 					) : null}
@@ -511,11 +509,6 @@ export default function ChickenGame() {
 								<span>
 									موجودی: <b>{config ? fa(balance) : "…"}</b> امتیاز
 								</span>
-								<div className="ck-audio-tools">
-									<button type="button" aria-label={sound ? "قطع موسیقی و افکت‌ها" : "پخش موسیقی و افکت‌ها"} aria-pressed={sound} onClick={() => setSound(!sound)}>
-										<Icon name={sound ? "volume-2" : "volume-x"} />
-									</button>
-								</div>
 								<span className="ck-demo">{LEVELS.find(([key]) => key === level)?.[1]}</span>
 							</div>
 						</section>

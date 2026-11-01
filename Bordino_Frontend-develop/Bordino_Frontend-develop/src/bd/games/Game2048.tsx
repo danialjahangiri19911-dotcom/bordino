@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { inertIf } from "./SudokuGame";
@@ -26,7 +26,7 @@ const digits = (n: number) => n.toLocaleString("fa-IR", { useGrouping: false });
 // Per account: another player on this phone keeps their own record.
 const bestKey = () => `2048-best-score:${currentUserId()}`;
 
-type Confirm = "" | "reset" | "exit";
+type Confirm = "" | "reset";
 
 function View() {
 	const game = useContext(GameContext);
@@ -55,7 +55,21 @@ function View() {
 	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
 	// header's exit button does).
 	// A charge on its way holds Back: leaving now would lose the game being paid for.
-	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? setConfirm("exit") : push(R.games)));
+	// Leaving mid-game: the shared question (every game asks it the same way).
+	const askExit = () =>
+		askLeave(
+			{
+				title: "از بازی خارج می‌شوی؟",
+				text: "بازی روی همین دستگاه نگه داشته می‌شود و هر وقت برگردی ادامه دارد.",
+				yes: "خروج",
+				no: "ادامهٔ بازی",
+			},
+			() => {
+				music.current?.stop();
+				push(R.games);
+			},
+		);
+	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? askExit() : push(R.games)));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 	// A tap outside a question answers «stay» (its second button); start, win and loss need a choice.
 	useDismissOutside(!!confirm, dialogRef, () => setConfirm(""));
@@ -169,7 +183,6 @@ function View() {
 		win: ["۲۰۴۸ را ساختی!", `امتیاز این بازی: ${fa(game.score)}. یک رکورد بزرگ‌تر؟`],
 		lost: ["این دور تمام شد", `حرکتی باقی نمانده؛ امتیاز نهایی ${fa(game.score)}.`],
 		reset: ["از نو شروع کنیم؟", `صفحهٔ فعلی پاک می‌شود و بازی تازه${playCost !== undefined ? ` ${fa(playCost)} امتیاز` : ""} هزینه دارد؛ رکوردت می‌ماند.`],
-		exit: ["از بازی خارج شوی؟", "بازی روی همین دستگاه نگه داشته می‌شود و هر وقت برگردی ادامه دارد."],
 	};
 
 	return (
@@ -196,7 +209,7 @@ function View() {
 						<button type="button" className="g48-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? setConfirm("exit") : push(R.games))}>
+						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? askExit() : push(R.games))}>
 							<Icon name="arrow-right" />
 						</button>
 					</div>
@@ -267,17 +280,7 @@ function View() {
 											</p>
 										) : null}
 										<div className="g48-dialog-actions">
-											{modal === "exit" ? (
-												<>
-													<button type="button" className="g48-primary" onClick={() => { music.current?.stop(); push(R.games); }}>
-														خروج از بازی
-													</button>
-													<button type="button" className="g48-secondary" onClick={() => setConfirm("")}>
-														ادامهٔ همین بازی
-													</button>
-												</>
-											) : (
-												<>
+											<>
 													<button type="button" className="g48-primary" disabled={game.isCharging} onClick={() => void start()}>
 														{game.isCharging ? "در حال شروع…" : modal === "reset" ? "شروع دوباره" : modal === "ready" ? "شروع بازی" : "بازی تازه"}
 													</button>
@@ -290,8 +293,7 @@ function View() {
 															برگشت یک حرکت
 														</button>
 													) : null}
-												</>
-											)}
+											</>
 										</div>
 									</div>
 								</div>

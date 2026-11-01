@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
-import { useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
@@ -113,7 +113,7 @@ export default function CrashGame() {
 	const [size, setSize] = useState({ width: 600, height: 320 });
 	const [mode, setMode] = useState<"manual" | "auto">("manual");
 	const [form, setForm] = useState<CrashForm>(DEFAULT_FORM);
-	const [panel, setPanel] = useState<"" | "help" | "fair" | "exit">("");
+	const [panel, setPanel] = useState<"" | "help" | "fair">("");
 	const [sound, setSound] = useState(true);
 	const [unlocked, setUnlocked] = useState(false);
 	const [hidden, setHidden] = useState(false);
@@ -354,8 +354,23 @@ export default function CrashGame() {
 		}
 	};
 	const inPlay = flying || autoRunning || busy;
-	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? setPanel("exit") : leave()));
-	useBrowserBackGuard(inPlay, () => setPanel("exit"));
+	// Leaving mid-round: the shared question (every game asks it the same way).
+	const askExit = () =>
+		askLeave(
+			{
+				title: "از بازی خارج می‌شوی؟",
+				text: flying
+					? round?.auto_cashout
+						? `دور جاری روی سرور ادامه دارد؛ اگر ضریب به ${fa2(round.auto_cashout)} برسد خودکار برداشت می‌شود.`
+						: "دور جاری روی سرور ادامه دارد و بدون برداشت، با انفجار امتیاز شرط از دست می‌رود."
+					: "اجرای خودکار متوقف می‌شود.",
+				yes: "خروج",
+				no: "ادامهٔ بازی",
+			},
+			leave,
+		);
+	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? askExit() : leave()));
+	useBrowserBackGuard(inPlay, askExit);
 	const panelBox = useRef<HTMLElement>(null);
 	useDismissOutside(!!panel, panelBox, () => setPanel(""));
 	// The top bar is out of the way while a round flies or auto-play runs (GameBar).
@@ -439,7 +454,7 @@ export default function CrashGame() {
 						<button type="button" className="cr-icon" aria-label="اطلاعات بازی" aria-expanded={panel === "help"} onClick={() => setPanel(panel === "help" ? "" : "help")}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? setPanel("exit") : leave())}>
+						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? askExit() : leave())}>
 							<Icon name="arrow-right" />
 						</button>
 					</div>
@@ -457,27 +472,6 @@ export default function CrashGame() {
 						</p>
 					</section>
 				) : null}
-				{panel === "exit" ? (
-					<section ref={panelBox} className="cr-help" role="alertdialog" aria-label="خروج از بازی">
-						<b>از بازی خارج می‌شوی؟</b>
-						<p>
-							{flying
-								? round?.auto_cashout
-									? `دور جاری روی سرور ادامه دارد؛ اگر ضریب به ${fa2(round.auto_cashout)} برسد خودکار برداشت می‌شود.`
-									: "دور جاری روی سرور ادامه دارد و بدون برداشت، با انفجار امتیاز شرط از دست می‌رود."
-								: "اجرای خودکار متوقف می‌شود."}
-						</p>
-						<div className="cr-panel-actions">
-							<button type="button" autoFocus onClick={() => setPanel("")}>
-								ادامهٔ بازی
-							</button>
-							<button type="button" className="cr-leave" onClick={leave}>
-								خروج
-							</button>
-						</div>
-					</section>
-				) : null}
-
 				<main className="cr-main">
 					<div className="cr-recent">
 						<span>دورهای اخیر</span>

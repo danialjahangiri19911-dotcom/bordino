@@ -30,7 +30,7 @@ const UPDATE_SNOOZE_MS = 3 * 24 * 3600 * 1000;
 /** Screens where Back leaves the app (asks first). */
 const ROOTS = new Set<string>([R.home, R.landing, "/pwa", R.login, R.otp]);
 /** The bottom-navigation tabs: Back from one goes to the home tab. */
-const TABS = new Set<string>([R.games, R.wallet, R.profile]);
+const TABS = new Set<string>([R.games, R.earn, R.wallet, R.profile]);
 
 /** Where Back goes when the page was opened directly (no page before it in this app). */
 export function parentOf(path: string): string {
@@ -74,15 +74,21 @@ export default function BackButton() {
 	const pathname = usePathname();
 	const path = useRef(pathname);
 	path.current = pathname;
-	const [question, setQuestion] = useState<(LeaveQuestion & { onYes: () => void }) | null>(null);
+	const [question, setQuestion] = useState<(LeaveQuestion & { onYes: () => void; onNo?: () => void }) | null>(null);
+	// Staying (the button, a tap outside, Back): the question goes, the asker's `stay` runs.
+	const stay = () => {
+		const after = question?.onNo;
+		setQuestion(null);
+		after?.();
+	};
 	// The Android app 1.0 (before the Back plugin): hardware Back closes it, so it asks for 1.1+.
 	const [oldApp, setOldApp] = useState(false);
 
-	useBackHandler(!!question, () => setQuestion(null));
+	useBackHandler(!!question, stay);
 
 	// The leave question works everywhere (a game's exit button asks it in a browser too).
 	useEffect(() => {
-		setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()) }));
+		setLeaveAsker((q, go, onNo) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()), onNo }));
 		return () => setLeaveAsker(null);
 	}, []);
 
@@ -117,7 +123,7 @@ export default function BackButton() {
 			if (canGoBackNow) window.history.back();
 			else router.replace(parentOf(here));
 		};
-		setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? leave }));
+		setLeaveAsker((q, go, onNo) => setQuestion({ ...q, onYes: go ?? leave, onNo }));
 		const onBack = ({ canGoBack }: { canGoBack?: boolean }) => {
 			canGoBackNow = !!canGoBack;
 			if (handleBackInPage() || closeOpenDialog()) return;
@@ -137,7 +143,7 @@ export default function BackButton() {
 		};
 		const handle = app.addListener("backButton", onBack) as { remove?: () => void } | Promise<{ remove?: () => void }>;
 		return () => {
-			setLeaveAsker((q, go) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()) }));
+			setLeaveAsker((q, go, onNo) => setQuestion({ ...q, onYes: go ?? (() => window.history.back()), onNo }));
 			void Promise.resolve(handle).then((h) => h?.remove?.());
 		};
 	}, [router, app]);
@@ -176,7 +182,7 @@ export default function BackButton() {
 	}
 	if (!question) return null;
 	return (
-		<div className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && setQuestion(null)}>
+		<div className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && stay()}>
 			<div className="bd-product st-brutal bd-sheet bd-leave" role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
 				<p className="bd-leave-title" id="leave-title">
 					{question.title}
@@ -193,8 +199,8 @@ export default function BackButton() {
 				>
 					{question.yes}
 				</button>
-				<button type="button" className="bd-sheet-item bd-sheet-cancel" autoFocus onClick={() => setQuestion(null)}>
-					ماندن
+				<button type="button" className="bd-sheet-item bd-sheet-cancel" autoFocus onClick={stay}>
+					{question.no ?? "ماندن"}
 				</button>
 			</div>
 		</div>
