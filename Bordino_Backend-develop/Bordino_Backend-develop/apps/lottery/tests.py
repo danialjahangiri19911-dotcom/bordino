@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest import mock
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -398,6 +399,20 @@ class AuditPhase2Tests(TestCase):
         self.assertFalse(admin.has_change_permission(None))
         self.assertFalse(admin.has_delete_permission(None))
         self.assertFalse(admin.has_add_permission(None))
+
+    def test_admin_import_is_off_for_money_and_on_only_for_reference_data(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+        from django.test import RequestFactory  # pylint: disable=import-outside-toplevel
+
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import Bank, TokenWalletAccount  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransaction  # pylint: disable=import-outside-toplevel
+
+        request = RequestFactory().get("/admin/")
+        request.user = get_user_model().objects.create_superuser(phone_number="9120003099", password="x-Pass-123")
+        for model in (LotteryTicketTransaction, TokenWalletAccount, LotteryWheel):
+            self.assertFalse(site._registry[model].has_import_permission(request), model)  # pylint: disable=protected-access
+        self.assertTrue(site._registry[Bank].has_import_permission(request))  # pylint: disable=protected-access
 
     def test_the_wheel_tells_its_bet_range(self):
         body = self.api.get(f"/api/v1/lotteries/lottery-wheel/{self.wheel.pk}/").json()

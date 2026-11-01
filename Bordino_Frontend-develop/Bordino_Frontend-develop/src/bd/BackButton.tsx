@@ -95,6 +95,8 @@ export default function BackButton() {
 	// dialog); focus comes back where it was.
 	useEffect(() => {
 		if (!question || !sheet.current) return undefined;
+		// What had focus before the sheet (the game's exit button): the sheet takes focus only now,
+		// after noting it, so closing gives it back.
 		const before = document.activeElement as HTMLElement | null;
 		const hidden: Element[] = [];
 		for (let node: Element | null = sheet.current; node && node !== document.body; node = node.parentElement) {
@@ -105,6 +107,7 @@ export default function BackButton() {
 				}
 			}
 		}
+		sheet.current.querySelector<HTMLButtonElement>(".bd-sheet-cancel")?.focus({ preventScroll: true });
 		return () => {
 			hidden.forEach((el) => el.removeAttribute("inert"));
 			before?.focus?.({ preventScroll: true });
@@ -224,7 +227,7 @@ export default function BackButton() {
 				>
 					{question.yes}
 				</button>
-				<button type="button" className="bd-sheet-item bd-sheet-cancel" autoFocus onClick={stay}>
+				<button type="button" className="bd-sheet-item bd-sheet-cancel" onClick={stay}>
 					{question.no ?? "ماندن"}
 				</button>
 			</div>

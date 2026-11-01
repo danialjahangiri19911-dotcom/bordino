@@ -6,6 +6,7 @@ from apps.entertainment.models import FortuneReading
 
 @register(FortuneReading)
 class FortuneReadingAdmin(BaseAdmin):
+    allow_import = True  # plain reference data, no money
     list_display = (
         "id",
         "type",

@@ -8,6 +8,13 @@ from apps.django_helper.models.base import AbstractBaseModel
 class BaseAdmin(ImportExportModelAdmin):
     list_display = ("__str__",)
     list_filter = ()
+    # Import (a CSV/Excel upload) writes rows straight into the database, past every rule these
+    # admins keep (balances are never saved by hand, money records are read-only, statuses that
+    # pay or refund): off, unless an admin of harmless data opts in. Export stays.
+    allow_import = False
+
+    def has_import_permission(self, request):
+        return self.allow_import and super().has_import_permission(request)
 
     def get_fields(self, request, obj=None):
         fields = super().get_fields(request, obj)

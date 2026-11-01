@@ -6,6 +6,7 @@ from apps.users.models.category import Category
 
 @register(Category)
 class CategoryAdmin(BaseAdmin):
+    allow_import = True  # plain reference data, no money
     search_fields = ("name",)
     autocomplete_fields = ("parent", "icon")
     list_display = (
