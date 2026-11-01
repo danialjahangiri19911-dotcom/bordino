@@ -106,6 +106,20 @@ class AdiveryTests(TestCase):
         self.assertEqual(self.points(), 12)
         self.assertTrue(missions.claim(self.customer, attempt.pk).already)
 
+    def test_the_admin_shows_the_callback_address_to_superusers_only(self):
+        from django.contrib.auth.models import Permission  # pylint: disable=import-outside-toplevel
+
+        url = "/admin/wallet/adrewardsession/"
+        staff = get_user_model().objects.create_user(phone_number="9120009002", password="x-Pass-123")
+        staff.is_admin = True
+        staff.save()
+        staff.user_permissions.add(Permission.objects.get(codename="view_adrewardsession"))
+        self.client.force_login(staff)
+        self.assertNotIn(self.secret, self.client.get(url).content.decode())
+        boss = get_user_model().objects.create_superuser(phone_number="9120009003", password="x-Pass-123")
+        self.client.force_login(boss)
+        self.assertIn(f"/api/v1/wallet/ad-reward/adivery/{self.secret}/", self.client.get(url).content.decode())
+
     def test_the_callback_address_command(self):
         from io import StringIO  # pylint: disable=import-outside-toplevel
 
