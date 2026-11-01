@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -48,8 +50,12 @@ class AdiveryTests(TestCase):
         return answer
 
     def test_without_a_placement_nothing_is_offered(self):
-        setting("ADIVERY_REWARDED_PLACEMENT_ID", "")
-        self.assertFalse(ad_reward.offer(self.customer).available)
+        SystemConfiguration.objects.filter(key="ADIVERY_REWARDED_PLACEMENT_ID").delete()
+        cache.clear()
+        with mock.patch.dict(ad_reward.DEFAULTS, {"ADIVERY_REWARDED_PLACEMENT_ID": ""}):
+            self.assertFalse(ad_reward.offer(self.customer).available)
+        # Bordino's own placement is the default.
+        self.assertTrue(ad_reward.offer(self.customer).available)
 
     def test_the_app_alone_cannot_claim_only_adiverys_server_confirms(self):
         session = self.start()

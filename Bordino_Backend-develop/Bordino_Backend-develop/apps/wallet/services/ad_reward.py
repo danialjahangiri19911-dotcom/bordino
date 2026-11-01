@@ -41,7 +41,7 @@ DEFAULTS = {
     "AD_DEMO_SECONDS": 15,
     # Adivery (docs.adivery.com): the app's id and its «جایزه‌ای» (rewarded) placement.
     "ADIVERY_APP_ID": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee",
-    "ADIVERY_REWARDED_PLACEMENT_ID": "",
+    "ADIVERY_REWARDED_PLACEMENT_ID": "e7e3f382-c0d7-4b9b-b754-b06e5ee5fac1",
 }
 
 logger = logging.getLogger(__name__)
