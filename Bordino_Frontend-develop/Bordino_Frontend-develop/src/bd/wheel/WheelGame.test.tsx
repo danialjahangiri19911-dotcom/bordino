@@ -27,8 +27,9 @@ jest.mock("../ui", () => ({
 	useRequireLogin: () => true,
 	usePoints: () => ({ points: 1000, account: { id: "acc" }, refetch: jest.fn() }),
 }));
+let cost = "10";
 jest.mock("@/api/lottery/hooks/useGetWheel", () => () => ({
-	data: { result: { name: "گردونه", cost_per_spin: "10", lottery_wheel_prizes: prizes } },
+	data: { result: { name: "گردونه", cost_per_spin: cost, min_bet: 10, max_bet: 500, lottery_wheel_prizes: prizes } },
 	isLoading: false,
 	error: null,
 	refetch: jest.fn(),
@@ -71,6 +72,7 @@ beforeEach(() => {
 	clock = 0;
 	reduce = false;
 	spinAsync.mockClear();
+	cost = "10";
 	window.requestAnimationFrame = (f) => (frames.push(f), frames.length);
 	window.cancelAnimationFrame = () => {
 		frames = [];
@@ -162,6 +164,22 @@ describe("WheelGame", () => {
 		await act(async () => answer({ result: { prize: prizes[1] } }));
 		expect(frames.length).toBe(0);
 		root = createRoot(host); // for afterEach
+	});
+
+	it("sends the chosen bet", async () => {
+		render();
+		await click('[aria-label="زیاد کردن شرط"]');
+		await click(".wh-spin");
+		expect(spinAsync).toHaveBeenCalledWith(expect.objectContaining({ bet: 20 }));
+	});
+
+	it("a free wheel takes no bet and sends none", async () => {
+		cost = "0";
+		render();
+		expect(q(".wh-cost").hidden).toBe(true);
+		await click(".wh-spin");
+		expect(spinAsync).toHaveBeenCalledTimes(1);
+		expect(spinAsync.mock.calls[0][0]).not.toHaveProperty("bet");
 	});
 
 	it("one click, one spin", async () => {

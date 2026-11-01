@@ -73,6 +73,19 @@ describe("AdiveryAd", () => {
 		expect(host.textContent).toContain("فعلاً ویدیویی برای نمایش نیست");
 	});
 
+	it("a result after the player left changes nothing", async () => {
+		let resolve: (v: { rewarded: boolean }) => void = () => undefined;
+		plugin(jest.fn(() => new Promise((done) => (resolve = done))));
+		const onWatched = jest.fn();
+		const onAbort = jest.fn();
+		await act(async () => root.render(<AdiveryAd session={session} onWatched={onWatched} onAbort={onAbort} />));
+		act(() => root.unmount());
+		await act(async () => resolve({ rewarded: false }));
+		expect(onAbort).not.toHaveBeenCalled();
+		expect(onWatched).not.toHaveBeenCalled();
+		root = createRoot(host); // for afterEach
+	});
+
 	it("outside the app: says where it plays", async () => {
 		await act(async () => root.render(<AdiveryAd session={session} onWatched={jest.fn()} onAbort={jest.fn()} />));
 		expect(host.textContent).toContain("فقط در اپ اندروید");

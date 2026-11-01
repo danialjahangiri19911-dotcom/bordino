@@ -88,16 +88,18 @@ export default function WheelGame() {
 	const minBet = wheel?.min_bet ?? base;
 	const maxBet = wheel?.max_bet ?? base;
 	const step = Math.max(1, base || 1);
+	// A free wheel (cost 0) takes no bet: spun as it is, nothing charged.
+	const free = !!wheel && base === 0;
 	const bet = Number(persianNumberConverter(betText ?? String(minBet)));
-	const betOk = Number.isInteger(bet) && bet >= minBet && bet <= maxBet;
+	const betOk = free || (Number.isInteger(bet) && bet >= minBet && bet <= maxBet);
 	// Each slice's chance stays; what it pays grows with the bet (× bet / cost_per_spin).
 	const scale = base && betOk ? bet / base : 1;
 	const live = useMemo(() => slicesFor(prizes, 1, scale), [prizes, scale]);
 	const slices = frozen ?? live;
-	const cost = betOk ? bet : minBet;
+	const cost = free ? 0 : betOk ? bet : minBet;
 	const balance = points.points ?? 0;
 	const enough = points.points !== null && balance >= cost;
-	const betProblem = betText !== null && !betOk ? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} امتیاز باشد.` : null;
+	const betProblem = !free && betText !== null && !betOk ? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} امتیاز باشد.` : null;
 	const setBet = (value: number | string) => {
 		setBetText(String(value));
 		setOutcome(null);
@@ -232,7 +234,7 @@ export default function WheelGame() {
 		setError(null);
 		setCelebrate(false);
 		try {
-			const answer = await spinAsync({ lottery_wheel: wheelId, token_wallet_account: points.account.id, bet });
+			const answer = await spinAsync({ lottery_wheel: wheelId, token_wallet_account: points.account.id, ...(free ? {} : { bet }) });
 			if (!mounted.current) return;
 			const won = answer.result?.prize;
 			// What was won comes from the server's answer (its amount is already × bet / cost); the
@@ -368,7 +370,7 @@ export default function WheelGame() {
 								موجودی <b>{points.points === null ? "…" : fa(balance)}</b>
 							</span>
 						</span>
-						<span className="wh-demo">{cost ? `شرط ${fa(cost)} امتیاز` : "گردونهٔ بردینو"}</span>
+						<span className="wh-demo">{free ? "چرخش رایگان" : cost ? `شرط ${fa(cost)} امتیاز` : "گردونهٔ بردینو"}</span>
 					</div>
 					{!slices.length ? (
 						<div className="wh-state" role="status">
@@ -445,7 +447,7 @@ export default function WheelGame() {
 								<strong>{resultText}</strong>
 							</div>
 							<section className="wh-controls" aria-label="کنترل گردونه">
-								<div className="wh-cost">
+								<div className="wh-cost" hidden={free}>
 									<span>
 										شرط هر چرخش <small>امتیاز</small>
 									</span>

@@ -15,7 +15,16 @@ import type { AdPlayerProps } from "./players";
 export default function AdiveryAd({ session, onWatched, onAbort }: Readonly<AdPlayerProps>) {
 	const [failed, setFailed] = useState<string | null>(null);
 	const started = useRef(false);
-	useBackHandler(!!failed, onAbort);
+	const alive = useRef(true);
+	useBackHandler(true, onAbort);
+
+	useEffect(() => {
+		alive.current = true;
+		return () => {
+			// Gone (the player left): a late result from the SDK changes nothing here.
+			alive.current = false;
+		};
+	}, []);
 
 	useEffect(() => {
 		if (started.current) return;
@@ -28,8 +37,13 @@ export default function AdiveryAd({ session, onWatched, onAbort }: Readonly<AdPl
 		}
 		plugin
 			.show({ appId: app_id, placementId: placement_id, userId: session.session_id })
-			.then(({ rewarded }) => (rewarded ? onWatched() : onAbort()))
+			.then(({ rewarded }) => {
+				if (!alive.current) return;
+				if (rewarded) onWatched();
+				else onAbort();
+			})
 			.catch((e: { code?: string; message?: string }) =>
+				alive.current &&
 				setFailed(
 					(e?.code ?? e?.message) === "no_fill"
 						? "فعلاً ویدیویی برای نمایش نیست؛ کمی بعد دوباره امتحان کن."

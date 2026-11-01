@@ -85,6 +85,31 @@ export default function BackButton() {
 	const [oldApp, setOldApp] = useState(false);
 
 	useBackHandler(!!question, stay);
+	const sheet = useRef<HTMLDivElement>(null);
+	// A question belongs to the page that asked it: another page (browser Back, a link) drops it,
+	// without running its «stay» for a game that is gone.
+	useEffect(() => {
+		setQuestion(null);
+	}, [pathname]);
+	// While it is open nothing under it can be reached (keyboard, screen reader, a game's own
+	// dialog); focus comes back where it was.
+	useEffect(() => {
+		if (!question || !sheet.current) return undefined;
+		const before = document.activeElement as HTMLElement | null;
+		const hidden: Element[] = [];
+		for (let node: Element | null = sheet.current; node && node !== document.body; node = node.parentElement) {
+			for (const sibling of Array.from(node.parentElement?.children ?? [])) {
+				if (sibling !== node && !sibling.hasAttribute("inert")) {
+					sibling.setAttribute("inert", "");
+					hidden.push(sibling);
+				}
+			}
+		}
+		return () => {
+			hidden.forEach((el) => el.removeAttribute("inert"));
+			before?.focus?.({ preventScroll: true });
+		};
+	}, [question]);
 
 	// The leave question works everywhere (a game's exit button asks it in a browser too).
 	useEffect(() => {
@@ -182,7 +207,7 @@ export default function BackButton() {
 	}
 	if (!question) return null;
 	return (
-		<div className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && stay()}>
+		<div ref={sheet} className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && stay()}>
 			<div className="bd-product st-brutal bd-sheet bd-leave" role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
 				<p className="bd-leave-title" id="leave-title">
 					{question.title}

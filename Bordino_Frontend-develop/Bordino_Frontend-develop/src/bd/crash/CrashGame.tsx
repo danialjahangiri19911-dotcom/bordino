@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, handleBackInPage, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
@@ -83,7 +83,8 @@ function useBrowserBackGuard(active: boolean, onBack: () => void) {
 			if (!armed) return;
 			// Back left the guard entry: put it back and ask.
 			window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
-			handler.current();
+			// Like Android Back: the newest overlay first (an open question closes), else the game.
+			if (!handleBackInPage()) handler.current();
 		};
 		window.addEventListener("popstate", onPop);
 		return () => {

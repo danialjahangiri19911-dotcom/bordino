@@ -57,6 +57,8 @@ export default function SudokuGame() {
 	const { chargeAsync, isCharging } = useChargeGamePlay();
 	const [level, setLevel] = useState<Difficulty>("easy");
 	const [confirm, setConfirm] = useState<Confirm>("");
+	// The shared «leave now?» sheet is open: the game is paused under it, without its own dialog.
+	const [asking, setAsking] = useState(false);
 	// A charge on its way (start or continue): the buttons that would replace the board wait.
 	const [paying, setPaying] = useState(false);
 	const [pendingLevel, setPendingLevel] = useState<Difficulty | null>(null);
@@ -78,7 +80,7 @@ export default function SudokuGame() {
 	const completions = getCompletionCounts();
 	const { board, status, selectedCell, conflicts, numberProgress } = game;
 	const playing = status === "playing" && board.length > 0;
-	const modal: Modal = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : game.paused ? "pause" : "");
+	const modal: Modal = confirm || (status === "menu" || !board.length ? "ready" : status === "won" ? "won" : status === "lost" ? "lost" : game.paused && !asking ? "pause" : "");
 	// Android Back: closes the open question, asks «از بازی خارج شوی؟» mid-game, else leaves (as the
 	// header's exit button does).
 	// A charge on its way (start/continue) holds Back: leaving now would lose what is being paid for.
@@ -86,6 +88,7 @@ export default function SudokuGame() {
 	const askExit = () => {
 		const wasPaused = game.paused;
 		if (!wasPaused) game.pause();
+		setAsking(true);
 		askLeave(
 			{
 				title: "از بازی خارج می‌شوی؟",
@@ -98,6 +101,7 @@ export default function SudokuGame() {
 				push(R.games);
 			},
 			() => {
+				setAsking(false);
 				if (!wasPaused) game.resume();
 			},
 		);
