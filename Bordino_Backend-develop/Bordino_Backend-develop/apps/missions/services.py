@@ -89,10 +89,10 @@ def unavailable(mission: Mission, now=None, taken_total: int | None = None) -> s
     return None
 
 
-def _check_can_take(customer: Customer, mission: Mission):
-    if mission.capacity is not None:
-        # Players are locked one by one; the last free place of the mission is locked here.
-        Mission.objects.select_for_update().filter(pk=mission.pk).first()
+def _check_can_take(customer: Customer, mission: Mission) -> Mission:
+    """Checks the mission as it is now, locked (an admin's edit or the last free place cannot cross
+    this try); returns that fresh copy."""
+    mission = Mission.objects.select_for_update().get(pk=mission.pk)
     reason = unavailable(mission)
     if reason:
         raise MissionError(UNAVAILABLE[reason], reason)
@@ -100,13 +100,13 @@ def _check_can_take(customer: Customer, mission: Mission):
         if mission.repeat == Mission.Repeat.DAILY:
             raise MissionError("سهم امروزت از این مأموریت تمام شده؛ فردا دوباره بیا.", "done_today")
         raise MissionError("این مأموریت را قبلاً انجام داده‌ای.", "done")
+    return mission
 
 
 def _check_capacity(mission: Mission):
-    if mission.capacity is not None:
-        Mission.objects.select_for_update().filter(pk=mission.pk).first()
-        if _taken_total(mission) >= mission.capacity:
-            raise MissionError(UNAVAILABLE["full"], "full")
+    mission = Mission.objects.select_for_update().get(pk=mission.pk)
+    if mission.capacity is not None and _taken_total(mission) >= mission.capacity:
+        raise MissionError(UNAVAILABLE["full"], "full")
 
 
 def link_for(attempt: MissionAttempt) -> str:
@@ -123,8 +123,9 @@ class View:
     used: int
     limit: int
     attempt: MissionAttempt | None
-    # This player's tries of the mission still waiting for review (any day).
+    # This player's tries of the mission still waiting for review (any day), and the ones paid.
     pending: int = 0
+    completed: int = 0
 
 
 def listing(customer: Customer) -> list[View]:
@@ -149,6 +150,9 @@ def listing(customer: Customer) -> list[View]:
     )
     pending = dict(
         mine.filter(status=Status.PENDING).values_list("mission_id").annotate(n=Count("id")).values_list("mission_id", "n")
+    )
+    completed = dict(
+        mine.filter(status=Status.COMPLETED).values_list("mission_id").annotate(n=Count("id")).values_list("mission_id", "n")
     )
     latest = {
         a.mission_id: a
@@ -185,7 +189,7 @@ def listing(customer: Customer) -> list[View]:
             state = "rejected"
         else:
             state = "available"
-        views.append(View(m, state, used, limit, last, pending.get(m.pk, 0)))
+        views.append(View(m, state, used, limit, last, pending.get(m.pk, 0), completed.get(m.pk, 0)))
     return views
 
 
@@ -200,7 +204,7 @@ def start(customer: Customer, mission_id) -> MissionAttempt:
         mission = Mission.objects.select_for_update().filter(pk=mission_id).exclude(kind=Mission.Kind.QR).first()
         if mission is None or not mission.is_visible:
             raise NotFound()
-        _check_can_take(customer, mission)
+        mission = _check_can_take(customer, mission)
         if mission.kind != Mission.Kind.VIDEO:
             open_try = (
                 MissionAttempt.objects.filter(customer=customer, mission=mission, status=Status.STARTED)
@@ -270,7 +274,7 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
         mission = attempt.mission
         if attempt.status != Status.STARTED or mission.kind not in (Mission.Kind.VIDEO, Mission.Kind.BANNER):
             raise MissionError("این مأموریت این‌طور انجام نمی‌شود.")
-        _check_can_take(customer, mission)
+        mission = _check_can_take(customer, mission)
         if mission.kind == Mission.Kind.VIDEO:
             if attempt.ad_session_id is None:
                 raise MissionError("ویدیوی این مأموریت پیدا نشد؛ دوباره شروع کن.")
@@ -341,7 +345,7 @@ def submit_proof(customer: Customer, attempt_id, text: str = "", image=None) -> 
             raise MissionError("یک توضیح یا اسکرین‌شات بفرست.")
         if image:
             _check_image(image)
-        _check_can_take(customer, mission)
+        mission = _check_can_take(customer, mission)
         attempt.proof_text = text
         if image:
             attempt.proof_image = image
@@ -356,7 +360,8 @@ def claim_qr(customer: Customer, token: str) -> Claim:
     """A QR at a place, scanned with the phone's camera (its link opens the app)."""
     with transaction.atomic():
         _lock(customer)
-        mission = Mission.objects.filter(qr_token=token, kind=Mission.Kind.QR).first() if token else None
+        # Locked like start(): an admin's edit of the mission cannot cross the scan.
+        mission = Mission.objects.select_for_update().filter(qr_token=token, kind=Mission.Kind.QR).first() if token else None
         if mission is None:
             raise NotFound("این کد QR معتبر نیست.")
         done_today = (
@@ -365,7 +370,7 @@ def claim_qr(customer: Customer, token: str) -> Claim:
             .first()
         )
         try:
-            _check_can_take(customer, mission)
+            mission = _check_can_take(customer, mission)
         except MissionError as exc:
             if exc.code in ("done", "done_today") and done_today:
                 return Claim(done_today, already=True)

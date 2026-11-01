@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../Icon";
 import { fa } from "../format";
 import MissionSheet from "../missions/MissionSheet";
-import { type Mission, type MissionState, awaitsOthers, useMissions } from "../missions/api";
+import { type Mission, type MissionState, useMissions } from "../missions/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { KIND_ICON, STATE_LABEL, progressText } from "../missions/labels";
 import { AppShell, Balance, Chips, EmptyState, LoadState } from "../ui";
@@ -51,16 +51,17 @@ export default function Earn() {
 	const [sort, setSort] = useState<Sort>("suggested");
 	const [openId, setOpenId] = useState<string | null>(null);
 	const queryClient = useQueryClient();
-	const waiting = useRef<Map<string, number>>(new Map());
+	const paid = useRef<number | null>(null);
 
-	// A review approved or a partner's confirmation while the page is open (each waiting try that
-	// is no longer waiting): the balances too.
+	// A review approved or a partner's confirmation while the page is open (more tries paid than
+	// before): the balances too.
 	useEffect(() => {
 		if (!list) return;
-		const now = new Map(list.missions.filter(awaitsOthers).map((m) => [m.id, m.pending + (m.state === "waiting" ? 1 : 0)]));
-		const finished = [...waiting.current].some(([id, n]) => (now.get(id) ?? 0) < n);
-		waiting.current = now;
-		if (finished) void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
+		const now = list.missions.reduce((sum, m) => sum + m.completed, 0);
+		if (paid.current !== null && now > paid.current) {
+			void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
+		}
+		paid.current = now;
 	}, [list, queryClient]);
 
 	const shown = useMemo(

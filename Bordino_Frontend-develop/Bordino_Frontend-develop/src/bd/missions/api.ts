@@ -54,8 +54,9 @@ export interface Mission {
 	order: number;
 	create_time: string;
 	state: MissionState;
-	/** This player's tries still waiting for review (any day). */
+	/** This player's tries still waiting for review (any day), and the ones paid. */
 	pending: number;
+	completed: number;
 	attempt: MissionAttempt | null;
 }
 
@@ -83,7 +84,8 @@ export interface MissionReward {
 export const MISSIONS = "missions/";
 
 /** Waiting for someone else (an admin's review, the partner's server): the list asks again. */
-export const awaitsOthers = (m: Mission) => m.state === "waiting" || m.pending > 0;
+export const awaitsOthers = (m: Mission) =>
+	m.state === "waiting" || m.pending > 0 || (m.verification === "callback" && m.attempt?.status === "started");
 
 export function useMissions() {
 	return useQuery<ResponseApiData<MissionList>>({

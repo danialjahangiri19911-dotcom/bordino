@@ -462,7 +462,10 @@ class MissionTests(TestCase):
             attempt = services.start(self.customer, m.pk)
             services.submit_proof(self.customer, attempt.pk, text, None)
         view = next(v for v in services.listing(self.customer) if v.mission.pk == m.pk)
-        self.assertEqual(view.pending, 2)
+        self.assertEqual((view.pending, view.completed), (2, 0))
+        services.approve(MissionAttempt.objects.filter(mission=m).order_by("create_time").first().pk)
+        view = next(v for v in services.listing(self.customer) if v.mission.pk == m.pk)
+        self.assertEqual((view.pending, view.completed), (1, 1))
 
     def test_admin_shows_the_qr(self):
         try:

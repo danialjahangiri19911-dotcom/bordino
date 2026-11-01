@@ -102,6 +102,7 @@ def mission_payload(view: services.View) -> dict:
         "create_time": m.create_time.isoformat(),
         "state": view.state,
         "pending": view.pending,
+        "completed": view.completed,
         "attempt": attempt_payload(view.attempt),
     }
 
