@@ -111,6 +111,16 @@ describe("WheelGame", () => {
 		expect(q(".wh-history .wh-chip").textContent).toBe("۵۰۰٬۰۰۰ ت");
 	});
 
+	it("a prize drawn with no room (0% when the spin began) is shown, never landed beside", async () => {
+		prizes = [prize(1, 0, 100, "empty"), prize(2, 20, 0)];
+		render();
+		await click(".wh-spin");
+		await reply({ prize: prizes[1] });
+		runSpin();
+		expect(q(".wh-result strong").textContent).toBe("۲۰ امتیاز");
+		expect(q(".wh-selected")).toBeNull();
+	});
+
 	it("history repeats what the server paid, not the cached prize", async () => {
 		render();
 		await click(".wh-spin");

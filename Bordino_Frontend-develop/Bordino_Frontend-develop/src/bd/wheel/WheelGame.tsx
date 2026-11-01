@@ -223,7 +223,8 @@ export default function WheelGame() {
 			// wheel only has to find the slice to land on.
 			const amount = Number(won?.prize_amount || 0);
 			const empty = !won || won.prize_type === "empty" || amount <= 0;
-			const index = won ? snapshot.findIndex((s) => s.prize.id === won.id) : -1;
+			// A slice to land on: the prize's, if this page draws it at all (a 0% slice has no room).
+			const index = won ? snapshot.findIndex((s) => s.prize.id === won.id && s.end - s.start > 0) : -1;
 			const result: Outcome = !won
 				? { won: false, text: "نتیجه رسید؛ کیف‌پول را ببین.", short: "؟", slice: null }
 				: empty
@@ -235,7 +236,7 @@ export default function WheelGame() {
 							slice: index < 0 ? null : index,
 						};
 			if (index < 0) {
-				// A prize this page does not know yet (the wheel changed): shown as it is, no landing.
+				// A prize this page does not know or draw (the wheel changed): shown as it is, no landing.
 				pending.current = result;
 				setFrozen(null);
 				void wheelQuery.refetch();
