@@ -51,14 +51,15 @@ export default function Earn() {
 	const [sort, setSort] = useState<Sort>("suggested");
 	const [openId, setOpenId] = useState<string | null>(null);
 	const queryClient = useQueryClient();
-	const paid = useRef<number | null>(null);
+	const paid = useRef<Map<string, number> | null>(null);
 
-	// A review approved or a partner's confirmation while the page is open (more tries paid than
-	// before): the balances too.
+	// A review approved or a partner's confirmation while the page is open (a mission with more
+	// tries paid than before): the balances too.
 	useEffect(() => {
 		if (!list) return;
-		const now = list.missions.reduce((sum, m) => sum + m.completed, 0);
-		if (paid.current !== null && now > paid.current) {
+		const now = new Map(list.missions.map((m) => [m.id, m.completed]));
+		const before = paid.current;
+		if (before && [...now].some(([id, n]) => n > (before.get(id) ?? n))) {
 			void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
 		}
 		paid.current = now;
