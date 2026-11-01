@@ -9,6 +9,7 @@ import { useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
+import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 import { R, usePoints, useRequireLogin } from "../ui";
 import { type Slice, labelPoint, landingRotation, prizeLabel, sliceAt, slicesFor, spinEasing, wedgePath } from "../wheelMath";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -20,7 +21,6 @@ import useSpinWheel from "@/api/lottery/hooks/useSpinWheel";
 
 // The wheel made by `manage.py seed_wheel`; another one can be opened with ?wheel=<id>.
 const DEFAULT_WHEEL_ID = "11111111-1111-1111-1111-111111111111";
-const MULTIPLIERS = [1, 2, 3, 4, 5];
 const SPIN_MS = 5200;
 const REDUCED_MS = 650;
 const BULBS = 24;
@@ -40,7 +40,7 @@ const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia
 
 /**
  * «گردونه» in the Bordino-Wheel-Game-Design look (neobrutalism), driven by the server: the prizes,
- * the cost, the multiplier's effect and every spin's result come from it; the wheel only shows them
+ * the bet range, the prizes (× bet / cost) and every spin's result come from it; the wheel only shows them
  * (each slice as large as its real chance) and lands on the slice the server chose.
  */
 export default function WheelGame() {
@@ -53,7 +53,8 @@ export default function WheelGame() {
 	const { spinAsync } = useSpinWheel();
 	const scheme = useResolvedScheme();
 
-	const [multiplier, setMultiplier] = useState(1);
+	// The player's bet, like crash and chicken (typed or −/+); null until the wheel tells its range.
+	const [betText, setBetText] = useState<string | null>(null);
 	const [phase, setPhase] = useState<Phase>("ready");
 	const [requesting, setRequesting] = useState(false);
 	const [paused, setPaused] = useState(false);
@@ -83,11 +84,26 @@ export default function WheelGame() {
 	const celebrateTimer = useRef(0);
 
 	const prizes = useMemo(() => wheel?.lottery_wheel_prizes ?? [], [wheel?.lottery_wheel_prizes]);
-	const live = useMemo(() => slicesFor(prizes, multiplier), [prizes, multiplier]);
+	const base = Number(wheel?.cost_per_spin ?? 0);
+	const minBet = wheel?.min_bet ?? base;
+	const maxBet = wheel?.max_bet ?? base;
+	const step = Math.max(1, base || 1);
+	const bet = Number(persianNumberConverter(betText ?? String(minBet)));
+	const betOk = Number.isInteger(bet) && bet >= minBet && bet <= maxBet;
+	// Each slice's chance stays; what it pays grows with the bet (× bet / cost_per_spin).
+	const scale = base && betOk ? bet / base : 1;
+	const live = useMemo(() => slicesFor(prizes, 1, scale), [prizes, scale]);
 	const slices = frozen ?? live;
-	const cost = Number(wheel?.cost_per_spin ?? 0);
+	const cost = betOk ? bet : minBet;
 	const balance = points.points ?? 0;
 	const enough = points.points !== null && balance >= cost;
+	const betProblem = betText !== null && !betOk ? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} امتیاز باشد.` : null;
+	const setBet = (value: number | string) => {
+		setBetText(String(value));
+		setOutcome(null);
+		setFrozen(null);
+		setPhase("ready");
+	};
 	const spinning = phase === "spinning" || requesting;
 
 	// ── sound: one switch for the music and the effects, remembered on this device ──
@@ -204,7 +220,7 @@ export default function WheelGame() {
 	};
 
 	const spin = async () => {
-		if (busy.current || !points.account || !enough || !live.length) return;
+		if (busy.current || !points.account || !enough || !betOk || !live.length) return;
 		busy.current = true;
 		unlocked.current = true;
 		const snapshot = live;
@@ -216,10 +232,10 @@ export default function WheelGame() {
 		setError(null);
 		setCelebrate(false);
 		try {
-			const answer = await spinAsync({ lottery_wheel: wheelId, token_wallet_account: points.account.id, multiplier });
+			const answer = await spinAsync({ lottery_wheel: wheelId, token_wallet_account: points.account.id, bet });
 			if (!mounted.current) return;
 			const won = answer.result?.prize;
-			// What was won comes from the server's answer (its amount is already ×multiplier); the
+			// What was won comes from the server's answer (its amount is already × bet / cost); the
 			// wheel only has to find the slice to land on.
 			const amount = Number(won?.prize_amount || 0);
 			const empty = !won || won.prize_type === "empty" || amount <= 0;
@@ -341,8 +357,8 @@ export default function WheelGame() {
 				</GameBar>
 				<section className="wh-help" hidden={!help}>
 					<b>یک چرخش، یک شانس تازه</b>
-					<p>هر چرخش {cost ? `${fa(cost)} امتیاز` : "به اندازهٔ هزینهٔ گردونه"} از کیف امتیاز کم می‌کند. جایزه را سرور انتخاب می‌کند و گردونه روی همان خانه می‌ایستد؛ اندازهٔ هر خانه همان شانس واقعی آن است.</p>
-					<p>ضریب ×۲ تا ×۵ جایزه را چند برابر و شانس بردنش را به همان نسبت کمتر می‌کند؛ هزینهٔ چرخش ثابت است. جایزهٔ امتیازی به کیف امتیاز و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود.</p>
+					<p>شرط هر چرخش را خودت انتخاب می‌کن{minBet ? `ی (${fa(minBet)} تا ${fa(maxBet)} امتیاز)` : "ی"} و همان از کیف امتیاز کم می‌شود. جایزه را سرور انتخاب می‌کند و گردونه روی همان خانه می‌ایستد؛ اندازهٔ هر خانه همان شانس واقعی آن است.</p>
+					<p>جایزهٔ هر خانه به نسبت شرط بزرگ‌تر می‌شود{base ? `: شرط ${fa(base * 2)} یعنی دو برابرِ جایزه‌های شرط ${fa(base)}` : ""}؛ شانس‌ها ثابت می‌مانند. جایزهٔ امتیازی به کیف امتیاز و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود.</p>
 				</section>
 				<main className="wh-main">
 					<div className="wh-topline">
@@ -352,7 +368,7 @@ export default function WheelGame() {
 								موجودی <b>{points.points === null ? "…" : fa(balance)}</b>
 							</span>
 						</span>
-						<span className="wh-demo">{cost ? `هر چرخش ${fa(cost)} امتیاز` : "گردونهٔ بردینو"}</span>
+						<span className="wh-demo">{cost ? `شرط ${fa(cost)} امتیاز` : "گردونهٔ بردینو"}</span>
 					</div>
 					{!slices.length ? (
 						<div className="wh-state" role="status">
@@ -431,46 +447,43 @@ export default function WheelGame() {
 							<section className="wh-controls" aria-label="کنترل گردونه">
 								<div className="wh-cost">
 									<span>
-										ضریب جایزه <small>هزینه ثابت</small>
+										شرط هر چرخش <small>امتیاز</small>
 									</span>
 									<div className="wh-stepper" dir="ltr">
 										<button
 											type="button"
-											aria-label="کاهش ضریب جایزه"
-											disabled={spinning || multiplier <= MULTIPLIERS[0]}
-											onClick={() => {
-												setMultiplier((m) => Math.max(MULTIPLIERS[0], m - 1));
-												setOutcome(null);
-												setFrozen(null);
-												setPhase("ready");
-											}}
+											aria-label="کم کردن شرط"
+											disabled={spinning || !betOk || bet <= minBet}
+											onClick={() => setBet(Math.max(minBet, (Math.ceil(bet / step) - 1) * step))}
 										>
 											<Icon name="minus" />
 										</button>
-										<output aria-live="polite">
-											<bdi dir="ltr">{fa(multiplier)}×</bdi>
-										</output>
+										<input
+											className="wh-bet"
+											type="text"
+											inputMode="numeric"
+											aria-label="شرط هر چرخش"
+											aria-invalid={!!betProblem}
+											value={betText ?? String(minBet || "")}
+											disabled={spinning}
+											onChange={(e) => setBet(e.target.value.replace(/[^0-9۰-۹٠-٩]/g, "").slice(0, 7))}
+										/>
 										<button
 											type="button"
-											aria-label="افزایش ضریب جایزه"
-											disabled={spinning || multiplier >= MULTIPLIERS[MULTIPLIERS.length - 1]}
-											onClick={() => {
-												setMultiplier((m) => Math.min(MULTIPLIERS[MULTIPLIERS.length - 1], m + 1));
-												setOutcome(null);
-												setFrozen(null);
-												setPhase("ready");
-											}}
+											aria-label="زیاد کردن شرط"
+											disabled={spinning || (betOk && bet >= maxBet)}
+											onClick={() => setBet(betOk ? Math.min(maxBet, (Math.floor(bet / step) + 1) * step) : minBet)}
 										>
 											<Icon name="plus" />
 										</button>
 									</div>
 								</div>
-								<button type="button" className="wh-spin" disabled={spinning || !enough || !points.account} onClick={() => void spin()}>
+								<button type="button" className="wh-spin" disabled={spinning || !enough || !betOk || !points.account} onClick={() => void spin()}>
 									<Icon name={spinning ? "loader-circle" : "rotate-cw"} className={requesting ? "bd-spin" : undefined} />
 									<span>{spinning ? "داره می‌چرخه…" : "بگردون"}</span>
 								</button>
-								<p className="wh-error" role="alert" hidden={!error && (points.points === null || enough || spinning)}>
-									{error ?? `امتیاز کافی نیست؛ هر چرخش ${fa(cost)} امتیاز است.`}
+								<p className="wh-error" role="alert" hidden={!error && !betProblem && (points.points === null || enough || spinning)}>
+									{error ?? betProblem ?? `امتیاز کافی نیست؛ شرط این چرخش ${fa(cost)} امتیاز است.`}
 								</p>
 							</section>
 							<div className="wh-history">

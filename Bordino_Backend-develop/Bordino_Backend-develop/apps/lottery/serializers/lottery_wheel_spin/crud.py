@@ -26,6 +26,8 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
     multiplier = serializers.IntegerField(
         min_value=1, max_value=5, default=1, write_only=True, required=False
     )
+    # The player's bet (between the wheel's min_bet and max_bet); absent = cost_per_spin.
+    bet = serializers.IntegerField(min_value=1, required=False, write_only=True)
     request_id = serializers.CharField(max_length=64, required=False, write_only=True)
     prize = LotteryWheelPrizeMinimalSerializer(read_only=True)
 
@@ -35,6 +37,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
             "lottery_wheel",
             "token_wallet_account",
             "multiplier",
+            "bet",
             "request_id",
             "prize",
             "count",
@@ -52,6 +55,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
                     lottery_wheel=validated_data["lottery_wheel"],
                     token_wallet_account=validated_data["token_wallet_account"],
                     multiplier=validated_data.get("multiplier", 1),
+                    bet=validated_data.get("bet"),
                     request_id=validated_data.get("request_id"),
                 )
             )
@@ -101,9 +105,17 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         except LotteryWheelSpin.DoesNotExist:
             pass
 
+        bet = validated_data.get("bet")
+        if bet is not None:
+            if not lottery_wheel.min_bet <= bet <= lottery_wheel.max_bet:
+                raise serializers.ValidationError(
+                    _("شرط باید بین %(min)s و %(max)s امتیاز باشد.") % {"min": lottery_wheel.min_bet, "max": lottery_wheel.max_bet}
+                )
+            if not lottery_wheel.cost_per_spin:
+                raise serializers.ValidationError(_("این گردونه شرط نمی‌پذیرد."))
         if would_deduction_exceed_negative_limit(
             token_wallet_account.amount,
-            lottery_wheel.cost_per_spin,
+            bet if bet is not None else lottery_wheel.cost_per_spin,
             get_max_negative_limit(token_wallet_account),
         ):
             raise serializers.ValidationError(

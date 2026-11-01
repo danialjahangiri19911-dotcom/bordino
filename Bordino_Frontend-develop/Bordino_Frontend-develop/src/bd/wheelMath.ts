@@ -6,6 +6,11 @@ export function prizeLabel(amount: number, type: WheelPrize["prize_type"]) {
 	return `${fa(amount)} ${type === "cash" ? "تومان" : "امتیاز"}`;
 }
 
+/** What a prize pays at multiplier M and bet scale (bet / cost_per_spin), rounded down as the server does. */
+export function paid(prize: WheelPrize, M = 1, scale = 1): number {
+	return Math.floor(Number(prize.prize_amount || 0) * M * scale + 1e-9);
+}
+
 export interface Slice {
 	prize: WheelPrize;
 	label: string;
@@ -19,7 +24,7 @@ export interface Slice {
  * Slices sized like the odds at multiplier M: a prize pays ×M and is M times rarer, the empty
  * slices take what the prizes give up (the server applies the same rule when it draws).
  */
-export function slicesFor(prizes: WheelPrize[], M: number): Slice[] {
+export function slicesFor(prizes: WheelPrize[], M: number, scale = 1): Slice[] {
 	const nonEmpty = prizes.filter((p) => p.prize_type !== "empty");
 	const empties = prizes.filter((p) => p.prize_type === "empty");
 	// Exact odds (no minimum size): a slice drawn bigger than its chance would mislead the player.
@@ -42,11 +47,11 @@ export function slicesFor(prizes: WheelPrize[], M: number): Slice[] {
 		const span = (Math.max(weights[i], 0) / total) * 360;
 		const slice = {
 			prize,
-			label: prize.prize_type === "empty" ? "پوچ" : prizeLabel(Number(prize.prize_amount || 0) * M, prize.prize_type),
+			label: prize.prize_type === "empty" ? "پوچ" : prizeLabel(paid(prize, M, scale), prize.prize_type),
 			short:
 				prize.prize_type === "empty"
 					? "پوچ"
-					: `${fa(Number(prize.prize_amount || 0) * M)}${prize.prize_type === "cash" ? " ت" : ""}`,
+					: `${fa(paid(prize, M, scale))}${prize.prize_type === "cash" ? " ت" : ""}`,
 			start: at,
 			end: at + span,
 		};

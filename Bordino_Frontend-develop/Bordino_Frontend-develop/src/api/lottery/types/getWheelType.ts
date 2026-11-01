@@ -14,6 +14,9 @@ export interface Wheel {
 	name: string;
 	owner: string;
 	cost_per_spin: string;
+	/** The player's bet per spin (prizes are paid × bet / cost_per_spin). */
+	min_bet?: number;
+	max_bet?: number;
 	max_spins_per_customer: number;
 	lottery_wheel_prizes: WheelPrize[];
 }

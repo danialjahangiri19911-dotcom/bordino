@@ -25,6 +25,10 @@ class LotteryWheel(AbstractBaseModel):
     cost_per_spin = models.DecimalField(
         verbose_name=_("Cost Per Spin"), max_digits=20, decimal_places=0, default=0
     )
+    # The player's bet per spin (like crash and chicken): every prize, cash too, is paid
+    # × bet / cost_per_spin; the chances stay those of the prizes.
+    min_bet = models.PositiveIntegerField(verbose_name=_("Minimum bet"), default=10)
+    max_bet = models.PositiveIntegerField(verbose_name=_("Maximum bet"), default=500)
     max_spins = models.PositiveIntegerField(
         verbose_name=_("Max Spins"),
         default=10,
@@ -39,6 +43,13 @@ class LotteryWheel(AbstractBaseModel):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+
+    def clean(self):
+        super().clean()
+        from django.core.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+        if self.min_bet < 1 or self.max_bet < self.min_bet:
+            raise ValidationError({"max_bet": _("حداقل شرط باید ۱ یا بیشتر و حداکثر شرط از آن کمتر نباشد.")})
 
     def __str__(self):
         return self.name

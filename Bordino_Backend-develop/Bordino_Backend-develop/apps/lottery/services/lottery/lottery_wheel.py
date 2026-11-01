@@ -32,6 +32,8 @@ class LotteryWheelService:
         lottery_wheel: LotteryWheel
         token_wallet_account: TokenWalletAccount
         multiplier: int = 1
+        # The player's bet; None = cost_per_spin. Every prize pays × bet / cost_per_spin.
+        bet: int | None = None
         # One id per spin the app starts; a retry with it gets the first spin back, not a new one.
         request_id: str | None = None
 
@@ -109,6 +111,13 @@ class LotteryWheelService:
         # same order everywhere): two requests that both passed the serializer's check must not
         # both spin past the limit.
         wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
+        base = int(wheel.cost_per_spin)
+        if dto.bet is not None:
+            if not base:
+                raise ValidationError(_("این گردونه شرط نمی‌پذیرد."))
+            if not wheel.min_bet <= int(dto.bet) <= wheel.max_bet:
+                raise ValidationError(_("شرط خارج از بازهٔ این گردونه است."))
+        cost = int(dto.bet) if dto.bet is not None else base
         # A retry of a spin that already happened is answered first — before the limits and the
         # wheel's state, which that very spin may have changed — with exactly what was paid then.
         # The same request id for another wheel or multiplier is not a retry: refused.
@@ -119,7 +128,11 @@ class LotteryWheelService:
                 .first()
             )
             if earlier:
-                if earlier.lottery_wheel_id != wheel.pk or earlier.multiplier != max(1, int(dto.multiplier or 1)):
+                if (
+                    earlier.lottery_wheel_id != wheel.pk
+                    or earlier.multiplier != max(1, int(dto.multiplier or 1))
+                    or int(earlier.cost) != cost
+                ):
                     raise ValidationError(_("This request was already used for another spin."))
                 prize = earlier.prize
                 if prize and prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
@@ -150,19 +163,22 @@ class LotteryWheelService:
         account = balance.lock(dto.token_wallet_account)
         balance.check_debit(
             account,
-            dto.lottery_wheel.cost_per_spin,
+            cost,
             _("Cannot spin: would exceed maximum negative points limit."),
         )
-        balance.add_points(account, -int(dto.lottery_wheel.cost_per_spin))
+        balance.add_points(account, -cost)
 
         multiplier = max(1, int(dto.multiplier or 1))
         selected_prize = self.select_prize(prizes, multiplier)
         if not selected_prize:
             return None
 
-        # مبلغِ جایزه ×M (فقط در حافظه برای پرداخت و پاسخ؛ ردیفِ مدل save نمی‌شود)
+        # مبلغِ جایزه ×M × شرط/هزینه (فقط در حافظه برای پرداخت و پاسخ؛ ردیفِ مدل save نمی‌شود)
         if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY:
-            selected_prize.prize_amount = selected_prize.prize_amount * multiplier
+            scaled = selected_prize.prize_amount * multiplier
+            if dto.bet is not None:
+                scaled = (scaled * cost) // base  # rounded down: never more than the bet's share
+            selected_prize.prize_amount = scaled
 
         target_account = None  # the token account a recharge prize credited (for the history)
         match selected_prize.prize_type:
@@ -216,7 +232,7 @@ class LotteryWheelService:
         LotteryWheelSpinLog.objects.create(
             lottery_wheel=dto.lottery_wheel,
             customer=dto.customer,
-            cost=int(dto.lottery_wheel.cost_per_spin),
+            cost=cost,
             multiplier=multiplier,
             prize=selected_prize if selected_prize.pk else None,
             paid_amount=selected_prize.prize_amount if selected_prize.prize_type != LotteryWheelPrize.PrizeType.EMPTY else 0,

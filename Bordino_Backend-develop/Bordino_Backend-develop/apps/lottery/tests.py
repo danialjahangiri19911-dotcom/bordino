@@ -326,6 +326,49 @@ class AuditPhase2Tests(TestCase):
         self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "request_id": "spin-2"}, format="json")
         self.assertEqual(balance.points_account(self.player).amount, 980)
 
+    def spin_with(self, prize, **body):
+        from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService  # pylint: disable=import-outside-toplevel
+
+        prize = type(prize).objects.get(pk=prize.pk)  # as a real spin gets it: fresh from the database
+        with mock.patch.object(LotteryWheelService, "select_prize", return_value=prize):
+            return self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(self.wheel.pk), **body}, format="json")
+
+    def test_the_bet_is_charged_and_scales_the_prize(self):
+        from apps.lottery.models import LotteryWheelPrize, LotteryWheelSpinLog  # pylint: disable=import-outside-toplevel
+
+        LotteryWheelPrize.objects.filter(pk=self.empty.pk).update(probability=50)
+        twenty = LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="20", prize_amount=20, probability=50, prize_type=LotteryWheelPrize.PrizeType.RECHARGE)
+        r = self.spin_with(twenty, bet=50, request_id="b-1")  # cost 10 → bet 50 = ×5
+        self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual(r.json()["result"]["prize"]["prize_amount"], "100")
+        self.assertEqual(balance.points_account(self.player).amount, 1000 - 50 + 100)
+        log = LotteryWheelSpinLog.objects.get(request_id="b-1")
+        self.assertEqual((log.cost, log.paid_amount), (50, 100))
+        # 15 = ×1.5: 20 → 30; 25 = ×2.5 of 5 → 12 (rounded down)
+        self.spin_with(twenty, bet=15, request_id="b-2")
+        self.assertEqual(LotteryWheelSpinLog.objects.get(request_id="b-2").paid_amount, 30)
+        five = LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="5", prize_amount=5, probability=0, prize_type=LotteryWheelPrize.PrizeType.RECHARGE)
+        self.spin_with(five, bet=25, request_id="b-3")
+        self.assertEqual(LotteryWheelSpinLog.objects.get(request_id="b-3").paid_amount, 12)
+
+    def test_a_bet_outside_the_range_is_refused_and_nothing_is_charged(self):
+        for bet in (9, 501, 0):
+            r = self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(self.wheel.pk), "bet": bet, "request_id": f"x{bet}"}, format="json")
+            self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_a_retry_with_another_bet_is_not_the_same_spin(self):
+        url = "/api/v1/lotteries/lottery-wheel/spin/"
+        self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "bet": 20, "request_id": "r-1"}, format="json")
+        again = self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "bet": 200, "request_id": "r-1"}, format="json")
+        self.assertEqual(again.status_code, 400)
+        self.assertEqual(balance.points_account(self.player).amount, 980)
+
+    def test_the_wheel_tells_its_bet_range(self):
+        body = self.api.get(f"/api/v1/lotteries/lottery-wheel/{self.wheel.pk}/").json()
+        body = body.get("result", body)
+        self.assertEqual((body["min_bet"], body["max_bet"]), (10, 500))
+
     def test_a_negative_wheel_prize_is_refused(self):
         from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
 

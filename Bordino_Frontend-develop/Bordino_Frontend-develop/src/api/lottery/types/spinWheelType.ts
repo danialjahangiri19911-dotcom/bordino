@@ -6,6 +6,8 @@ export interface SpinWheelRequest {
 	token_wallet_account: string;
 	/** ضریبِ انتخابی (۱ تا ۵) */
 	multiplier?: number;
+	/** The player's bet (the wheel's min_bet…max_bet); prizes are paid × bet / cost_per_spin. */
+	bet?: number;
 }
 
 export interface SpinWheelResult {

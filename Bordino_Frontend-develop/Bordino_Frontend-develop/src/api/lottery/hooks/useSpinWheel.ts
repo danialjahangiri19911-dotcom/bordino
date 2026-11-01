@@ -22,10 +22,10 @@ export default function useSpinWheel() {
 		// Through withAuth: an expired access token is renewed and the spin sent again, instead
 		// of a silent 401.
 		// One id per spin, kept until the server answers: a retry gets the same spin back. The
-		// multiplier is part of the key: a spin at another multiplier is another spin, never the
-		// replay of the earlier one.
+		// multiplier and the bet are part of the key: a spin at another bet is another spin, never
+		// the replay of the earlier one.
 		mutationFn: (payload) =>
-			withRequestId(`spin:${payload.lottery_wheel}:${payload.multiplier ?? 1}`, async (requestId) => {
+			withRequestId(`spin:${payload.lottery_wheel}:${payload.multiplier ?? 1}:${payload.bet ?? "-"}`, async (requestId) => {
 				const { data } = await withAuth((token) =>
 					requester.post<SpinWheelApiResponse>(
 						LOTTERY_WHEEL.SPIN,

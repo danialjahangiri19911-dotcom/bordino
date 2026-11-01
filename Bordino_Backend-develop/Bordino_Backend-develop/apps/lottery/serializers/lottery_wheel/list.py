@@ -12,6 +12,8 @@ class LotteryWheelSerializer(BaseModelSerializer):
             "name",
             "owner",
             "cost_per_spin",
+            "min_bet",
+            "max_bet",
             "max_spins_per_customer",
             "lottery_wheel_prizes",
         )

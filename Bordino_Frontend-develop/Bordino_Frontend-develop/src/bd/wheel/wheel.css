@@ -28,3 +28,7 @@
 .wh .wh-state strong { color: var(--w-ink); font-size: 18px; }
 .wh .wh-spin span { white-space: nowrap; }
 .wh[data-phase="spinning"] .wh-spin span { font-size: .82em; }
+/* The bet field in the design's stepper (the design shows a fixed cost there; the app lets the player type the bet). */
+.wh .wh-stepper input.wh-bet { width: 100%; min-width: 0; text-align: center; font: inherit; font-weight: 700; font-size: 20px; color: inherit; background: transparent; border: 0; padding: 4px 0; direction: ltr; }
+.wh .wh-stepper input.wh-bet:focus-visible { outline: 3px solid var(--w-accent); outline-offset: 2px; }
+.wh .wh-stepper input.wh-bet[aria-invalid="true"] { color: #b23750; }
