@@ -75,6 +75,22 @@ class AdiveryTests(TestCase):
         self.assertTrue(claim.json()["result"]["already_rewarded"])
         self.assertEqual(self.points(), 5)
 
+    def test_until_adivery_calls_us_the_app_can_be_trusted_by_a_switch(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        session = self.start()
+        url = f"/api/v1/wallet/ad-reward/sessions/{session['session_id']}/complete/"
+        setting("ADIVERY_TRUST_APP", "true")
+        self.assertEqual(self.api.post(url, {}, format="json").status_code, 409)  # too soon
+        AdRewardSession.objects.filter(pk=session["session_id"]).update(create_time=timezone.now() - timedelta(seconds=6))
+        self.assertEqual(self.api.post(url, {}, format="json").status_code, 200)
+        self.assertEqual(self.points(), 5)
+        # A late confirmation from Adivery changes nothing.
+        self.assertTrue(self.callback(session["session_id"], eid="late").json()["result"]["already"])
+        self.assertEqual(self.points(), 5)
+
     def test_one_event_pays_one_session(self):
         first, second = self.start(), self.start()
         self.callback(first["session_id"], eid="ev-9")

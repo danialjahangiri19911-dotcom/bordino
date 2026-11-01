@@ -42,6 +42,10 @@ DEFAULTS = {
     # Adivery (docs.adivery.com): the app's id and its «جایزه‌ای» (rewarded) placement.
     "ADIVERY_APP_ID": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee",
     "ADIVERY_REWARDED_PLACEMENT_ID": "e7e3f382-c0d7-4b9b-b754-b06e5ee5fac1",
+    # Until Adivery calls our confirmation address (set by Adivery for the placement): trust the
+    # app's «watched» after this many seconds — as safe as the demo, within the same daily limit.
+    "ADIVERY_TRUST_APP": False,
+    "ADIVERY_TRUST_SECONDS": 5,
 }
 
 logger = logging.getLogger(__name__)
@@ -109,7 +113,12 @@ class AdiveryProvider(AdProvider):
         return bool(setting("ADIVERY_APP_ID")) and bool(setting("ADIVERY_REWARDED_PLACEMENT_ID"))
 
     def verify(self, session, evidence):
-        return session.verified_at is not None
+        if session.verified_at is not None:
+            return True
+        if str(setting("ADIVERY_TRUST_APP")).strip().lower() in ("true", "1", "yes", "on"):
+            elapsed = (timezone.now() - session.create_time).total_seconds()
+            return elapsed >= max(1, int(setting("ADIVERY_TRUST_SECONDS")))
+        return False
 
 
 PROVIDERS: dict[str, AdProvider] = {DemoVideoProvider.name: DemoVideoProvider(), AdiveryProvider.name: AdiveryProvider()}
