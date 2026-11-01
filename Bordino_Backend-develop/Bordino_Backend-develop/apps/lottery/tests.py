@@ -389,6 +389,16 @@ class AuditPhase2Tests(TestCase):
         self.assertIn("min_bet", fields)
         self.assertIn("max_bet", fields)
 
+    def test_ticket_purchases_cannot_be_changed_or_deleted_in_the_admin(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransaction  # pylint: disable=import-outside-toplevel
+
+        admin = site._registry[LotteryTicketTransaction]  # pylint: disable=protected-access
+        self.assertFalse(admin.has_change_permission(None))
+        self.assertFalse(admin.has_delete_permission(None))
+        self.assertFalse(admin.has_add_permission(None))
+
     def test_the_wheel_tells_its_bet_range(self):
         body = self.api.get(f"/api/v1/lotteries/lottery-wheel/{self.wheel.pk}/").json()
         body = body.get("result", body)

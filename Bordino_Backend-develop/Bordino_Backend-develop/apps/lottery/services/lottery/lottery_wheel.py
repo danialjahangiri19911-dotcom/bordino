@@ -103,14 +103,15 @@ class LotteryWheelService:
         Returns the awarded prize or None if no prize was awarded.
         """
 
-        prizes = dto.lottery_wheel.lottery_wheel_prizes.all()
-
-        self._validate_prizes(prizes)
-
         # The spin limits again, under the wheel's row lock (wheel first, then the account, the
         # same order everywhere): two requests that both passed the serializer's check must not
         # both spin past the limit.
         wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
+        # The prizes as they are under that lock (an admin's save of the wheel and its prizes
+        # takes the same row): never old prizes with a newly edited cost, or the reverse.
+        prizes = wheel.lottery_wheel_prizes.all()
+
+        self._validate_prizes(prizes)
         base = int(wheel.cost_per_spin)
         if dto.bet is not None and not base:
             raise ValidationError(_("این گردونه رایگان است و شرط نمی‌پذیرد."))

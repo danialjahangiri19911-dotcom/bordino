@@ -6,5 +6,19 @@ from apps.wallet.models.transactions.lottery_ticket import LotteryTicketTransact
 
 @admin.register(LotteryTicketTransaction)
 class LotteryTicketTransactionAdmin(BaseAdmin):
-    autocomplete_fields = ("customer",)
-    list_display = ("id", "lottery", "ticket", "status", "create_time")
+    """Ticket purchases, for reading. Written only by the purchase service: changing one's status or
+    deleting it would pay the points back while its ticket stays in the draw (a refund is a points
+    adjustment instead, which is recorded)."""
+
+    list_display = ("id", "lottery", "ticket", "customer", "amount", "status", "create_time")
+    list_filter = ("status",)
+    search_fields = ("customer__user__phone_number",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
