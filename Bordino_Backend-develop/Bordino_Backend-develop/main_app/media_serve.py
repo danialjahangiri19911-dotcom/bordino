@@ -17,11 +17,13 @@ def serve_media_with_range(request, path, document_root=None, show_indexes=False
     object storage (S3/MinIO) which already supports Range; this shim gives the
     dev server the same behavior.
     """
-    # Proof screenshots (MEDIA_ROOT/private) are shown by the admin only, never as media.
-    if os.path.normpath(path).split(os.sep)[0] == "private":
-        raise Http404
     full_path = os.path.normpath(os.path.join(document_root, path))
     root = os.path.normpath(document_root)
+    # Proof screenshots (MEDIA_ROOT/private) are shown by the admin only, never as media — judged
+    # on the resolved path, so "../media/private/..." is refused too.
+    inside = os.path.relpath(os.path.realpath(full_path), os.path.realpath(root))
+    if inside == "private" or inside.startswith("private" + os.sep) or inside.startswith(".."):
+        raise Http404
     if not full_path.startswith(root) or not os.path.isfile(full_path):
         return static_serve(
             request, path, document_root=document_root, show_indexes=show_indexes

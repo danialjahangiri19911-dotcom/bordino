@@ -431,6 +431,37 @@ class MissionTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual((attempt.status, self.points()), ("pending", 0))
 
+    def test_view_only_staff_never_see_the_partner_key(self):
+        from django.contrib.auth.models import Permission  # pylint: disable=import-outside-toplevel
+
+        m = self.callback_mission()
+        viewer = get_user_model().objects.create_user(phone_number="9120007096", password="x-Pass-123")
+        viewer.is_admin = True
+        viewer.save()
+        viewer.user_permissions.add(Permission.objects.get(codename="view_mission"))
+        self.client.force_login(viewer)
+        page = self.client.get(f"/admin/missions/mission/{m.pk}/change/")
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn(m.callback_secret, page.content.decode())
+        staff = get_user_model().objects.create_superuser(phone_number="9120007095", password="x-Pass-123")
+        self.client.force_login(staff)
+        self.assertIn(m.callback_secret, self.client.get(f"/admin/missions/mission/{m.pk}/change/").content.decode())
+
+    def test_a_broken_unicode_secret_is_refused(self):
+        m = self.callback_mission()
+        attempt = services.start(self.customer, m.pk)
+        with self.assertRaises(services.MissionError) as refused:
+            services.partner_callback(m.pk, attempt.click_id, "\ud800")
+        self.assertEqual(refused.exception.code, "forbidden")
+
+    def test_pending_tries_are_counted(self):
+        m = self.review_mission(repeat=Mission.Repeat.DAILY, daily_limit=2)
+        for text in ("0912", "0913"):
+            attempt = services.start(self.customer, m.pk)
+            services.submit_proof(self.customer, attempt.pk, text, None)
+        view = next(v for v in services.listing(self.customer) if v.mission.pk == m.pk)
+        self.assertEqual(view.pending, 2)
+
     def test_admin_shows_the_qr(self):
         try:
             import segno  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import

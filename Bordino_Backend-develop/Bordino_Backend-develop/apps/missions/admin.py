@@ -70,6 +70,25 @@ class MissionAdmin(admin.ModelAdmin):
             link,
         )
 
+    # The partner's key pays points: only those who may change missions see it (others get the
+    # same row without the key).
+    def _callback_field(self, request, obj):
+        return "partner_callback" if self.has_change_permission(request, obj) else "partner_callback_hidden"
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("qr_code", self._callback_field(request, obj))
+
+    def get_fieldsets(self, request, obj=None):
+        name = self._callback_field(request, obj)
+        return [
+            (title, {**opts, "fields": tuple(name if f == "partner_callback" else f for f in opts["fields"])})
+            for title, opts in self.fieldsets
+        ]
+
+    @admin.display(description="آدرس تأیید برای سرور همکار")
+    def partner_callback_hidden(self, obj):
+        return "فقط کسی که اجازهٔ ویرایش مأموریت دارد کلید را می‌بیند."
+
     @admin.display(description="آدرس تأیید برای سرور همکار")
     def partner_callback(self, obj):
         if not obj or obj.verification != Mission.Verification.CALLBACK or not obj.callback_secret:

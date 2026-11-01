@@ -123,6 +123,8 @@ class View:
     used: int
     limit: int
     attempt: MissionAttempt | None
+    # This player's tries of the mission still waiting for review (any day).
+    pending: int = 0
 
 
 def listing(customer: Customer) -> list[View]:
@@ -144,6 +146,9 @@ def listing(customer: Customer) -> list[View]:
         .values_list("mission_id")
         .annotate(n=Count("id"))
         .values_list("mission_id", "n")
+    )
+    pending = dict(
+        mine.filter(status=Status.PENDING).values_list("mission_id").annotate(n=Count("id")).values_list("mission_id", "n")
     )
     latest = {
         a.mission_id: a
@@ -180,7 +185,7 @@ def listing(customer: Customer) -> list[View]:
             state = "rejected"
         else:
             state = "available"
-        views.append(View(m, state, used, limit, last))
+        views.append(View(m, state, used, limit, last, pending.get(m.pk, 0)))
     return views
 
 
@@ -191,7 +196,8 @@ def start(customer: Customer, mission_id) -> MissionAttempt:
     """Starts (or continues) a try. A video gets its rewarded-ad session; the others get the link."""
     with transaction.atomic():
         _lock(customer)
-        mission = Mission.objects.filter(pk=mission_id).exclude(kind=Mission.Kind.QR).first()
+        # Locked: an admin's edit of the mission (its kind) and a first start never cross.
+        mission = Mission.objects.select_for_update().filter(pk=mission_id).exclude(kind=Mission.Kind.QR).first()
         if mission is None or not mission.is_visible:
             raise NotFound()
         _check_can_take(customer, mission)
@@ -378,7 +384,11 @@ def partner_callback(mission_id, click_id, secret: str) -> Claim:
     mission = Mission.objects.filter(pk=mission_id, verification=Mission.Verification.CALLBACK).first()
     if mission is None or not mission.callback_secret:
         raise NotFound()
-    if not hmac.compare_digest(str(secret or "").encode(), mission.callback_secret.encode()):
+    try:
+        given = str(secret or "").encode()
+    except UnicodeEncodeError:
+        given = b""
+    if not given or not hmac.compare_digest(given, mission.callback_secret.encode()):
         raise MissionError("کلید نادرست است.", "forbidden")
     attempt = MissionAttempt.objects.filter(mission=mission, click_id=click_id).select_related("customer").first()
     if attempt is None:
@@ -392,6 +402,7 @@ def partner_callback(mission_id, click_id, secret: str) -> Claim:
             raise MissionError("این کلیک قابل تأیید نیست.", "conflict")
         # Started while the mission was open: the partner's word still counts if it has ended
         # since (a sign-up can take a while); the player's limit still holds.
+        mission = attempt.mission  # as read under the lock (a capacity changed meanwhile counts)
         if _used(attempt.customer, mission) >= _limit(mission):
             raise MissionError("سهم این بازیکن از این مأموریت پر شده است.", "conflict")
         _check_capacity(mission)

@@ -195,7 +195,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							{m.ends_at ? <li>پایان: {dateText(m.ends_at)}</li> : null}
 						</ul>
 
-						{m.state === "pending" || m.attempt?.status === "pending" ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، امتیاز خودکار اضافه می‌شود.</p> : null}
+						{m.state === "pending" || m.pending > 0 ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، امتیاز خودکار اضافه می‌شود.</p> : null}
 						{m.state === "rejected" && m.attempt?.review_note ? <p className="mi-note mi-note-bad">دلیل رد: {m.attempt.review_note}</p> : null}
 						{m.state === "done" ? <p className="mi-note mi-note-ok">این مأموریت را انجام داده‌ای و امتیازش را گرفته‌ای.</p> : null}
 						{m.state === "done_today" ? <p className="mi-note mi-note-ok">سهم امروزت را گرفتی؛ فردا دوباره بیا.</p> : null}

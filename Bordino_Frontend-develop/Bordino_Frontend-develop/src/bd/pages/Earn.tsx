@@ -51,13 +51,14 @@ export default function Earn() {
 	const [sort, setSort] = useState<Sort>("suggested");
 	const [openId, setOpenId] = useState<string | null>(null);
 	const queryClient = useQueryClient();
-	const waiting = useRef<Set<string>>(new Set());
+	const waiting = useRef<Map<string, number>>(new Map());
 
-	// A review approved or a partner's confirmation while the page is open: the balances too.
+	// A review approved or a partner's confirmation while the page is open (each waiting try that
+	// is no longer waiting): the balances too.
 	useEffect(() => {
 		if (!list) return;
-		const now = new Set(list.missions.filter(awaitsOthers).map((m) => m.id));
-		const finished = [...waiting.current].some((id) => !now.has(id));
+		const now = new Map(list.missions.filter(awaitsOthers).map((m) => [m.id, m.pending + (m.state === "waiting" ? 1 : 0)]));
+		const finished = [...waiting.current].some(([id, n]) => (now.get(id) ?? 0) < n);
 		waiting.current = now;
 		if (finished) void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
 	}, [list, queryClient]);

@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
@@ -185,7 +185,11 @@ class Mission(AbstractBaseModel):
             self.qr_token = new_qr_token()
         if self.verification == self.Verification.CALLBACK and not self.callback_secret:
             self.callback_secret = new_callback_secret()
-        return super().save(*args, **kwargs)
+        with transaction.atomic():
+            if self.pk:
+                # The same lock as a player's start: clean() sees every try started before this edit.
+                Mission.objects.select_for_update().filter(pk=self.pk).first()
+            return super().save(*args, **kwargs)
 
 
 class MissionAttempt(AbstractBaseModel):
