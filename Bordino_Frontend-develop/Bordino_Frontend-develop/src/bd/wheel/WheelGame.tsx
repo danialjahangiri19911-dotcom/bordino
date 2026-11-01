@@ -10,7 +10,7 @@ import { GameBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
 import { R, usePoints, useRequireLogin } from "../ui";
-import { labelPoint, landingRotation, prizeLabel, sliceAt, slicesFor, spinEasing, wedgePath } from "../wheelMath";
+import { type Slice, labelPoint, landingRotation, prizeLabel, sliceAt, slicesFor, spinEasing, wedgePath } from "../wheelMath";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
 import "./wheel.css";
 
@@ -64,6 +64,9 @@ export default function WheelGame() {
 	const [help, setHelp] = useState(false);
 	const [sound, setSound] = useState(true);
 	const [celebrate, setCelebrate] = useState(false);
+	// The wheel as it was when the spin began: a refetch (new odds, new prizes) never moves the
+	// slices under a spin or under its shown result; the live wheel returns at the next change.
+	const [frozen, setFrozen] = useState<Slice[] | null>(null);
 
 	const rotor = useRef<HTMLDivElement>(null);
 	const angle = useRef(0);
@@ -73,9 +76,15 @@ export default function WheelGame() {
 	const music = useRef<Soundtrack | null>(null);
 	const unlocked = useRef(false);
 	const busy = useRef(false);
+	const mounted = useRef(true);
+	const soundOn = useRef(true);
+	const reduced = useRef(false);
+	const spinSlices = useRef<Slice[]>([]);
+	const celebrateTimer = useRef(0);
 
 	const prizes = useMemo(() => wheel?.lottery_wheel_prizes ?? [], [wheel?.lottery_wheel_prizes]);
-	const slices = useMemo(() => slicesFor(prizes, multiplier), [prizes, multiplier]);
+	const live = useMemo(() => slicesFor(prizes, multiplier), [prizes, multiplier]);
+	const slices = frozen ?? live;
 	const cost = Number(wheel?.cost_per_spin ?? 0);
 	const balance = points.points ?? 0;
 	const enough = points.points !== null && balance >= cost;
@@ -89,8 +98,18 @@ export default function WheelGame() {
 			// storage blocked: sound stays on
 		}
 		music.current = createSoundtrack();
-		return () => music.current?.destroy();
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+			window.cancelAnimationFrame(frame.current);
+			frame.current = 0;
+			window.clearTimeout(celebrateTimer.current);
+			music.current?.destroy();
+		};
 	}, []);
+	useEffect(() => {
+		soundOn.current = sound;
+	}, [sound]);
 	const visible = () => typeof document !== "undefined" && !document.hidden;
 	const syncMusic = useCallback(
 		(on = sound, isPaused = paused) => {
@@ -99,8 +118,9 @@ export default function WheelGame() {
 		},
 		[sound, paused],
 	);
+	// Read at the moment of the sound (a mute during a spin silences the rest of it).
 	const effect = (kind: "tick" | "win" | "lose") => {
-		if (sound && unlocked.current && visible()) music.current?.effect(kind);
+		if (soundOn.current && unlocked.current && visible()) music.current?.effect(kind);
 	};
 
 	// ── the turning: one animation frame loop while a spin runs ──
@@ -111,30 +131,38 @@ export default function WheelGame() {
 		const result = pending.current;
 		pending.current = null;
 		busy.current = false;
+		if (!mounted.current) return;
 		setPhase("result");
 		if (!result) return;
 		setOutcome(result);
 		setHistory((h) => [result, ...h].slice(0, HISTORY));
 		setRounds((n) => n + 1);
-		if (sound && unlocked.current && visible()) music.current?.effect(result.won ? "win" : "lose");
+		effect(result.won ? "win" : "lose");
 		if (result.won && !reducedMotion()) {
 			setCelebrate(true);
-			window.setTimeout(() => setCelebrate(false), 1700);
+			window.clearTimeout(celebrateTimer.current);
+			celebrateTimer.current = window.setTimeout(() => setCelebrate(false), 1700);
 		}
 		void points.refetch();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [sound, points.refetch]);
+	}, [points.refetch]);
 
 	const loop = useCallback(
 		(now: number) => {
+			if (!mounted.current) return;
 			const a = anim.current;
 			const dt = a.last ? Math.max(0, now - a.last) : 0;
 			a.last = now;
 			a.elapsed = Math.min(a.duration, a.elapsed + dt);
-			angle.current = a.from + (a.to - a.from) * spinEasing(a.elapsed / a.duration);
+			// Reduced motion: the wheel holds still, then shows where it stopped (no fast turning).
+			angle.current = reduced.current
+				? a.elapsed >= a.duration
+					? a.to
+					: a.from
+				: a.from + (a.to - a.from) * spinEasing(a.elapsed / a.duration);
 			draw();
-			const sector = sliceAt(slices, angle.current);
-			if (sector !== a.sector && now - a.lastTick > 35 && a.duration > REDUCED_MS) {
+			const sector = sliceAt(spinSlices.current, angle.current);
+			if (sector !== a.sector && now - a.lastTick > 35 && !reduced.current) {
 				effect("tick");
 				a.lastTick = now;
 			}
@@ -147,9 +175,8 @@ export default function WheelGame() {
 			frame.current = window.requestAnimationFrame(loop);
 		},
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[slices, finish, sound],
+		[finish],
 	);
-	useEffect(() => () => window.cancelAnimationFrame(frame.current), []);
 	useEffect(draw);
 
 	// Away (another app or tab): the turning waits, the sound stops; «ادامهٔ چرخش» carries on.
@@ -168,6 +195,7 @@ export default function WheelGame() {
 		return () => document.removeEventListener("visibilitychange", onVisibility);
 	}, []);
 	const resume = () => {
+		if (frame.current) return;
 		unlocked.current = true;
 		setPaused(false);
 		anim.current.last = 0;
@@ -176,9 +204,12 @@ export default function WheelGame() {
 	};
 
 	const spin = async () => {
-		if (busy.current || !points.account || !enough || !slices.length) return;
+		if (busy.current || !points.account || !enough || !live.length) return;
 		busy.current = true;
 		unlocked.current = true;
+		const snapshot = live;
+		spinSlices.current = snapshot;
+		setFrozen(snapshot);
 		syncMusic(sound, false);
 		setRequesting(true);
 		setOutcome(null);
@@ -186,39 +217,51 @@ export default function WheelGame() {
 		setCelebrate(false);
 		try {
 			const answer = await spinAsync({ lottery_wheel: wheelId, token_wallet_account: points.account.id, multiplier });
+			if (!mounted.current) return;
 			const won = answer.result?.prize;
-			const index = won ? slices.findIndex((s) => s.prize.id === won.id) : -1;
-			if (!won || index < 0) {
-				// The wheel changed on the server: show what it says, then draw the wheel again.
-				pending.current = null;
-				busy.current = false;
-				setOutcome({ won: false, text: "نتیجه رسید؛ گردونه به‌روز می‌شود. کیف‌پول را ببین.", short: "؟", slice: null });
+			// What was won comes from the server's answer (its amount is already ×multiplier); the
+			// wheel only has to find the slice to land on.
+			const amount = Number(won?.prize_amount || 0);
+			const empty = !won || won.prize_type === "empty" || amount <= 0;
+			const index = won ? snapshot.findIndex((s) => s.prize.id === won.id) : -1;
+			const result: Outcome = !won
+				? { won: false, text: "نتیجه رسید؛ کیف‌پول را ببین.", short: "؟", slice: null }
+				: empty
+					? { won: false, text: "", short: "پوچ", slice: index < 0 ? null : index }
+					: {
+							won: true,
+							text: prizeLabel(amount, won.prize_type),
+							short: `${fa(amount)}${won.prize_type === "cash" ? " ت" : ""}`,
+							slice: index < 0 ? null : index,
+						};
+			if (index < 0) {
+				// A prize this page does not know yet (the wheel changed): shown as it is, no landing.
+				pending.current = result;
+				setFrozen(null);
 				void wheelQuery.refetch();
-				void points.refetch();
-				setPhase("result");
+				finish();
 				return;
 			}
-			const slice = slices[index];
-			const amount = Number(won.prize_amount || 0);
-			pending.current =
-				won.prize_type === "empty" || amount <= 0
-					? { won: false, text: "", short: "پوچ", slice: index }
-					: { won: true, text: prizeLabel(amount, won.prize_type), short: slice.short, slice: index };
+			pending.current = result;
+			const slice = snapshot[index];
 			// Anywhere inside the chosen slice (not on its edge), after five turns.
 			const span = slice.end - slice.start;
 			const target = slice.start + span / 2 + (Math.random() - 0.5) * span * 0.6;
-			const duration = reducedMotion() ? REDUCED_MS : SPIN_MS;
-			anim.current = { from: angle.current, to: landingRotation(angle.current, target), elapsed: 0, duration, last: 0, sector: sliceAt(slices, angle.current), lastTick: -Infinity };
+			reduced.current = reducedMotion();
+			const duration = reduced.current ? REDUCED_MS : SPIN_MS;
+			anim.current = { from: angle.current, to: landingRotation(angle.current, target), elapsed: 0, duration, last: 0, sector: sliceAt(snapshot, angle.current), lastTick: -Infinity };
 			setPhase("spinning");
 			setPaused(false);
 			frame.current = window.requestAnimationFrame(loop);
 		} catch (e) {
 			busy.current = false;
+			if (!mounted.current) return;
 			setError(gameErrorMessage(e));
 			setPhase("ready");
+			setFrozen(null);
 			void points.refetch();
 		} finally {
-			setRequesting(false);
+			if (mounted.current) setRequesting(false);
 		}
 	};
 
@@ -397,6 +440,7 @@ export default function WheelGame() {
 											onClick={() => {
 												setMultiplier((m) => Math.max(MULTIPLIERS[0], m - 1));
 												setOutcome(null);
+												setFrozen(null);
 												setPhase("ready");
 											}}
 										>
@@ -412,6 +456,7 @@ export default function WheelGame() {
 											onClick={() => {
 												setMultiplier((m) => Math.min(MULTIPLIERS[MULTIPLIERS.length - 1], m + 1));
 												setOutcome(null);
+												setFrozen(null);
 												setPhase("ready");
 											}}
 										>

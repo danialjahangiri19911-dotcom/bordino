@@ -70,6 +70,11 @@ export function GameBar({ playing, children }: { playing: boolean; children: Rea
 	}, [playing, show]);
 
 	const hidden = playing && !shown;
+	// Out of sight is out of reach: keyboard focus and screen readers skip the hidden bar's
+	// controls (everything but the handle that brings it back).
+	useEffect(() => {
+		box.current?.querySelectorAll(":scope > :not(.bd-bar-handle)").forEach((el) => el.toggleAttribute("inert", hidden));
+	}, [hidden]);
 	return (
 		<div
 			ref={box}
