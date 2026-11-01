@@ -112,11 +112,8 @@ class LotteryWheelService:
         # both spin past the limit.
         wheel = LotteryWheel.objects.select_for_update().get(pk=dto.lottery_wheel.pk)
         base = int(wheel.cost_per_spin)
-        if dto.bet is not None:
-            if not base:
-                raise ValidationError(_("این گردونه شرط نمی‌پذیرد."))
-            if not wheel.min_bet <= int(dto.bet) <= wheel.max_bet:
-                raise ValidationError(_("شرط خارج از بازهٔ این گردونه است."))
+        if dto.bet is not None and not base:
+            raise ValidationError(_("این گردونه رایگان است و شرط نمی‌پذیرد."))
         cost = int(dto.bet) if dto.bet is not None else base
         # A retry of a spin that already happened is answered first — before the limits and the
         # wheel's state, which that very spin may have changed — with exactly what was paid then.
@@ -140,6 +137,10 @@ class LotteryWheelService:
                         earlier.paid_amount if earlier.paid_amount is not None else prize.prize_amount * earlier.multiplier
                     )
                 return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
+        # A paid wheel's range holds for every new spin, also one that names no bet (it costs
+        # `base`); checked after the retry above, which replays what was decided then.
+        if base and not wheel.min_bet <= cost <= wheel.max_bet:
+            raise ValidationError(_("شرط خارج از بازهٔ این گردونه است."))
         if wheel.status != LotteryWheel.Status.ACTIVE:
             raise ValidationError(_("This wheel is not active."))
         total = LotteryWheelSpin.objects.filter(lottery_wheel=wheel).aggregate(n=Sum("count"))["n"] or 0

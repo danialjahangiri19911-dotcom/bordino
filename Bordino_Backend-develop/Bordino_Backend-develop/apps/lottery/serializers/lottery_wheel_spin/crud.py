@@ -106,13 +106,15 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
             pass
 
         bet = validated_data.get("bet")
-        if bet is not None:
-            if not lottery_wheel.min_bet <= bet <= lottery_wheel.max_bet:
-                raise serializers.ValidationError(
-                    _("شرط باید بین %(min)s و %(max)s امتیاز باشد.") % {"min": lottery_wheel.min_bet, "max": lottery_wheel.max_bet}
-                )
-            if not lottery_wheel.cost_per_spin:
-                raise serializers.ValidationError(_("این گردونه شرط نمی‌پذیرد."))
+        if bet is not None and not lottery_wheel.cost_per_spin:
+            raise serializers.ValidationError(_("این گردونه رایگان است و شرط نمی‌پذیرد."))
+        # A paid wheel's range holds for every spin: a request without `bet` costs cost_per_spin,
+        # which must be inside it too.
+        effective = bet if bet is not None else int(lottery_wheel.cost_per_spin)
+        if lottery_wheel.cost_per_spin and not lottery_wheel.min_bet <= effective <= lottery_wheel.max_bet:
+            raise serializers.ValidationError(
+                _("شرط باید بین %(min)s و %(max)s امتیاز باشد.") % {"min": lottery_wheel.min_bet, "max": lottery_wheel.max_bet}
+            )
         if would_deduction_exceed_negative_limit(
             token_wallet_account.amount,
             bet if bet is not None else lottery_wheel.cost_per_spin,

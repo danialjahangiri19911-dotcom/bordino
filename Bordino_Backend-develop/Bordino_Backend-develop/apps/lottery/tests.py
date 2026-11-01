@@ -364,6 +364,31 @@ class AuditPhase2Tests(TestCase):
         self.assertEqual(again.status_code, 400)
         self.assertEqual(balance.points_account(self.player).amount, 980)
 
+    def test_a_spin_without_a_bet_keeps_to_the_range_too(self):
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(min_bet=50)
+        r = self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(self.wheel.pk), "request_id": "nobet"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_a_free_wheel_spins_without_a_bet_and_refuses_one(self):
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(cost_per_spin=0)
+        url = "/api/v1/lotteries/lottery-wheel/spin/"
+        self.assertIn(self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "request_id": "free"}, format="json").status_code, (200, 201))
+        self.assertEqual(self.api.post(url, {"lottery_wheel": str(self.wheel.pk), "bet": 10, "request_id": "free-bet"}, format="json").status_code, 400)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_the_admin_form_has_the_bet_range(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        fields = [f for _, opts in site._registry[LotteryWheel].fieldsets for f in opts["fields"]]  # pylint: disable=protected-access
+        self.assertIn("min_bet", fields)
+        self.assertIn("max_bet", fields)
+
     def test_the_wheel_tells_its_bet_range(self):
         body = self.api.get(f"/api/v1/lotteries/lottery-wheel/{self.wheel.pk}/").json()
         body = body.get("result", body)

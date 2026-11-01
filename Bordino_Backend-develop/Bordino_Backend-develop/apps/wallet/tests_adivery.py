@@ -91,6 +91,18 @@ class AdiveryTests(TestCase):
         self.assertTrue(self.callback(session["session_id"], eid="late").json()["result"]["already"])
         self.assertEqual(self.points(), 5)
 
+    def test_a_failure_while_paying_asks_adivery_to_call_again_and_then_pays_once(self):
+        from django.db import OperationalError  # pylint: disable=import-outside-toplevel
+
+        session = self.start()
+        with mock.patch.object(ad_reward, "complete", side_effect=OperationalError("db hiccup")):
+            with self.assertRaises(OperationalError):
+                ad_reward.adivery_callback(self.secret, session["session_id"], PLACEMENT, "e-r")
+        self.assertEqual(self.points(), 0)
+        again = self.callback(session["session_id"], eid="e-r")  # Adivery repeats the call
+        self.assertEqual((again.status_code, again.json()["result"]["paid"]), (200, True))
+        self.assertEqual(self.points(), 5)
+
     def test_one_event_pays_one_session(self):
         first, second = self.start(), self.start()
         self.callback(first["session_id"], eid="ev-9")

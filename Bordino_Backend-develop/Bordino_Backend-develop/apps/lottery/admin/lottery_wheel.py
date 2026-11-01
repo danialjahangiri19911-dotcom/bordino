@@ -72,7 +72,7 @@ class LotteryWheelAdmin(BaseAdmin):
                 "description": _(
                     "تعیین می‌کند چرخش با کدام کیفِ امتیاز پرداخت شود و هزینهٔ هر چرخش چقدر باشد."
                 ),
-                "fields": ("tokens_whitelist", "cost_per_spin"),
+                "fields": ("tokens_whitelist", "cost_per_spin", "min_bet", "max_bet"),
             },
         ),
         (

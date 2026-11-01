@@ -284,15 +284,17 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         customer = session.customer
         mission_attempt = getattr(session, "mission_attempt", None) if session.placement.startswith("mission:") else None
     # Paid as the app would claim it (each path pays once and keeps its own limits).
+    from apps.missions import services as missions  # pylint: disable=import-outside-toplevel
+
     try:
         if mission_attempt is not None:
-            from apps.missions import services as missions  # pylint: disable=import-outside-toplevel
-
             result = missions.claim(customer, mission_attempt.pk)
             return Callback(paid=True, already=result.already)
         result = complete(customer, session.pk)
         return Callback(paid=True, already=result.already)
-    except Exception as exc:  # pylint: disable=broad-except
-        # Verified but not paid (the day's limit, an old session...): recorded, not retried.
+    except (AdRewardError, missions.MissionError) as exc:
+        # A rule says no (the day's limit, an old session...): recorded, final — not retried.
         logger.warning("Adivery reward for session %s not paid: %s", session.pk, exc)
         return Callback(paid=False, already=False, reason=str(exc))
+    # Anything else (a database hiccup) is not caught: the answer is an error, Adivery calls again,
+    # and the already-recorded confirmation pays then (once).
