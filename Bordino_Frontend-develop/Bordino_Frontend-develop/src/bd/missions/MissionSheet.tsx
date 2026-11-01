@@ -8,7 +8,7 @@ import { useBackHandler } from "../back";
 import { fa } from "../format";
 import { KIND_ICON, STATE_LABEL, progressText } from "./labels";
 import { PhotoError, openPhoto } from "../photo";
-import { type Mission, claimMission, sendProof, startMission } from "./api";
+import { type Mission, claimMission, openedMission, sendProof, startMission } from "./api";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -83,6 +83,14 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 			setStep({ kind: "idle" });
 			onChanged();
 		}
+	};
+
+	const opened = () => {
+		if (!m.attempt || m.attempt.opened) return;
+		// The banner's wait starts when the server hears of the opening.
+		openedMission(m.attempt.id)
+			.then(({ mission: next }) => update(next))
+			.catch(() => undefined);
 	};
 
 	const claim = async () => {
@@ -187,7 +195,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							{m.ends_at ? <li>پایان: {dateText(m.ends_at)}</li> : null}
 						</ul>
 
-						{m.state === "pending" ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، امتیاز خودکار اضافه می‌شود.</p> : null}
+						{m.state === "pending" || m.attempt?.status === "pending" ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، امتیاز خودکار اضافه می‌شود.</p> : null}
 						{m.state === "rejected" && m.attempt?.review_note ? <p className="mi-note mi-note-bad">دلیل رد: {m.attempt.review_note}</p> : null}
 						{m.state === "done" ? <p className="mi-note mi-note-ok">این مأموریت را انجام داده‌ای و امتیازش را گرفته‌ای.</p> : null}
 						{m.state === "done_today" ? <p className="mi-note mi-note-ok">سهم امروزت را گرفتی؛ فردا دوباره بیا.</p> : null}
@@ -202,14 +210,14 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						) : null}
 
 						{open && m.kind !== "video" && open.link ? (
-							<a className="bd-sheet-item mi-link" href={open.link} {...linkTarget}>
+							<a className="bd-sheet-item mi-link" href={open.link} {...linkTarget} onClick={opened}>
 								<Icon name="external-link" /> {m.kind === "banner" ? "باز کردن بنر" : `رفتن به ${partner}`}
 							</a>
 						) : null}
 						{open && m.kind === "banner" ? (
-							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy || waitSeconds > 0} onClick={() => void claim()}>
+							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy || !open.opened || waitSeconds > 0} onClick={() => void claim()}>
 								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name="coins" />}
-								{waitSeconds > 0 ? `دریافت امتیاز تا ${fa(waitSeconds)} ثانیهٔ دیگر` : `دریافت ${fa(m.points)} امتیاز`}
+								{!open.opened ? "اول بنر را باز کن" : waitSeconds > 0 ? `دریافت امتیاز تا ${fa(waitSeconds)} ثانیهٔ دیگر` : `دریافت ${fa(m.points)} امتیاز`}
 							</button>
 						) : null}
 						{open && m.verification === "callback" ? (

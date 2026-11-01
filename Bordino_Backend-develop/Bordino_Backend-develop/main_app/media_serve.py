@@ -2,7 +2,7 @@ import mimetypes
 import os
 import re
 
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.views.static import serve as static_serve
 
 _RANGE_RE = re.compile(r"bytes\s*=\s*(\d+)-(\d*)", re.IGNORECASE)
@@ -17,6 +17,9 @@ def serve_media_with_range(request, path, document_root=None, show_indexes=False
     object storage (S3/MinIO) which already supports Range; this shim gives the
     dev server the same behavior.
     """
+    # Proof screenshots (MEDIA_ROOT/private) are shown by the admin only, never as media.
+    if os.path.normpath(path).split(os.sep)[0] == "private":
+        raise Http404
     full_path = os.path.normpath(os.path.join(document_root, path))
     root = os.path.normpath(document_root)
     if not full_path.startswith(root) or not os.path.isfile(full_path):

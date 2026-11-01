@@ -37,7 +37,7 @@ class MissionAdmin(admin.ModelAdmin):
     readonly_fields = ("qr_code", "partner_callback")
     actions = ("new_qr",)
 
-    @admin.action(description="ساخت QR تازه (QR قبلی دیگر کار نمی‌کند)")
+    @admin.action(description="ساخت QR تازه (QR قبلی دیگر کار نمی‌کند)", permissions=["change"])
     def new_qr(self, request, queryset):
         done = 0
         for mission in queryset.filter(kind=Mission.Kind.QR):
@@ -90,11 +90,11 @@ class MissionAttemptAdmin(admin.ModelAdmin):
     ordering = ("-create_time",)
     actions = ("approve_selected", "reject_selected")
     fields = (
-        "mission", "customer", "status", "points", "proof_text", "proof_preview", "submitted_at",
+        "mission", "customer", "status", "points", "proof_text", "proof_preview", "opened_at", "submitted_at",
         "review_note", "reviewed_at", "reviewed_by", "completed_at", "click_id",
     )
     readonly_fields = (
-        "mission", "customer", "status", "points", "proof_text", "proof_preview", "submitted_at",
+        "mission", "customer", "status", "points", "proof_text", "proof_preview", "opened_at", "submitted_at",
         "reviewed_at", "reviewed_by", "completed_at", "click_id",
     )
 
@@ -147,12 +147,12 @@ class MissionAttemptAdmin(admin.ModelAdmin):
         if change and "review_note" in form.changed_data:
             obj.save(update_fields=["review_note", "update_time"])
 
-    @admin.action(description="تأیید و پرداخت امتیاز")
+    @admin.action(description="تأیید و پرداخت امتیاز", permissions=["change"])
     def approve_selected(self, request, queryset):
         done = sum(1 for pk in queryset.values_list("pk", flat=True) if services.approve(pk, by=request.user))
         self.message_user(request, f"{done} مورد تأیید و پرداخت شد.", messages.SUCCESS)
 
-    @admin.action(description="رد (با «پیام بررسی» هر مورد)")
+    @admin.action(description="رد (با «پیام بررسی» هر مورد)", permissions=["change"])
     def reject_selected(self, request, queryset):
         done = sum(1 for pk in queryset.values_list("pk", flat=True) if services.reject(pk, by=request.user))
         self.message_user(request, f"{done} مورد رد شد.", messages.WARNING)

@@ -25,7 +25,8 @@ export interface MissionAttempt {
 	review_note: string;
 	/** The partner / banner address (with this try's click id), while the try is open. */
 	link?: string;
-	/** Seconds until a banner's points can be taken. */
+	/** A banner: whether its link was opened (its wait counts from then), and the seconds left. */
+	opened?: boolean;
 	claim_in?: number;
 	/** A video mission's rewarded-ad session. */
 	ad?: Omit<AdSession, "session_id"> & { session_id: string };
@@ -79,11 +80,21 @@ export interface MissionReward {
 
 export const MISSIONS = "missions/";
 
+/** Waiting for someone else (an admin's review, the partner's server): the list asks again. */
+export const awaitsOthers = (m: Mission) => m.state === "pending" || m.state === "waiting" || m.attempt?.status === "pending";
+
 export function useMissions() {
-	return useQuery<ResponseApiData<MissionList>>({ url: MISSIONS, headers: true });
+	return useQuery<ResponseApiData<MissionList>>({
+		url: MISSIONS,
+		headers: true,
+		refetchInterval: (query) => (query.state.data?.data?.result?.missions.some(awaitsOthers) ? 20_000 : false),
+	});
 }
 
 export const startMission = (id: string) => call<{ mission: Mission }>("post", `${MISSIONS}${id}/start/`, {});
+
+/** The player opened the try's link (a banner's wait starts then). */
+export const openedMission = (attemptId: string) => call<{ mission: Mission }>("post", `${MISSIONS}attempts/${attemptId}/opened/`, {});
 
 export const claimMission = (attemptId: string) => call<MissionReward>("post", `${MISSIONS}attempts/${attemptId}/claim/`, {});
 

@@ -6,6 +6,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -66,16 +67,18 @@ class MissionTests(TestCase):
         return next(v for v in services.listing(self.customer) if v.mission.pk == mission.pk).state
 
     def age(self, attempt, seconds):
-        MissionAttempt.objects.filter(pk=attempt.pk).update(create_time=timezone.now() - timedelta(seconds=seconds))
+        """The try was started and its link opened `seconds` ago."""
+        then = timezone.now() - timedelta(seconds=seconds)
+        MissionAttempt.objects.filter(pk=attempt.pk).update(create_time=then, opened_at=then)
 
     # ── kinds and their checks ──
 
     def test_kind_and_verification_must_match(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             self.mission(kind=Mission.Kind.SIGNUP, verification=Mission.Verification.AUTO)
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             self.mission(kind=Mission.Kind.BANNER, verification=Mission.Verification.REVIEW)
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             self.mission(kind=Mission.Kind.SIGNUP, verification=Mission.Verification.CALLBACK, link_url="https://p.ir/")
         qr = self.mission(kind=Mission.Kind.QR, link_url="")
         self.assertTrue(qr.qr_token)
@@ -85,6 +88,11 @@ class MissionTests(TestCase):
         self.assertEqual(self.state(m), "available")
         attempt = services.start(self.customer, m.pk)
         self.assertEqual(self.state(m), "in_progress")
+        MissionAttempt.objects.filter(pk=attempt.pk).update(create_time=timezone.now() - timedelta(minutes=5))
+        with self.assertRaises(services.MissionError) as unopened:
+            services.claim(self.customer, attempt.pk)  # waited, but never opened the banner
+        self.assertEqual(unopened.exception.code, "not_opened")
+        services.mark_opened(self.customer, attempt.pk)
         with self.assertRaises(services.MissionError) as too_soon:
             services.claim(self.customer, attempt.pk)
         self.assertEqual(too_soon.exception.code, "too_soon")
@@ -176,6 +184,11 @@ class MissionTests(TestCase):
     def test_proof_must_be_a_real_image(self):
         m = self.review_mission()
         attempt = services.start(self.customer, m.pk)
+        broken = bytearray(png((64, 64)).read())
+        idat = broken.index(b"IDAT")
+        broken[idat + 10] ^= 0xFF  # a damaged picture: refused, not a server error
+        with self.assertRaises(services.MissionError):
+            services.submit_proof(self.customer, attempt.pk, "0912", SimpleUploadedFile("p.png", bytes(broken), content_type="image/png"))
         fake = SimpleUploadedFile("x.png", b"not an image", content_type="image/png")
         with self.assertRaises(services.MissionError):
             services.submit_proof(self.customer, attempt.pk, "0912", fake)
@@ -191,6 +204,26 @@ class MissionTests(TestCase):
         services.submit_proof(self.customer, attempt.pk, "0912", disguised)
         attempt.refresh_from_db()
         self.assertTrue(attempt.proof_image.name.endswith(".png"), attempt.proof_image.name)
+
+    def test_a_try_under_review_leaves_the_rest_of_the_day_open(self):
+        m = self.review_mission(repeat=Mission.Repeat.DAILY, daily_limit=2)
+        first = services.start(self.customer, m.pk)
+        services.submit_proof(self.customer, first.pk, "0912", None)
+        self.assertEqual(self.state(m), "available")
+        second = services.start(self.customer, m.pk)
+        services.submit_proof(self.customer, second.pk, "0913", None)
+        self.assertEqual(self.state(m), "pending")
+
+    def test_kind_cannot_change_once_players_started(self):
+        m = self.review_mission()
+        services.start(self.customer, m.pk)
+        m.kind = Mission.Kind.BANNER
+        m.verification = Mission.Verification.AUTO
+        with self.assertRaises(ValidationError):
+            m.save()
+        m.refresh_from_db()
+        m.points = 60  # other fields still change
+        m.save()
 
     def test_start_continues_an_open_try(self):
         m = self.review_mission()
@@ -224,6 +257,25 @@ class MissionTests(TestCase):
         self.assertTrue(services.partner_callback(m.pk, attempt.click_id, m.callback_secret).already)
         self.assertEqual(self.points(), 30)
         self.assertEqual(self.state(m), "done")
+
+    def test_callback_never_pays_past_the_capacity(self):
+        m = self.callback_mission()
+        Mission.objects.filter(pk=m.pk).update(capacity=1)
+        m.refresh_from_db()
+        first = services.start(self.customer, m.pk)
+        other = make_player("9120007005").customer
+        second = services.start(other, m.pk)
+        services.partner_callback(m.pk, first.click_id, m.callback_secret)
+        with self.assertRaises(services.MissionError) as full:
+            services.partner_callback(m.pk, second.click_id, m.callback_secret)
+        self.assertEqual(full.exception.code, "full")
+        self.assertEqual(MissionAttempt.objects.filter(mission=m, status="completed").count(), 1)
+
+    def test_a_non_ascii_secret_is_refused_not_a_crash(self):
+        m = self.callback_mission()
+        attempt = services.start(self.customer, m.pk)
+        response = APIClient().get(f"/api/v1/missions/callback/{m.pk}/", {"click_id": str(attempt.click_id), "secret": "غلط"})
+        self.assertEqual(response.status_code, 403)
 
     def test_callback_api(self):
         m = self.callback_mission()
@@ -273,7 +325,7 @@ class MissionTests(TestCase):
         api = APIClient()
         api.force_authenticate(self.user)
         refused = api.post(f"/api/v1/wallet/ad-reward/sessions/{attempt.ad_session_id}/complete/", {}, format="json")
-        self.assertGreaterEqual(refused.status_code, 400)
+        self.assertEqual(refused.status_code, 409)
         self.assertEqual(self.points(), 0)
         services.claim(self.customer, attempt.pk)
         self.assertEqual(self.points(), 40)
@@ -307,7 +359,8 @@ class MissionTests(TestCase):
         self.assertGreater(started["attempt"]["claim_in"], 0)
         attempt_id = started["attempt"]["id"]
         self.assertEqual(api.post(f"/api/v1/missions/attempts/{attempt_id}/claim/").status_code, 409)
-        MissionAttempt.objects.filter(pk=attempt_id).update(create_time=timezone.now() - timedelta(seconds=30))
+        self.assertEqual(api.post(f"/api/v1/missions/attempts/{attempt_id}/opened/").status_code, 200)
+        MissionAttempt.objects.filter(pk=attempt_id).update(opened_at=timezone.now() - timedelta(seconds=30))
         done = api.post(f"/api/v1/missions/attempts/{attempt_id}/claim/").json()["result"]
         self.assertEqual((done["points"], done["points_balance"], done["mission"]["state"]), (7, 7, "done"))
         tx = ActivityTransaction.objects.get(section="mission")
@@ -362,6 +415,21 @@ class MissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.points(), 50)
         self.assertTrue(queued.called)
+
+    def test_view_only_staff_cannot_approve(self):
+        from django.contrib.auth.models import Permission  # pylint: disable=import-outside-toplevel
+
+        m = self.review_mission()
+        attempt = services.start(self.customer, m.pk)
+        services.submit_proof(self.customer, attempt.pk, "0912", None)
+        viewer = get_user_model().objects.create_user(phone_number="9120007097", password="x-Pass-123")
+        viewer.is_admin = True  # staff (is_staff follows is_admin), not a superuser
+        viewer.save()
+        viewer.user_permissions.add(Permission.objects.get(codename="view_missionattempt"))
+        self.client.force_login(viewer)
+        self.client.post("/admin/missions/missionattempt/", {"action": "approve_selected", "_selected_action": [str(attempt.pk)]})
+        attempt.refresh_from_db()
+        self.assertEqual((attempt.status, self.points()), ("pending", 0))
 
     def test_admin_shows_the_qr(self):
         try:

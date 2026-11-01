@@ -59,8 +59,12 @@ def attempt_payload(attempt: MissionAttempt | None) -> dict | None:
         if mission.link_url:
             body["link"] = services.link_for(attempt)
         if mission.kind == Mission.Kind.BANNER:
-            wait = mission.min_seconds - (timezone.now() - attempt.create_time).total_seconds()
-            body["claim_in"] = max(0, int(wait + 0.999))
+            body["opened"] = attempt.opened_at is not None
+            if attempt.opened_at:
+                wait = mission.min_seconds - (timezone.now() - attempt.opened_at).total_seconds()
+                body["claim_in"] = max(0, int(wait + 0.999))
+            else:
+                body["claim_in"] = mission.min_seconds
         if attempt.ad_session_id and mission.kind == Mission.Kind.VIDEO:
             session = attempt.ad_session
             body["ad"] = {
@@ -164,6 +168,22 @@ class MissionClaimView(APIView):
                 "mission": _one(customer, result.attempt.mission_id),
             }
         )
+
+
+class MissionOpenedView(APIView):
+    """The player opened the try's link (a banner's wait starts here)."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="The mission's link was opened")
+    def post(self, request, attempt_id):
+        try:
+            customer = _customer(request)
+            attempt = services.mark_opened(customer, attempt_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response({"mission": _one(customer, attempt.mission_id)})
 
 
 class ProofSerializer(serializers.Serializer):

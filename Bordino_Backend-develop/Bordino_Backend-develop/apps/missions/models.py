@@ -172,6 +172,11 @@ class Mission(AbstractBaseModel):
             errors["link_url"] = _("برای تأیید سرور همکار، {click_id} باید در لینک باشد.")
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             errors["ends_at"] = _("پایان باید بعد از شروع باشد.")
+        if self.pk and self.attempts.exists():
+            # Open tries were started under these rules: changing them would let a try skip its check.
+            before = Mission.objects.filter(pk=self.pk).values("kind", "verification").first()
+            if before and (before["kind"], before["verification"]) != (self.kind, self.verification):
+                errors["kind"] = _("بعد از شروع بازیکنان، نوع و روش تأیید عوض نمی‌شود؛ مأموریت تازه بسازید.")
         if errors:
             raise ValidationError(errors)
 
@@ -208,6 +213,8 @@ class MissionAttempt(AbstractBaseModel):
     proof_image = models.FileField(
         storage=private_storage, upload_to=proof_path, blank=True, verbose_name=_("اسکرین‌شات")
     )
+    # When the player opened the banner's link (its wait counts from here).
+    opened_at = models.DateTimeField(null=True, blank=True, verbose_name=_("زمان باز کردن لینک"))
     submitted_at = models.DateTimeField(null=True, blank=True, verbose_name=_("زمان ارسال مدرک"))
     review_note = models.CharField(
         max_length=300, blank=True, verbose_name=_("پیام بررسی"), help_text=_("دلیل رد، که بازیکن می‌بیند.")

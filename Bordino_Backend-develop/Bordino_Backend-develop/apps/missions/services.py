@@ -102,6 +102,13 @@ def _check_can_take(customer: Customer, mission: Mission):
         raise MissionError("این مأموریت را قبلاً انجام داده‌ای.", "done")
 
 
+def _check_capacity(mission: Mission):
+    if mission.capacity is not None:
+        Mission.objects.select_for_update().filter(pk=mission.pk).first()
+        if _taken_total(mission) >= mission.capacity:
+            raise MissionError(UNAVAILABLE["full"], "full")
+
+
 def link_for(attempt: MissionAttempt) -> str:
     return (attempt.mission.link_url or "").replace("{click_id}", str(attempt.click_id))
 
@@ -158,7 +165,7 @@ def listing(customer: Customer) -> list[View]:
         last = latest.get(m.pk)
         reason = unavailable(m, now, taken.get(m.pk, 0))
         this_slot = last is not None and (not daily or last.day in (None, today))
-        if last and last.status == Status.PENDING and this_slot:
+        if last and last.status == Status.PENDING and this_slot and used >= limit:
             state = "pending"
         elif used >= limit:
             state = "done_today" if daily else "done"
@@ -267,11 +274,23 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
                 raise MissionError(str(exc)) from exc
             _pay(attempt, result.session.activity_transaction)
         else:
-            wait = mission.min_seconds - (timezone.now() - attempt.create_time).total_seconds()
+            if attempt.opened_at is None:
+                raise MissionError("اول بنر را باز کن.", "not_opened")
+            wait = mission.min_seconds - (timezone.now() - attempt.opened_at).total_seconds()
             if wait > 0:
                 raise MissionError(f"{int(wait) + 1} ثانیهٔ دیگر امتیاز را بگیر.", "too_soon")
             _pay(attempt)
         return Claim(attempt, already=False)
+
+
+def mark_opened(customer: Customer, attempt_id) -> MissionAttempt:
+    """The player opened the try's link (the banner's wait starts at the first opening)."""
+    with transaction.atomic():
+        attempt = _locked_attempt(customer, attempt_id)
+        if attempt.status == Status.STARTED and attempt.opened_at is None:
+            attempt.opened_at = timezone.now()
+            attempt.save(update_fields=["opened_at", "update_time"])
+        return attempt
 
 
 def _check_image(image):
@@ -285,7 +304,7 @@ def _check_image(image):
         with Image.open(image) as picture:
             kind = picture.format
             picture.verify()
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, Image.DecompressionBombError) as exc:
         raise MissionError("این فایل تصویر نیست.") from exc
     if kind not in PROOF_FORMATS:
         raise MissionError("تصویر باید JPG، PNG یا WEBP باشد.")
@@ -359,7 +378,7 @@ def partner_callback(mission_id, click_id, secret: str) -> Claim:
     mission = Mission.objects.filter(pk=mission_id, verification=Mission.Verification.CALLBACK).first()
     if mission is None or not mission.callback_secret:
         raise NotFound()
-    if not hmac.compare_digest(str(secret or ""), mission.callback_secret):
+    if not hmac.compare_digest(str(secret or "").encode(), mission.callback_secret.encode()):
         raise MissionError("کلید نادرست است.", "forbidden")
     attempt = MissionAttempt.objects.filter(mission=mission, click_id=click_id).select_related("customer").first()
     if attempt is None:
@@ -375,6 +394,7 @@ def partner_callback(mission_id, click_id, secret: str) -> Claim:
         # since (a sign-up can take a while); the player's limit still holds.
         if _used(attempt.customer, mission) >= _limit(mission):
             raise MissionError("سهم این بازیکن از این مأموریت پر شده است.", "conflict")
+        _check_capacity(mission)
         _pay(attempt)
     _notify_paid(attempt)
     return Claim(attempt, already=False)
@@ -416,8 +436,12 @@ def approve(attempt_id, by=None) -> bool:
 
 def reject(attempt_id, by=None, note: str = "") -> bool:
     with transaction.atomic():
-        attempt = MissionAttempt.objects.select_for_update().select_related("mission", "customer").filter(pk=attempt_id).first()
-        if attempt is None or attempt.status != Status.PENDING:
+        attempt = MissionAttempt.objects.filter(pk=attempt_id).select_related("customer").first()
+        if attempt is None:
+            return False
+        _lock(attempt.customer)  # the player first, then the try: the same order as approve()
+        attempt = _locked_attempt(attempt.customer, attempt.pk)
+        if attempt.status != Status.PENDING:
             return False
         attempt.status = Status.REJECTED
         attempt.review_note = (note or attempt.review_note or "مدرک فرستاده‌شده کافی نبود.")[:300]

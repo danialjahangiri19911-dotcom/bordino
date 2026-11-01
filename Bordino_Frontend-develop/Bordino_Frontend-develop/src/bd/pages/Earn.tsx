@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Icon from "../Icon";
 import { fa } from "../format";
 import MissionSheet from "../missions/MissionSheet";
-import { type Mission, type MissionState, useMissions } from "../missions/api";
+import { type Mission, type MissionState, awaitsOthers, useMissions } from "../missions/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { KIND_ICON, STATE_LABEL, progressText } from "../missions/labels";
 import { AppShell, Balance, Chips, EmptyState, LoadState } from "../ui";
 
@@ -49,6 +50,17 @@ export default function Earn() {
 	const [group, setGroup] = useState("all");
 	const [sort, setSort] = useState<Sort>("suggested");
 	const [openId, setOpenId] = useState<string | null>(null);
+	const queryClient = useQueryClient();
+	const waiting = useRef<Set<string>>(new Set());
+
+	// A review approved or a partner's confirmation while the page is open: the balances too.
+	useEffect(() => {
+		if (!list) return;
+		const now = new Set(list.missions.filter(awaitsOthers).map((m) => m.id));
+		const finished = [...waiting.current].some((id) => !now.has(id));
+		waiting.current = now;
+		if (finished) void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
+	}, [list, queryClient]);
 
 	const shown = useMemo(
 		() => sorted((list?.missions ?? []).filter((m) => group === "all" || m.category === group), sort),
