@@ -6,6 +6,11 @@ from apps.wallet.models import CurrencyTransaction
 
 @register(CurrencyTransaction)
 class CurrencyTransactionAdmin(BaseAdmin):
+    # A withdrawal is never deleted: its record (and request id, which stops a replay) stays; a
+    # pending one is cancelled through its status, which returns the money once.
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     list_display = (
         "id",
         "amount",

@@ -7,6 +7,7 @@ from apps.django_helper.admin.base import BaseAdmin
 from apps.wallet.models.token_wallet_account import TokenWalletAccount
 from apps.wallet.admin.safe_save import save_changed_fields
 from apps.wallet.services.adjust import adjust_points
+from apps.wallet.admin.safe_save import LockedOwnershipAdmin
 
 
 class TokenWalletAccountForm(forms.ModelForm):
@@ -30,7 +31,8 @@ class TokenWalletAccountForm(forms.ModelForm):
 
 
 @register(TokenWalletAccount)
-class TokenWalletAccountAdmin(BaseAdmin):
+class TokenWalletAccountAdmin(LockedOwnershipAdmin, BaseAdmin):
+    locked_on_change = ('wallet', 'token', 'preset_wallet')
     form = TokenWalletAccountForm
     list_display = (
         "id",
@@ -68,12 +70,19 @@ class TokenWalletAccountAdmin(BaseAdmin):
             super().save_model(request, obj, form, change)
         delta = form.cleaned_data.get("adjust_by")
         if delta:
-            adjust_points(obj, delta, request.user)
+            try:
+                adjust_points(obj, delta, request.user)
+            except ValueError as exc:
+                self.message_user(request, str(exc), messages.ERROR)
 
     def _adjust(self, request, queryset, delta):
         updated = 0
         for account in queryset:
-            adjust_points(account, delta, request.user)
+            try:
+                adjust_points(account, delta, request.user)
+            except ValueError as exc:
+                self.message_user(request, f"{account}: {exc}", messages.ERROR)
+                continue
             updated += 1
         self.message_user(
             request,

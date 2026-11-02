@@ -14,10 +14,9 @@ from apps.wallet.services.utils import get_max_negative_limit, would_deduction_e
 
 
 class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
-    # Only active wheels can be spun (the view's queryset does not limit this field).
-    lottery_wheel = serializers.PrimaryKeyRelatedField(
-        queryset=LotteryWheel.objects.filter(status=LotteryWheel.Status.ACTIVE)
-    )
+    # Only active wheels take new spins (checked in validate and the service); a retry of a spin
+    # made before the wheel was switched off still gets its answer.
+    lottery_wheel = serializers.PrimaryKeyRelatedField(queryset=LotteryWheel.objects.all())
     # Accepted for old clients and ignored: the spin is always paid from the player's own points
     # account, which the server picks (an id from the client could name anyone's account).
     token_wallet_account = serializers.PrimaryKeyRelatedField(
@@ -28,7 +27,8 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
     )
     # The player's bet (between the wheel's min_bet and max_bet); absent = cost_per_spin.
     bet = serializers.IntegerField(min_value=1, required=False, write_only=True)
-    request_id = serializers.CharField(max_length=64, required=False, write_only=True)
+    # Required (the app always sends one): a retry after a lost answer is the same spin, charged once.
+    request_id = serializers.CharField(max_length=64, write_only=True)
     prize = LotteryWheelPrizeMinimalSerializer(read_only=True)
 
     class Meta:
@@ -80,6 +80,8 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         request_id = validated_data.get("request_id")
         if request_id and LotteryWheelSpinLog.objects.filter(customer=user.customer, request_id=request_id).exists():
             return validated_data
+        if lottery_wheel.status != LotteryWheel.Status.ACTIVE:
+            raise serializers.ValidationError(_("This wheel is not active."))
 
         # Check total spins for the wheel (only this wheel)
         total_spins = (

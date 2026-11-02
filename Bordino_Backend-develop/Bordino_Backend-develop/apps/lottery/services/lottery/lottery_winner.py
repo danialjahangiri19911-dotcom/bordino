@@ -198,3 +198,36 @@ class LotteryWinnerService:
         self.lottery.save()
 
         return results
+
+
+def pay_pending_prize(prize_transaction_id) -> bool:
+    """Pays a lottery prize the draw could not pay (the winner's cash wallet was missing or
+    expired), once that wallet is usable: locked, paid, marked completed — never twice. False when
+    it was not pending, or still cannot be paid."""
+    from apps.wallet.models.transactions.lottery_prize import LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+    with transaction.atomic():
+        tx = (
+            LotteryPrizeTransaction.objects.select_for_update()
+            .select_related("ticket__customer__user")
+            .filter(pk=prize_transaction_id)
+            .first()
+        )
+        if tx is None or tx.status != LotteryPrizeTransaction.Status.PENDING or tx.prize_amount <= 0:
+            return False
+        customer = tx.ticket.customer
+        try:
+            with transaction.atomic():
+                CurrencyWalletAccountTransferService().send_prize_to_customer(
+                    CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
+                        prize_amount=tx.prize_amount,
+                        customer=customer,
+                        destination_wallet_account=balance.currency_account(customer.user),
+                    )
+                )
+        except (ValidationError, DRFValidationError) as exc:
+            logging.warning("Pending lottery prize %s still not payable: %s", tx.pk, exc)
+            return False
+        tx.status = LotteryPrizeTransaction.Status.COMPLETED
+        tx.save(update_fields=["status", "update_time"])
+        return True

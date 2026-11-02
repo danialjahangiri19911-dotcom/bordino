@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -23,7 +24,8 @@ class LotteryWheel(AbstractBaseModel):
         related_name="lottery_wheels",
     )
     cost_per_spin = models.DecimalField(
-        verbose_name=_("Cost Per Spin"), max_digits=20, decimal_places=0, default=0
+        verbose_name=_("Cost Per Spin"), max_digits=20, decimal_places=0, default=0,
+        validators=[MinValueValidator(0)],
     )
     # The player's bet per spin (like crash and chicken): every prize, cash too, is paid
     # × bet / cost_per_spin; the chances stay those of the prizes.

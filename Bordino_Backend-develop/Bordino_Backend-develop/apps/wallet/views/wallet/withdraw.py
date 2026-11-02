@@ -86,6 +86,12 @@ class CurrencyWithdrawViewSet(ViewSet):
                     {"error": _("Bank account not found")}, status=status.HTTP_404_NOT_FOUND
                 )
 
+            # Only money that is there goes to a bank account: never an overdraft, whatever the
+            # wallet's negative allowance (that is for in-app spending, not payouts).
+            if currency_account.balance < amount:
+                return Response(
+                    {"error": _("موجودی نقدی برای این برداشت کافی نیست.")}, status=status.HTTP_400_BAD_REQUEST
+                )
             try:
                 balance.check_debit(
                     currency_account,

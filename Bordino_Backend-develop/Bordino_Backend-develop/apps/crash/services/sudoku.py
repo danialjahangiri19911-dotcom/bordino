@@ -220,7 +220,7 @@ def start(user, difficulty: str, request_id: str) -> tuple[SudokuRound, int]:
     # The puzzle first (it takes a moment), outside the transaction that locks the wallet.
     puzzle, solution = make_puzzle(difficulty)
     with transaction.atomic():
-        result = GamePlayChargeService().charge(user, SECTION, request_id=request_id)
+        result = GamePlayChargeService().charge(user, SECTION, request_id=request_id, difficulty=difficulty)
         charge = GamePlayCharge.objects.get(customer=customer, request_id=request_id)
         round_ = SudokuRound.objects.filter(charge=charge).first()
         if round_ is None:

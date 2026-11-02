@@ -3,10 +3,12 @@ from django.contrib.admin import register
 from apps.django_helper.admin.base import BaseAdmin
 from apps.wallet.admin.safe_save import save_changed_fields
 from apps.wallet.models.currency_wallet_account import CurrencyWalletAccount
+from apps.wallet.admin.safe_save import LockedOwnershipAdmin
 
 
 @register(CurrencyWalletAccount)
-class CurrencyWalletAccountAdmin(BaseAdmin):
+class CurrencyWalletAccountAdmin(LockedOwnershipAdmin, BaseAdmin):
+    locked_on_change = ('wallet', 'preset_wallet')
     list_display = (
         "id",
         "name",

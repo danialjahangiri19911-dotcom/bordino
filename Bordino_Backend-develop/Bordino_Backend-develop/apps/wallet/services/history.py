@@ -97,13 +97,15 @@ def points_history(user, token_account=None):
 
     # These always move the points (L) account: listed for it, not for another token's account.
     if token_account is None or token_account.token.symbol == POINTS_SYMBOL:
+        # Every completed movement, taken away too (a support adjustment of −100): the history
+        # adds up to the balance.
         for t in ActivityTransaction.objects.filter(
-            customer=customer, status=ActivityTransaction.Status.COMPLETED, score_value__gt=0
-        ):
+            customer=customer, status=ActivityTransaction.Status.COMPLETED
+        ).exclude(score_value=0).exclude(score_value__isnull=True):
             title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
             if t.section == "mission" and t.metadata.get("title"):
                 title = f"مأموریت: {t.metadata['title']}"[:120]
-            rows.append(_row(t.id, "activity_reward", title, t.score_value, True, t.create_time))
+            rows.append(_row(t.id, "activity_reward", title, abs(t.score_value), t.score_value > 0, t.create_time))
 
         for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):
             title = GAME_TITLES.get(c.game_name, "بازی")

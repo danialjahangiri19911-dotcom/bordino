@@ -13,3 +13,5 @@ class AwardScoreDTO:
     action_type: str
     metadata: dict[str, Any] | None = None
     description: str | None = None
+    # An event the app reports (it proves nothing): recorded, never paid, whatever is configured.
+    event_only: bool = False

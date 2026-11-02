@@ -16,6 +16,24 @@ class GamePlayChargeService:
     در ادمین برای هر بازی جداگانه قابلِ تنظیم باشد (سودوکو=۱، ۲۰۴۸=۲).
     """
 
+    @staticmethod
+    def price(game_name: str, difficulty: str | None = None) -> int:
+        """The play's price. With a difficulty: that difficulty's active configuration, else the
+        game's general one (no difficulty), else the game's only one; several configurations and
+        none of them this difficulty's is refused (never another difficulty's price)."""
+        configs = list(GameConfigurationQueryRepository.filter_by_game_name(game_name=game_name))
+        if not difficulty:
+            config = configs[0] if configs else None
+        else:
+            config = (
+                next((c for c in configs if c.difficulty_level == difficulty), None)
+                or next((c for c in configs if not c.difficulty_level), None)
+                or (configs[0] if len(configs) == 1 else None)
+            )
+            if config is None and configs:
+                raise ValidationError(_("این سطح بازی فعلاً فعال نیست."))
+        return int(config.play_cost) if config else 0
+
     @dataclass
     class ChargeResult:
         game_name: str
@@ -23,13 +41,12 @@ class GamePlayChargeService:
         new_amount: int
 
     @transaction.atomic
-    def charge(self, user, game_name: str, request_id: str | None = None) -> "GamePlayChargeService.ChargeResult":
+    def charge(
+        self, user, game_name: str, request_id: str | None = None, difficulty: str | None = None
+    ) -> "GamePlayChargeService.ChargeResult":
         game_name = (game_name or "").lower().strip()
 
-        game_config = GameConfigurationQueryRepository.filter_by_game_name(
-            game_name=game_name
-        ).first()
-        cost = int(game_config.play_cost) if game_config else 0
+        cost = self.price(game_name, difficulty)
 
         # The points (L) account, locked: two plays at once cannot both pass the balance check.
         account = balance.points_account(user, lock=True)

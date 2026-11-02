@@ -50,6 +50,15 @@ class LotteryAdmin(BaseAdmin):
     # Drawn by the server at settlement (random, after sales close); shown, never typed in.
     readonly_fields = ("numbers",)
 
+    def get_readonly_fields(self, request, obj=None):
+        fields = tuple(super().get_readonly_fields(request, obj))
+        # Once tickets are sold, the lottery ends only through the draw (the «run_process» action),
+        # which pays its winners: a status typed in here would skip that, and the unit and price
+        # of what was bought stay as they were.
+        if obj is not None and obj.tickets.exists():
+            fields += tuple(f for f in ("status", "token", "ticket_price") if f not in fields)
+        return fields
+
     def save_model(self, request, obj, form, change):
         if not change:
             return super().save_model(request, obj, form, change)

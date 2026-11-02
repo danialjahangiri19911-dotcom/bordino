@@ -43,6 +43,8 @@ class RecordActionCRUDView(GenericViewSet):
                 action_type=serializer.validated_data["action_type"],
                 metadata=serializer.validated_data.get("metadata", {}),
                 description=serializer.validated_data.get("description"),
+                # The app's own report proves nothing: never paid, whatever the configuration says.
+                event_only=True,
             )
 
             response_status = (

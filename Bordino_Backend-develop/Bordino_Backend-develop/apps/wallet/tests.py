@@ -219,7 +219,7 @@ class WheelTests(TestCase):
         victim_account = balance.points_account(self.victim)
         r = self.api.post(
             "/api/v1/lotteries/lottery-wheel/spin/",
-            {"lottery_wheel": str(self.wheel.pk), "token_wallet_account": str(victim_account.pk)},
+            {"request_id": "own-1", "lottery_wheel": str(self.wheel.pk), "token_wallet_account": str(victim_account.pk)},
             format="json",
         )
         self.assertIn(r.status_code, (200, 201), r.content)

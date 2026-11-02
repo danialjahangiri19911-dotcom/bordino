@@ -27,6 +27,7 @@ class RecordActionService:
         action_type: str,
         metadata: dict | None = None,
         description: str | None = None,
+        event_only: bool = False,
     ) -> RecordActionResult:
         if not hasattr(user, "customer"):
             raise ValueError("User does not have a customer profile")
@@ -89,6 +90,7 @@ class RecordActionService:
                     action_type=action_type,
                     metadata=metadata,
                     description=description,
+                    event_only=event_only,
                 )
             )
         except (IntegrityError, ValidationError):

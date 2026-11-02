@@ -23,3 +23,11 @@ class TicketAdmin(BaseAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         return ("lottery", "customer", "numbers") if obj else ()
+
+    # A ticket's status follows the draw (winner / expired): set by hand it would leave a paid
+    # ticket out of the draw with no refund. Read only.
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

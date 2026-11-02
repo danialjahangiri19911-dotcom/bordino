@@ -119,6 +119,8 @@ class ScoreService:
                     else:
                         config.score_value = remaining
 
+        if dto.event_only:
+            config.score_value = 0
         description = dto.description or (
             f"Score awarded: {config.score_value} points for {dto.section}/{dto.action_type}"
         )

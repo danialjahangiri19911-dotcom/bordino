@@ -3,8 +3,6 @@
 import uuid
 
 from django.db import transaction
-from django.db.models import F
-
 from apps.wallet.models import ActivityTransaction, TokenWalletAccount
 from apps.wallet.services import balance
 
@@ -14,8 +12,8 @@ SECTION = "admin_adjust"
 @transaction.atomic
 def adjust_points(account: TokenWalletAccount, delta: int, by=None) -> None:
     """Adds `delta` (negative takes away) to the balance as it is at this moment, never to a copy
-    read earlier; the player's points account gets a history row (ActivityTransaction), any other
-    token account an atomic update."""
+    read earlier, with a history row (ActivityTransaction) for each change. Only a player's points
+    account can be adjusted: any other account would change with no record (refused)."""
     delta = int(delta)
     if not delta:
         return
@@ -35,4 +33,4 @@ def adjust_points(account: TokenWalletAccount, delta: int, by=None) -> None:
             description=f"Support adjustment {delta:+d}",
         )
     else:
-        TokenWalletAccount.objects.filter(pk=account.pk).update(amount=F("amount") + delta)
+        raise ValueError("فقط کیف امتیاز (L) بازیکن را می‌توان دستی تنظیم کرد.")

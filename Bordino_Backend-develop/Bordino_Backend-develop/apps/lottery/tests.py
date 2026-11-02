@@ -456,3 +456,149 @@ class AuditPhase2Tests(TestCase):
         after = Lottery.objects.get(pk=self.lottery.pk)
         self.assertEqual(after.name, "renamed")
         self.assertEqual((after.balance, after.tickets_points_spent), (fresh.balance, fresh.tickets_points_spent))
+
+
+@override_settings(CACHES=LOCMEM)
+class AccountingReviewTests(TestCase):
+    """Codex accounting review, 2026-11-02: each case below once moved money it should not have."""
+
+    def setUp(self):
+        from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+
+        self.player = make_customer("9120004001", points=1000)
+        self.sponsor = Sponsor.objects.create(user=make_customer("9120004002"))
+        self.wheel = LotteryWheel.objects.create(name="w", owner=self.sponsor, cost_per_spin=10, max_spins=100, max_spins_per_customer=10)
+        self.empty = LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="empty", prize_amount=0, probability=50, prize_type=LotteryWheelPrize.PrizeType.EMPTY)
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+        self.url = "/api/v1/lotteries/lottery-wheel/spin/"
+
+    def spin(self, **body):
+        return self.api.post(self.url, {"lottery_wheel": str(self.wheel.pk), **body}, format="json")
+
+    def test_a_prize_of_another_token_is_never_paid_as_points(self):
+        from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import Token  # pylint: disable=import-outside-toplevel
+
+        bonus = Token.objects.create(name="bonus", symbol="BONUS", price=1)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="b", prize_amount=100, probability=50, prize_type=LotteryWheelPrize.PrizeType.RECHARGE, target_token=bonus)
+        r = self.spin(request_id="t-1")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_a_negative_cost_is_refused_and_never_pays_a_debit(self):
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        self.wheel.cost_per_spin = -10
+        with self.assertRaises(ValidationError):
+            self.wheel.full_clean()
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(cost_per_spin=-10)  # an old row
+        self.assertEqual(self.spin(bet=10, request_id="n-1").status_code, 400)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_a_spin_and_a_game_charge_need_their_request_id(self):
+        self.assertEqual(self.spin().status_code, 400)
+        self.assertEqual(self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku"}, format="json").status_code, 400)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_a_retry_is_answered_after_the_wheel_is_switched_off(self):
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+
+        LotteryWheelPrize.objects.filter(pk=self.empty.pk).update(probability=100)
+        first = self.spin(request_id="r-1")
+        self.assertIn(first.status_code, (200, 201), first.content)
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(status=LotteryWheel.Status.INACTIVE)
+        again = self.spin(request_id="r-1")
+        self.assertIn(again.status_code, (200, 201), again.content)
+        self.assertEqual(balance.points_account(self.player).amount, 990)
+        self.assertEqual(self.spin(request_id="r-2").status_code, 400)  # a new spin is refused
+
+    def test_money_records_and_holders_are_protected_in_the_admin(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        from apps.lottery.models import Lottery as L, LotteryWheelSpin  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import BankAccount, CurrencyTransaction, CurrencyWalletAccount, TokenWalletAccount, Wallet  # pylint: disable=import-outside-toplevel
+
+        registry = site._registry  # pylint: disable=protected-access
+        for model in (Wallet, TokenWalletAccount, CurrencyWalletAccount, BankAccount, CurrencyTransaction, Ticket, LotteryWheelSpin):
+            self.assertFalse(registry[model].has_delete_permission(None), model)
+        self.assertFalse(registry[Ticket].has_change_permission(None))
+        self.assertFalse(registry[LotteryWheelSpin].has_change_permission(None))
+        account = balance.points_account(self.player)
+        self.assertTrue({"wallet", "token"} <= set(registry[TokenWalletAccount].get_readonly_fields(None, account)))
+        self.assertTrue({"owner"} <= set(registry[Wallet].get_readonly_fields(None, account.wallet)))
+        token = account.token
+        lottery = L.objects.create(name="l", owner=self.sponsor, token=token, ticket_price=10, status=L.Status.ACTIVE,
+                                   start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1))
+        self.assertNotIn("status", registry[L].get_readonly_fields(None, lottery))
+        TicketPurchaseService().purchase_with_numbers(self.player.customer, [1, 2, 3, 4, 5, 6])
+        self.assertIn("status", registry[L].get_readonly_fields(None, L.objects.get(pk=lottery.pk)))
+
+    def test_a_pending_lottery_prize_is_paid_once_when_the_wallet_works(self):
+        from apps.lottery.services.lottery.lottery_winner import pay_pending_prize  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import CurrencyWalletAccount  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models.transactions.lottery_prize import LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+        token = balance.points_account(self.player).token
+        token.price = 1
+        token.save()
+        lottery = Lottery.objects.create(name="p", owner=self.sponsor, token=token, ticket_price=10, status=Lottery.Status.ACTIVE,
+                                         start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1))
+        TicketPurchaseService().purchase_with_numbers(self.player.customer, [1, 2, 3, 4, 5, 6])
+        ticket = Ticket.objects.get(lottery=lottery, customer=self.player.customer)
+        tx = LotteryPrizeTransaction.objects.create(lottery=lottery, ticket=ticket, prize_amount=500, status=LotteryPrizeTransaction.Status.PENDING)
+        before = CurrencyWalletAccount.objects.get(wallet__owner=self.player).balance
+        self.assertTrue(pay_pending_prize(tx.pk))
+        self.assertFalse(pay_pending_prize(tx.pk))  # never twice
+        self.assertEqual(CurrencyWalletAccount.objects.get(wallet__owner=self.player).balance, before + 500)
+
+
+@override_settings(CACHES=LOCMEM)
+class LedgerCorrectnessTests(TestCase):
+    def setUp(self):
+        self.player = make_customer("9120004101", points=1000, rial=1000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+
+    def test_sudoku_charges_the_chosen_difficultys_price(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services.game_play.charge import GamePlayChargeService  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="easy", play_cost=5, is_active=True)
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="hard", play_cost=50, is_active=True)
+        self.assertEqual(GamePlayChargeService.price("sudoku", "easy"), 5)
+        self.assertEqual(GamePlayChargeService.price("sudoku", "hard"), 50)
+        with self.assertRaises(ValidationError):
+            GamePlayChargeService.price("sudoku", "medium")
+
+    def test_an_app_reported_event_never_pays(self):
+        from apps.configuration.models import GameConfiguration, ScoreConfiguration  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import GamePlayCharge  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="easy", play_cost=0, is_active=True)
+        ScoreConfiguration.objects.create(section="sudoku", action_type="hint_used", score_value=40, is_active=True)
+        GamePlayCharge.objects.create(customer=self.player.customer, token_account=balance.points_account(self.player), game_name="sudoku", cost=0)
+        r = self.api.post("/api/v1/activity/record-action/", {"section": "sudoku", "action_type": "hint_used"}, format="json")
+        self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual(balance.points_account(self.player).amount, 1000)
+
+    def test_adjustments_are_recorded_and_listed_taken_away_too(self):
+        from apps.wallet.services.adjust import adjust_points  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services.history import points_history  # pylint: disable=import-outside-toplevel
+
+        adjust_points(balance.points_account(self.player), -100)
+        rows = [r for r in points_history(self.player) if r["type"] == "activity_reward"]
+        self.assertEqual([(r["amount"], r["is_positive"]) for r in rows], [(100, False)])
+        self.assertEqual(balance.points_account(self.player).amount, 900)
+
+    def test_a_withdrawal_needs_the_money_to_be_there(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import Bank, BankAccount  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.update_or_create(key="WALLET_MAX_NEGATIVE_CURRENCY", defaults={"value": "100000", "value_type": "int"})
+        bank, _ = Bank.objects.get_or_create(code="012", defaults={"name": "b"})
+        account = BankAccount.objects.create(user=self.player, bank=bank, iban="IR062960000000100324200001", account_holder="t", status=BankAccount.Status.APPROVED)
+        r = self.api.post("/api/v1/wallet/currency/withdraw/", {"amount": 5000, "bank_account_id": str(account.pk), "request_id": "w-1"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)

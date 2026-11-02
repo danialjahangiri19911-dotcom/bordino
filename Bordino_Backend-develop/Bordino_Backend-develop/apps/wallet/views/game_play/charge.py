@@ -14,7 +14,9 @@ from apps.wallet.services.game_play.charge import GamePlayChargeService
 class GamePlayChargeSerializer(serializers.Serializer):
     game_name = serializers.CharField()
     # Made by the app for each play it starts and kept for its retries (see GamePlayCharge).
-    request_id = serializers.CharField(max_length=64, required=False, allow_blank=False)
+    # One id per play the app starts (it always sends one): a retry after a lost answer is the
+    # same play, charged once.
+    request_id = serializers.CharField(max_length=64, allow_blank=False)
 
 
 class GamePlayChargeResponseSerializer(serializers.Serializer):
