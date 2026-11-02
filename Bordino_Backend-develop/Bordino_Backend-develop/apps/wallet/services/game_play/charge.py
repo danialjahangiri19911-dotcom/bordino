@@ -45,8 +45,6 @@ class GamePlayChargeService:
         game_name = (game_name or "").lower().strip()
         difficulty = (difficulty or "").strip()
 
-        cost = self.price(game_name, difficulty)
-
         # The points (L) account, locked: two plays at once cannot both pass the balance check.
         account = balance.points_account(user, lock=True)
         if account is None:
@@ -62,6 +60,10 @@ class GamePlayChargeService:
                 return self.ChargeResult(
                     game_name=game_name, cost=earlier.cost, new_amount=int(account.amount), repeated=True
                 )
+
+        # Priced only for a new play: a retry above is answered as it was charged, even if this
+        # level's price was changed or switched off since.
+        cost = self.price(game_name, difficulty)
 
         if cost > 0:
             balance.check_debit(account, cost, _("امتیازِ کافی برای بازی نداری."))

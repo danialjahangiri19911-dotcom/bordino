@@ -657,6 +657,12 @@ class AccountingFollowUpTests(TestCase):
         self.assertEqual((quote("easy"), quote("hard"), quote("medium")), (5, 50, None))
         r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "c-1", "difficulty": "hard"}, format="json")
         self.assertEqual(r.json()["result"]["cost"], 50, r.content)
+        # Its retry, after that level's price was switched off: answered as it was charged.
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.filter(difficulty_level="hard").update(is_active=False)
+        r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "c-1", "difficulty": "hard"}, format="json")
+        self.assertEqual((r.status_code, r.json()["result"]["cost"]), (200, 50), r.content)
         # A level with no price of its own is not on offer (never another level's price).
         r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "c-2", "difficulty": "medium"}, format="json")
         self.assertEqual(r.status_code, 400, r.content)

@@ -18,7 +18,9 @@ export default function useChargeGamePlay() {
 	>({
 		// Through withAuth: an expired access token is renewed and the request sent again.
 		mutationFn: (payload) =>
-			withRequestId(`charge:${payload.game_name}:${payload.difficulty ?? "-"}`, async (requestId) => {
+			// Without a level the key is as before, so a charge still waiting from an older
+			// version keeps its id.
+			withRequestId(payload.difficulty ? `charge:${payload.game_name}:${payload.difficulty}` : `charge:${payload.game_name}`, async (requestId) => {
 				const { data } = await withAuth((token) =>
 					requester.post<ChargeApiResponse>(
 						WALLET.GAME_PLAY_CHARGE,

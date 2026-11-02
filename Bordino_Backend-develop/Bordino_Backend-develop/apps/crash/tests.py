@@ -695,8 +695,10 @@ class SudokuServerTests(TestCase):
         empty_row = next(r for r in range(9) if any(not row[r * 9 + c] for c in range(9)))
         for c in range(9):
             row[empty_row * 9 + c] = solution[empty_row * 9 + c]
-        awarded = self.body(self.report(rid, _grid(row)))["awarded"]
-        self.assertEqual([a["action"] for a in awarded], ["row_completed"])
+        # (The given cells of a random puzzle can make that row finish a box too.)
+        awarded = [a["action"] for a in self.body(self.report(rid, _grid(row)))["awarded"]]
+        self.assertIn("row_completed", awarded)
+        self.assertLessEqual(set(awarded), {"row_completed", "box_completed"})
         # The whole board at once, too fast: rows/boxes yes, the win no.
         r = self.body(self.report(rid, _grid(solution)))
         self.assertNotIn("win_game", [a["action"] for a in r["awarded"]])
