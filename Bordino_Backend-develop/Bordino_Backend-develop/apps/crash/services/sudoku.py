@@ -223,6 +223,9 @@ def start(user, difficulty: str, request_id: str) -> tuple[SudokuRound, int]:
         result = GamePlayChargeService().charge(user, SECTION, request_id=request_id, difficulty=difficulty)
         charge = GamePlayCharge.objects.get(customer=customer, request_id=request_id)
         round_ = SudokuRound.objects.filter(charge=charge).first()
+        if round_ is None and result.repeated:
+            # A charge made for something else (a continuation) never pays for a new board.
+            raise CrashError(_("این درخواست قبلاً برای پرداخت دیگری ثبت شده است."))
         if round_ is None:
             round_ = SudokuRound.objects.create(
                 customer=customer, charge=charge, difficulty=difficulty, puzzle=puzzle, solution=solution

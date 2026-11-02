@@ -7,14 +7,18 @@ import type {
 
 import { call } from "@/api/games/request";
 import { CHICKEN } from "@/api/urls";
+import { withRequestId } from "@/libs/http/requestId";
 
 const withId = (url: string, id: string) => url.replace(":id", id);
 
 export const chickenApi = {
 	config: () => call<ChickenConfig>("get", CHICKEN.CONFIG),
 	history: () => call<{ results: ChickenRound[] }>("get", CHICKEN.ROUNDS),
+	/** One id per bet (kept while its answer is unknown): a resent bet is the same round. */
 	bet: (bet: number, difficulty: ChickenDifficulty) =>
-		call<ChickenRoundState>("post", CHICKEN.ROUNDS, { bet, difficulty }),
+		withRequestId(`chicken:bet:${bet}:${difficulty}`, (requestId) =>
+			call<ChickenRoundState>("post", CHICKEN.ROUNDS, { bet, difficulty, request_id: requestId }),
+		),
 	/**
 	 * One lane, or with `to` up to that lane and cash out there (Go Max = last lane).
 	 * `fromStep` is the lane on screen; the server refuses (409) if it has moved since.

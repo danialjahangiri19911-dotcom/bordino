@@ -6,7 +6,7 @@ export type GameName = "sudoku" | "game_2048";
 export interface PlayCost {
 	game_name: string;
 	/** امتیازی که با هر بار بازی کم می‌شود (از ادمین قابلِ تنظیم). */
-	play_cost: number;
+	play_cost: number | null;
 	/** موجودیِ فعلیِ کیفِ امتیاز. */
 	current_amount: number;
 }

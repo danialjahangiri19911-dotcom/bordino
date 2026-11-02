@@ -14,11 +14,11 @@ export default function useChargeGamePlay() {
 	const mutation = useMutation<
 		ChargeApiResponse,
 		RequestError,
-		{ game_name: GameName }
+		{ game_name: GameName; difficulty?: string }
 	>({
 		// Through withAuth: an expired access token is renewed and the request sent again.
 		mutationFn: (payload) =>
-			withRequestId(`charge:${payload.game_name}`, async (requestId) => {
+			withRequestId(`charge:${payload.game_name}:${payload.difficulty ?? "-"}`, async (requestId) => {
 				const { data } = await withAuth((token) =>
 					requester.post<ChargeApiResponse>(
 						WALLET.GAME_PLAY_CHARGE,

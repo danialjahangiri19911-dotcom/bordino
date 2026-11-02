@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import register
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from apps.django_helper.admin.base import BaseAdmin
@@ -49,6 +50,7 @@ class LotteryAdmin(BaseAdmin):
     actions = ["run_process"]
     # Drawn by the server at settlement (random, after sales close); shown, never typed in.
     readonly_fields = ("numbers",)
+    LOCKED_ONCE_SOLD = ("status", "token", "ticket_price")
 
     def get_readonly_fields(self, request, obj=None):
         fields = tuple(super().get_readonly_fields(request, obj))
@@ -56,7 +58,7 @@ class LotteryAdmin(BaseAdmin):
         # which pays its winners: a status typed in here would skip that, and the unit and price
         # of what was bought stay as they were.
         if obj is not None and obj.tickets.exists():
-            fields += tuple(f for f in ("status", "token", "ticket_price") if f not in fields)
+            fields += tuple(f for f in self.LOCKED_ONCE_SOLD if f not in fields)
         return fields
 
     def save_model(self, request, obj, form, change):
@@ -65,8 +67,20 @@ class LotteryAdmin(BaseAdmin):
         # Only what the form changed: the pool counters (balance, points spent) move with every
         # ticket bought, and a copy loaded before a purchase must not write them back.
         fields = [f for f in form.changed_data if f in {fl.name for fl in obj._meta.concrete_fields}]
-        if fields:
-            obj.save(update_fields=[*fields, "update_time"])
+        with transaction.atomic():
+            # Under the lottery's lock, as a purchase takes it: a first ticket sold while this form
+            # was open is seen here, and the status, token and price then stay as they are.
+            Lottery.objects.select_for_update().get(pk=obj.pk)
+            locked = [f for f in fields if f in self.LOCKED_ONCE_SOLD]
+            if locked and obj.tickets.exists():
+                fields = [f for f in fields if f not in locked]
+                self.message_user(
+                    request,
+                    _("بلیط این قرعه‌کشی فروخته شده؛ وضعیت، توکن و قیمت بلیط تغییر نکرد."),
+                    messages.WARNING,
+                )
+            if fields:
+                obj.save(update_fields=[*fields, "update_time"])
         return None
 
     fieldsets = (

@@ -200,7 +200,7 @@ class ApiTests(TestCase):
         return response.json()["result"]
 
     def test_bet_and_config(self):
-        r = self.api.post("/api/v1/games/crash/rounds/", {"bet": 100, "auto_cashout": "2"}, format="json")
+        r = self.api.post("/api/v1/games/crash/rounds/", {"bet": 100, "auto_cashout": "2", "request_id": "c-api"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         body = self.result(r)
         self.assertEqual(body["balance"], 900)
@@ -491,7 +491,7 @@ class ChickenApiTests(TestCase):
         self.assertEqual(config["balance"], 1000)
 
     def test_play_through_the_api(self):
-        r = self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy"}, format="json")
+        r = self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy", "request_id": "k-api"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         round_id = self.result(r)["round"]["id"]
         ChickenRound.objects.filter(pk=round_id).update(hit_lane=None)

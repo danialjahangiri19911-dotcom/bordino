@@ -602,3 +602,154 @@ class LedgerCorrectnessTests(TestCase):
         account = BankAccount.objects.create(user=self.player, bank=bank, iban="IR062960000000100324200001", account_holder="t", status=BankAccount.Status.APPROVED)
         r = self.api.post("/api/v1/wallet/currency/withdraw/", {"amount": 5000, "bank_account_id": str(account.pk), "request_id": "w-1"}, format="json")
         self.assertEqual(r.status_code, 400, r.content)
+
+
+@override_settings(CACHES=LOCMEM)
+class AccountingFollowUpTests(TestCase):
+    """Codex's check of the accounting fixes, 2026-11-02: each case below still moved money wrongly."""
+
+    def setUp(self):
+        from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+
+        self.player = make_customer("9120004201", points=1000)
+        self.sponsor = Sponsor.objects.create(user=make_customer("9120004202"))
+        self.wheel = LotteryWheel.objects.create(name="w", owner=self.sponsor, cost_per_spin=10, max_spins=100, max_spins_per_customer=10)
+        self.empty = LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="empty", prize_amount=0, probability=100, prize_type=LotteryWheelPrize.PrizeType.EMPTY)
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+
+    def points(self):
+        return balance.points_account(self.player).amount
+
+    def spin(self, **body):
+        return self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"lottery_wheel": str(self.wheel.pk), **body}, format="json")
+
+    def sudoku_levels(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="easy", play_cost=5, is_active=True)
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="hard", play_cost=50, is_active=True)
+
+    def test_a_cheap_charge_never_starts_a_dearer_sudoku(self):
+        from apps.crash.services import sudoku  # pylint: disable=import-outside-toplevel
+
+        self.sudoku_levels()
+        r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "s-1"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        paid = r.json()["result"]["cost"]  # the game's general price (no level named)
+        start = lambda rid: self.api.post("/api/v1/games/sudoku/rounds/", {"difficulty": "hard", "request_id": rid}, format="json")  # noqa: E731
+        with mock.patch.object(sudoku, "check_unlocked"):
+            self.assertEqual(start("s-1").status_code, 400)
+            # A continuation paid at this very level does not buy a new board either.
+            r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "s-3", "difficulty": "hard"}, format="json")
+            self.assertEqual(r.json()["result"]["cost"], 50, r.content)
+            self.assertEqual(start("s-3").status_code, 400)
+            # The same id at another level's price is not the same charge either.
+            r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "s-1", "difficulty": "hard"}, format="json")
+            self.assertEqual(r.status_code, 400, r.content)
+            round_, _left = sudoku.start(self.player, "hard", "s-2")
+        self.assertEqual(round_.difficulty, "hard")
+        self.assertEqual(self.points(), 1000 - paid - 50 - 50)
+
+    def test_the_quoted_price_is_the_levels_and_so_is_a_continuation(self):
+        self.sudoku_levels()
+        quote = lambda level: self.api.get(f"/api/v1/wallet/games/charge/?game_name=sudoku&difficulty_level={level}").json()["result"]["play_cost"]  # noqa: E731
+        self.assertEqual((quote("easy"), quote("hard"), quote("medium")), (5, 50, None))
+        r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "c-1", "difficulty": "hard"}, format="json")
+        self.assertEqual(r.json()["result"]["cost"], 50, r.content)
+        # A level with no price of its own is not on offer (never another level's price).
+        r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "c-2", "difficulty": "medium"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(self.points(), 950)
+
+    def test_a_prize_token_with_two_accounts_still_pays_the_win(self):
+        from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import Token, TokenPresetWallet, TokenWalletAccount  # pylint: disable=import-outside-toplevel
+
+        own = balance.points_account(self.player)
+        bonus = Token.objects.create(name="bonus", symbol="BONUS", price=1)
+        other = next(v for v in TokenPresetWallet.ActivationBy.values if v != own.preset_wallet.activation_by)
+        preset = TokenPresetWallet.objects.create(name="second", wallet_type=own.preset_wallet.wallet_type, activation_by=other, actions=["exchange"])
+        first = TokenWalletAccount.objects.create(name="b1", wallet=own.wallet, preset_wallet=own.preset_wallet, token=bonus)
+        TokenWalletAccount.objects.create(name="b2", wallet=own.wallet, preset_wallet=preset, token=bonus)
+        LotteryWheelPrize.objects.filter(pk=self.empty.pk).update(probability=1)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="b", prize_amount=100, probability=99, prize_type=LotteryWheelPrize.PrizeType.RECHARGE, target_token=bonus)
+        with mock.patch("apps.lottery.services.lottery.lottery_wheel.random.uniform", return_value=50):
+            r = self.spin(request_id="b-1")
+        self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual((self.points(), TokenWalletAccount.objects.get(pk=first.pk).amount), (990, 100))
+
+    def test_retries_repeat_the_spin_after_the_price_changes(self):
+        from apps.lottery.models import LotteryWheel  # pylint: disable=import-outside-toplevel
+
+        self.assertIn(self.spin(request_id="p-1").status_code, (200, 201))
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(cost_per_spin=20)
+        self.assertIn(self.spin(request_id="p-1").status_code, (200, 201))
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(cost_per_spin=10)
+        self.assertIn(self.spin(request_id="p-2", bet=30).status_code, (200, 201))
+        LotteryWheel.objects.filter(pk=self.wheel.pk).update(cost_per_spin=0)
+        self.assertIn(self.spin(request_id="p-2", bet=30).status_code, (200, 201))
+        self.assertEqual(self.spin(request_id="p-2", bet=40).status_code, 400)  # another bet: not a retry
+        self.assertEqual(self.points(), 1000 - 10 - 30)
+
+    def test_a_blocked_cash_account_is_never_paid(self):
+        from apps.lottery.models import LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+        from apps.lottery.services.lottery.lottery_winner import pay_pending_prize  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models import CurrencyWalletAccount  # pylint: disable=import-outside-toplevel
+        from apps.wallet.models.transactions.lottery_prize import LotteryPrizeTransaction  # pylint: disable=import-outside-toplevel
+
+        LotteryWheelPrize.objects.filter(pk=self.empty.pk).update(probability=50)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="c", prize_amount=500, probability=50, prize_type=LotteryWheelPrize.PrizeType.CASH)
+        cash = CurrencyWalletAccount.objects.filter(wallet__owner=self.player)
+        cash.update(status=CurrencyWalletAccount.WalletStatus.BLOCKED)
+        self.assertEqual(self.spin(request_id="x-1").status_code, 400)
+        self.assertEqual(self.points(), 1000)
+        token = balance.points_account(self.player).token
+        lottery = Lottery.objects.create(name="p", owner=self.sponsor, token=token, ticket_price=10, status=Lottery.Status.ACTIVE,
+                                         start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1))
+        TicketPurchaseService().purchase_with_numbers(self.player.customer, [1, 2, 3, 4, 5, 6])
+        ticket = Ticket.objects.get(lottery=lottery, customer=self.player.customer)
+        tx = LotteryPrizeTransaction.objects.create(lottery=lottery, ticket=ticket, prize_amount=500, status=LotteryPrizeTransaction.Status.PENDING)
+        self.assertFalse(pay_pending_prize(tx.pk))
+        self.assertEqual(cash.get().balance, 0)
+        cash.update(status=CurrencyWalletAccount.WalletStatus.VALID)
+        self.assertTrue(pay_pending_prize(tx.pk))
+
+    def test_a_ticket_sold_while_the_admin_form_was_open_keeps_the_lottery_as_it_is(self):
+        from django.contrib.admin.sites import site  # pylint: disable=import-outside-toplevel
+
+        from apps.lottery.admin.lottery import LotteryForm  # pylint: disable=import-outside-toplevel
+
+        token = balance.points_account(self.player).token
+        lottery = Lottery.objects.create(name="a", owner=self.sponsor, token=token, ticket_price=10, status=Lottery.Status.ACTIVE,
+                                         start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1))
+        admin = site._registry[Lottery]  # pylint: disable=protected-access
+        form = LotteryForm(instance=lottery)
+        form.cleaned_data = {}
+        edited = Lottery.objects.get(pk=lottery.pk)
+        edited.status, edited.name = Lottery.Status.CANCELLED, "b"
+        TicketPurchaseService().purchase_with_numbers(self.player.customer, [1, 2, 3, 4, 5, 6])  # meanwhile
+        with mock.patch.object(type(form), "changed_data", ["status", "name"]), mock.patch.object(admin, "message_user") as told:
+            admin.save_model(None, edited, form, change=True)
+        lottery.refresh_from_db()
+        self.assertEqual((lottery.status, lottery.name), (Lottery.Status.ACTIVE, "b"))
+        told.assert_called_once()
+
+    def test_a_resent_crash_or_chicken_bet_is_the_same_round(self):
+        from apps.crash.models import ChickenRound, CrashRound  # pylint: disable=import-outside-toplevel
+
+        crash = lambda bet: self.api.post("/api/v1/games/crash/rounds/", {"bet": bet, "request_id": "cr-1"}, format="json")  # noqa: E731
+        first = crash(100)
+        self.assertEqual(first.status_code, 201, first.content)
+        CrashRound.objects.update(status=CrashRound.Status.LOST)  # the round is over
+        again = crash(100)
+        self.assertEqual(again.json()["result"]["round"]["id"], first.json()["result"]["round"]["id"])
+        self.assertEqual(crash(200).status_code, 400)
+        self.assertEqual(self.points(), 900)
+        chicken = lambda: self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy", "request_id": "ch-1"}, format="json")  # noqa: E731
+        first = chicken()
+        self.assertEqual(first.status_code, 201, first.content)
+        ChickenRound.objects.update(status=ChickenRound.Status.LOST)
+        self.assertEqual(chicken().json()["result"]["round"]["id"], first.json()["result"]["round"]["id"])
+        self.assertEqual(self.points(), 800)
+        self.assertEqual(self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy"}, format="json").status_code, 400)

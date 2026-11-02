@@ -85,7 +85,7 @@ def seed_for(customer: Customer) -> CrashSeed:
     return seed
 
 
-def place_bet(user, bet: int, auto_cashout=None, now=None) -> tuple[CrashRound, int]:
+def place_bet(user, bet: int, auto_cashout=None, now=None, request_id: str | None = None) -> tuple[CrashRound, int]:
     config = CrashConfiguration.current()
     if not config.enabled:
         raise CrashError("بازی انفجار فعلاً غیرفعال است.")
@@ -111,6 +111,13 @@ def place_bet(user, bet: int, auto_cashout=None, now=None) -> tuple[CrashRound, 
         settle_due(customer=customer, now=now)
         # Serialises everything this player does: two bets cannot both pass the balance check.
         account = TokenWalletAccount.objects.select_for_update().get(pk=account.pk)
+        if request_id:
+            # Under the account lock: a resend (or two copies at once) finds the first bet.
+            earlier = CrashRound.objects.filter(customer=customer, request_id=request_id).first()
+            if earlier:
+                if earlier.bet != bet or earlier.auto_cashout != auto_cashout:
+                    raise CrashError("این درخواست قبلاً برای شرط دیگری ثبت شده است.")
+                return earlier, account.amount
         if CrashRound.objects.filter(customer=customer, status=CrashRound.Status.ACTIVE).exists():
             raise CrashError("یک دست هنوز در جریان است.")
         if account.status != TokenWalletAccount.WalletStatus.VALID:
@@ -126,6 +133,7 @@ def place_bet(user, bet: int, auto_cashout=None, now=None) -> tuple[CrashRound, 
         server_seed = fair.new_server_seed()
         round_ = CrashRound.objects.create(
             customer=customer,
+            request_id=request_id or None,
             token_account=account,
             bet=bet,
             auto_cashout=auto_cashout,

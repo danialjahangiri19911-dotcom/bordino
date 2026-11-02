@@ -6,7 +6,6 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
-from apps.configuration.repositories.game import GameConfigurationQueryRepository
 from apps.wallet.services import balance
 from apps.wallet.services.game_play.charge import GamePlayChargeService
 
@@ -17,6 +16,8 @@ class GamePlayChargeSerializer(serializers.Serializer):
     # One id per play the app starts (it always sends one): a retry after a lost answer is the
     # same play, charged once.
     request_id = serializers.CharField(max_length=64, allow_blank=False)
+    # The level being paid for (sudoku's continuation): charged at that level's price.
+    difficulty = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
 
 class GamePlayChargeResponseSerializer(serializers.Serializer):
@@ -27,7 +28,7 @@ class GamePlayChargeResponseSerializer(serializers.Serializer):
 
 class GamePlayCostSerializer(serializers.Serializer):
     game_name = serializers.CharField()
-    play_cost = serializers.IntegerField()
+    play_cost = serializers.IntegerField(allow_null=True)
     current_amount = serializers.IntegerField()
 
 
@@ -39,16 +40,20 @@ class GamePlayChargeView(APIView):
     @extend_schema(
         tags=["wallet"],
         summary="Get a game's play cost and current points",
-        parameters=[OpenApiParameter("game_name", str, required=True)],
+        parameters=[
+            OpenApiParameter("game_name", str, required=True),
+            OpenApiParameter("difficulty_level", str, required=False),
+        ],
         responses={200: GamePlayCostSerializer},
     )
     def get(self, request):
         game_name = (request.query_params.get("game_name") or "").lower().strip()
 
-        game_config = GameConfigurationQueryRepository.filter_by_game_name(
-            game_name=game_name
-        ).first()
-        play_cost = int(game_config.play_cost) if game_config else 0
+        # The price that is charged: the level's own when one is named (sudoku), never another's.
+        try:
+            play_cost = GamePlayChargeService.price(game_name, request.query_params.get("difficulty_level") or None)
+        except ValidationError:
+            play_cost = None  # that level is not on offer
 
         # The account a play is charged to (points, token L) — not "the first account".
         account = balance.points_account(request.user)
@@ -78,6 +83,7 @@ class GamePlayChargeView(APIView):
                 user=request.user,
                 game_name=serializer.validated_data["game_name"],
                 request_id=serializer.validated_data.get("request_id"),
+                difficulty=serializer.validated_data.get("difficulty") or None,
             )
         except ValidationError as exc:
             message = exc.messages[0] if getattr(exc, "messages", None) else str(exc)

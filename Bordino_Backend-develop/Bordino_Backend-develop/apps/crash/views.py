@@ -52,6 +52,8 @@ class BetSerializer(serializers.Serializer):
     auto_cashout = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, allow_null=True
     )
+    # One id per bet the app places, kept for its resends: a resent bet is the same round.
+    request_id = serializers.CharField(max_length=64, allow_blank=False)
 
 
 class SeedSerializer(serializers.Serializer):
@@ -134,6 +136,7 @@ class CrashRoundsView(APIView):
                 request.user,
                 serializer.validated_data["bet"],
                 serializer.validated_data.get("auto_cashout"),
+                request_id=serializer.validated_data["request_id"],
             )
         except rounds.CrashError as exc:
             return _error(exc)
@@ -250,6 +253,8 @@ async def round_wait_view(request, round_id):
 class ChickenBetSerializer(serializers.Serializer):
     bet = serializers.IntegerField(min_value=1)
     difficulty = serializers.ChoiceField(choices=CHICKEN_DIFFICULTIES)
+    # One id per bet the app places, kept for its resends: a resent bet is the same round.
+    request_id = serializers.CharField(max_length=64, allow_blank=False)
 
 
 class ChickenStepSerializer(serializers.Serializer):
@@ -334,6 +339,7 @@ class ChickenRoundsView(APIView):
                 request.user,
                 serializer.validated_data["bet"],
                 serializer.validated_data["difficulty"],
+                request_id=serializer.validated_data["request_id"],
             )
         except rounds.CrashError as exc:
             return _error(exc)

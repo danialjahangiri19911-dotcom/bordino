@@ -53,7 +53,6 @@ export default function SudokuGame() {
 	const scheme = useResolvedScheme();
 	const game = useSudoku();
 	const { isMediumUnlocked, isHardUnlocked, getCompletionCounts } = useSudokuStore();
-	const { data: costData, refetch: refetchCost } = useGetPlayCost({ gameName: "sudoku" });
 	const { chargeAsync, isCharging } = useChargeGamePlay();
 	const [level, setLevel] = useState<Difficulty>("easy");
 	const [confirm, setConfirm] = useState<Confirm>("");
@@ -74,7 +73,9 @@ export default function SudokuGame() {
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const cellsRef = useRef<HTMLDivElement>(null);
 
-	const playCost = costData?.result?.play_cost;
+	// The price of the level on the board (or the one chosen): each level has its own.
+	const { data: costData, refetch: refetchCost } = useGetPlayCost({ gameName: "sudoku", difficulty: game.difficulty ?? level });
+	const playCost = costData?.result?.play_cost ?? undefined;
 	const points = costData?.result?.current_amount;
 	const unlockedLevel = (d: Difficulty) => d === "easy" || (d === "medium" && isMediumUnlocked()) || (d === "hard" && isHardUnlocked());
 	const completions = getCompletionCounts();
@@ -198,7 +199,8 @@ export default function SudokuGame() {
 		setPaying(true);
 		setProblem(null);
 		try {
-			await chargeAsync({ game_name: "sudoku" });
+			// At this board's level: a continuation costs what its level costs.
+			await chargeAsync({ game_name: "sudoku", difficulty: game.difficulty ?? level });
 			void refetchCost();
 			game.continueAfterLoss();
 		} catch (e) {

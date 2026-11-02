@@ -89,7 +89,7 @@ def payout_cap_lane(round_: ChickenRound, multipliers) -> int | None:
     return None
 
 
-def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, int]:
+def place_bet(user, bet: int, difficulty: str, now=None, request_id: str | None = None) -> tuple[ChickenRound, int]:
     config = ChickenConfiguration.current()
     if not config.enabled:
         raise CrashError("بازی مرغ فراری فعلاً غیرفعال است.")
@@ -113,6 +113,13 @@ def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, 
 
     with transaction.atomic():
         account = TokenWalletAccount.objects.select_for_update().get(pk=account.pk)
+        if request_id:
+            # Under the account lock: a resend (or two copies at once) finds the first bet.
+            earlier = ChickenRound.objects.filter(customer=customer, request_id=request_id).first()
+            if earlier:
+                if earlier.bet != bet or earlier.difficulty != difficulty:
+                    raise CrashError("این درخواست قبلاً برای شرط دیگری ثبت شده است.")
+                return earlier, account.amount
         if ChickenRound.objects.filter(customer=customer, status=ChickenRound.Status.ACTIVE).exists():
             raise CrashError("یک دست هنوز در جریان است.")
         if account.status != TokenWalletAccount.WalletStatus.VALID:
@@ -128,6 +135,7 @@ def place_bet(user, bet: int, difficulty: str, now=None) -> tuple[ChickenRound, 
         server_seed = fair.new_server_seed()
         round_ = ChickenRound.objects.create(
             customer=customer,
+            request_id=request_id or None,
             token_account=account,
             bet=bet,
             difficulty=difficulty,

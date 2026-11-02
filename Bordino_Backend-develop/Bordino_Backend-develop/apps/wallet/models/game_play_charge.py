@@ -31,6 +31,9 @@ class GamePlayCharge(AbstractBaseModel):
         related_name="game_play_charges",
     )
     game_name = models.CharField(max_length=50)
+    # The level this play was priced at ("" = the game's general price): a retry of the request
+    # must be for the same level, never a cheaper level's charge reused for a dearer one.
+    difficulty = models.CharField(max_length=20, blank=True, default="", editable=False)
     cost = models.PositiveIntegerField(default=0)
     # One id per play the app starts; a retry of a request whose answer was lost sends the same id
     # and gets the first result instead of a second charge.

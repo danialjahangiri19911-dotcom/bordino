@@ -111,15 +111,11 @@ class LotteryWheelService:
         # The prizes as they are under that lock (an admin's save of the wheel and its prizes
         # takes the same row): never old prizes with a newly edited cost, or the reverse.
         prizes = wheel.lottery_wheel_prizes.all()
-        base = int(wheel.cost_per_spin)
-        if base < 0:
-            raise ValidationError(_("هزینهٔ چرخش این گردونه نامعتبر است."))
-        if dto.bet is not None and not base:
-            raise ValidationError(_("این گردونه رایگان است و شرط نمی‌پذیرد."))
-        cost = int(dto.bet) if dto.bet is not None else base
-        # A retry of a spin that already happened is answered first — before the limits and the
-        # wheel's state, which that very spin may have changed — with exactly what was paid then.
-        # The same request id for another wheel or multiplier is not a retry: refused.
+        multiplier = max(1, int(dto.multiplier or 1))
+        # A retry of a spin that already happened is answered first — before the wheel's price,
+        # limits and state, which may have changed since (that very spin among them) — with
+        # exactly what was paid then. The same request id for another wheel, multiplier or bet is
+        # not a retry: refused. A request that named no bet repeats whatever it cost then.
         if dto.request_id:
             earlier = (
                 LotteryWheelSpinLog.objects.filter(customer=dto.customer, request_id=dto.request_id)
@@ -129,8 +125,8 @@ class LotteryWheelService:
             if earlier:
                 if (
                     earlier.lottery_wheel_id != wheel.pk
-                    or earlier.multiplier != max(1, int(dto.multiplier or 1))
-                    or int(earlier.cost) != cost
+                    or earlier.multiplier != multiplier
+                    or (dto.bet is not None and int(earlier.cost) != int(dto.bet))
                 ):
                     raise ValidationError(_("This request was already used for another spin."))
                 prize = earlier.prize
@@ -139,6 +135,12 @@ class LotteryWheelService:
                         earlier.paid_amount if earlier.paid_amount is not None else prize.prize_amount * earlier.multiplier
                     )
                 return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
+        base = int(wheel.cost_per_spin)
+        if base < 0:
+            raise ValidationError(_("هزینهٔ چرخش این گردونه نامعتبر است."))
+        if dto.bet is not None and not base:
+            raise ValidationError(_("این گردونه رایگان است و شرط نمی‌پذیرد."))
+        cost = int(dto.bet) if dto.bet is not None else base
         # The wheel as it is now must be valid for a new spin (a retry above replays the past).
         self._validate_prizes(prizes)
         # A paid wheel's range holds for every new spin, also one that names no bet (it costs
@@ -159,21 +161,30 @@ class LotteryWheelService:
         if mine >= wheel.max_spins_per_customer:
             raise ValidationError(_("You have reached your maximum spins for this wheel"))
         # Every prize this wheel can draw must be payable to this player, checked before charging
-        # (rather than a won spin rolled back, or paid into another account): a cash prize needs a
-        # usable cash account, a points prize for another token needs the player's account of it.
+        # (rather than a won spin rolled back, or paid into another account), and the account each
+        # one pays into is chosen here, once: a cash prize needs a usable cash account, a points
+        # prize for another token the player's active account of it (the oldest, if several).
         wallet = dto.token_wallet_account.wallet
+        valid = TokenWalletAccount.WalletStatus.VALID
+        cash = None
         if any(p.prize_type == LotteryWheelPrize.PrizeType.CASH for p in prizes):
             cash = wallet.currency_wallet_accounts.filter(primary=True).first()
-            if cash is None or is_wallet_expired(cash.wallet):
+            if cash is None or cash.status != valid or is_wallet_expired(cash.wallet):
                 raise ValidationError(_("کیف نقدی برای دریافت جایزه پیدا نشد؛ با پشتیبانی تماس بگیر."))
+        targets = {}
         for p in prizes:
+            token_id = p.target_token_id
             if (
                 p.prize_type == LotteryWheelPrize.PrizeType.RECHARGE
-                and p.target_token_id
-                and p.target_token_id != dto.token_wallet_account.token_id
-                and not wallet.token_wallet_accounts.filter(token_id=p.target_token_id).exists()
+                and token_id
+                and token_id != dto.token_wallet_account.token_id
+                and token_id not in targets
             ):
-                raise ValidationError(_("کیف امتیاز این جایزه برای تو ساخته نشده؛ با پشتیبانی تماس بگیر."))
+                targets[token_id] = (
+                    wallet.token_wallet_accounts.filter(token_id=token_id, status=valid).order_by("create_time", "pk").first()
+                )
+                if targets[token_id] is None:
+                    raise ValidationError(_("کیف امتیاز این جایزه برای تو ساخته نشده؛ با پشتیبانی تماس بگیر."))
 
         # Locked, checked and debited in one go: two spins at once cannot both pass the check,
         # and no other change to the account is overwritten.
@@ -185,7 +196,6 @@ class LotteryWheelService:
         )
         balance.add_points(account, -cost)
 
-        multiplier = max(1, int(dto.multiplier or 1))
         selected_prize = self.select_prize(prizes, multiplier)
         if not selected_prize:
             return None
@@ -206,9 +216,7 @@ class LotteryWheelService:
                     CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
                         prize_amount=selected_prize.prize_amount,
                         customer=dto.customer,
-                        destination_wallet_account=dto.token_wallet_account.wallet.currency_wallet_accounts.filter(
-                            primary=True
-                        ).first(),
+                        destination_wallet_account=cash,
                     )
                 )
             case LotteryWheelPrize.PrizeType.RECHARGE:
@@ -216,10 +224,8 @@ class LotteryWheelService:
                 # برای جایزه target_token مشخص شده باشد، کیفِ همان توکن شارژ می‌شود.
                 target_account = dto.token_wallet_account
                 if selected_prize.target_token_id and selected_prize.target_token_id != target_account.token_id:
-                    # Checked before charging; never paid into an account of another token.
-                    target_account = dto.token_wallet_account.wallet.token_wallet_accounts.get(
-                        token_id=selected_prize.target_token_id
-                    )
+                    # Chosen before charging; never an account of another token.
+                    target_account = targets[selected_prize.target_token_id]
                 balance.add_points(target_account, selected_prize.prize_amount)
             case LotteryWheelPrize.PrizeType.EMPTY:
                 # پوچ: جایزه‌ای واریز نمی‌شود

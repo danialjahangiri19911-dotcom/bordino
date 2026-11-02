@@ -5,12 +5,14 @@ import useQuery from "@/libs/http/query";
 
 interface Props extends ExtendableOptions<PlayCostApiResponse> {
 	gameName: GameName;
+	/** The level the price is for (sudoku): its own price, as the server charges it. */
+	difficulty?: string;
 }
 
 /** هزینهٔ هر بار بازی + موجودیِ فعلیِ کیفِ امتیاز (برای نمایش در دیالوگِ باخت). */
-export default function useGetPlayCost({ gameName, ...restProps }: Props) {
+export default function useGetPlayCost({ gameName, difficulty, ...restProps }: Props) {
 	const { data, isLoading, error, refetch } = useQuery<PlayCostApiResponse>({
-		url: `${WALLET.GAME_PLAY_COST}?game_name=${encodeURIComponent(gameName)}`,
+		url: `${WALLET.GAME_PLAY_COST}?game_name=${encodeURIComponent(gameName)}${difficulty ? `&difficulty_level=${encodeURIComponent(difficulty)}` : ""}`,
 		headers: true,
 		enabled: !!gameName,
 		...restProps,

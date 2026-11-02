@@ -82,7 +82,12 @@ class CrashRound(AbstractBaseModel):
                 fields=["customer"],
                 condition=Q(status="active"),
                 name="crash_one_active_round_per_customer",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["customer", "request_id"],
+                condition=Q(request_id__isnull=False),
+                name="crash_unique_request_id",
+            ),
         ]
         indexes = [
             models.Index(fields=["customer", "-create_time"], name="crash_customer_recent"),
@@ -101,6 +106,9 @@ class CrashRound(AbstractBaseModel):
         "wallet.TokenWalletAccount", on_delete=models.PROTECT, related_name="crash_rounds"
     )
     bet = models.PositiveIntegerField(verbose_name=_("شرط"))
+    # One id per bet the app places; a resend of a bet whose answer was lost gets this round
+    # back instead of a second round and a second debit.
+    request_id = models.CharField(max_length=64, null=True, blank=True, editable=False)
     auto_cashout = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_("برداشت خودکار")
     )
@@ -226,7 +234,12 @@ class ChickenRound(AbstractBaseModel):
                 fields=["customer"],
                 condition=Q(status="active"),
                 name="chicken_one_active_round_per_customer",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["customer", "request_id"],
+                condition=Q(request_id__isnull=False),
+                name="chicken_unique_request_id",
+            ),
         ]
         indexes = [models.Index(fields=["customer", "-create_time"], name="chicken_customer_recent")]
 
@@ -239,6 +252,9 @@ class ChickenRound(AbstractBaseModel):
         "wallet.TokenWalletAccount", on_delete=models.PROTECT, related_name="chicken_rounds"
     )
     bet = models.PositiveIntegerField(verbose_name=_("شرط"))
+    # One id per bet the app places; a resend of a bet whose answer was lost gets this round
+    # back instead of a second round and a second debit.
+    request_id = models.CharField(max_length=64, null=True, blank=True, editable=False)
     difficulty = models.CharField(max_length=10, verbose_name=_("سطح"))
     # Snapshotted at bet time, so an admin change never alters a running round.
     lanes = models.PositiveSmallIntegerField()

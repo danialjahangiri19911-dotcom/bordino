@@ -21,6 +21,10 @@ class CurrencyWalletAccountTransferService:
     def send_prize_to_customer(self, dto: SendPrizeToCustomerDTO):
         if dto.destination_wallet_account is None:
             raise ValidationError("Currency account not found")
+        # Only into an active account (a blocked or closed one is not paid; a lottery prize waits
+        # as pending for it).
+        if dto.destination_wallet_account.status != CurrencyWalletAccount.WalletStatus.VALID:
+            raise ValidationError("Currency account is not active")
         if is_wallet_expired(dto.destination_wallet_account.wallet):
             raise ValidationError("Wallet has expired")
         # One UPDATE: a withdrawal or another prize at the same moment is not overwritten.

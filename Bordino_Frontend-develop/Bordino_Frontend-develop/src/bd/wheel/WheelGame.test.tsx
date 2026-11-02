@@ -15,7 +15,7 @@ const prize = (id: number, amount: number, probability: number, type: WheelPrize
 
 let prizes: WheelPrize[] = [];
 let answer: (value: unknown) => void = () => undefined;
-const spinAsync = jest.fn(() => new Promise((done) => (answer = done)));
+const spinAsync = jest.fn((_payload?: unknown) => new Promise((done) => (answer = done)));
 const effects: string[] = [];
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }), useSearchParams: () => new URLSearchParams() }));

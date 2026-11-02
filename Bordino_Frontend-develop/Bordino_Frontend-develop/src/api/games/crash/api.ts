@@ -7,6 +7,7 @@ import type {
 
 import { call, gameErrorMessage } from "@/api/games/request";
 import { CRASH } from "@/api/urls";
+import { withRequestId } from "@/libs/http/requestId";
 
 /** The server's message for a failed crash call (e.g. «امتیاز کافی برای این شرط نداری.»). */
 export const crashErrorMessage = gameErrorMessage;
@@ -16,11 +17,15 @@ const withId = (url: string, id: string) => url.replace(":id", id);
 export const crashApi = {
 	config: () => call<CrashConfig>("get", CRASH.CONFIG),
 	history: () => call<CrashHistory>("get", CRASH.ROUNDS),
+	/** One id per bet (kept while its answer is unknown): a resent bet is the same round. */
 	bet: (bet: number, autoCashout: string | null) =>
-		call<CrashRoundState>("post", CRASH.ROUNDS, {
-			bet,
-			auto_cashout: autoCashout,
-		}),
+		withRequestId(`crash:bet:${bet}:${autoCashout ?? "-"}`, (requestId) =>
+			call<CrashRoundState>("post", CRASH.ROUNDS, {
+				bet,
+				auto_cashout: autoCashout,
+				request_id: requestId,
+			}),
+		),
 	cashOut: (id: string) =>
 		call<CrashRoundState>("post", withId(CRASH.CASHOUT, id)),
 	/**
