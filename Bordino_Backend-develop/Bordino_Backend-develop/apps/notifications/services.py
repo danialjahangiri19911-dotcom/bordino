@@ -35,7 +35,9 @@ def is_push_endpoint(url: str) -> bool:
     except ValueError:
         return False
     host = (parts.hostname or "").lower()
-    if parts.scheme != "https" or parts.port not in (None, 443) or parts.username or parts.password:
+    # A fragment is never sent to the push service: "<address>#1", "#2"… would be one device saved
+    # (and sent to) many times.
+    if parts.scheme != "https" or parts.port not in (None, 443) or parts.username or parts.password or parts.fragment or "#" in url:
         return False
     return host in PUSH_HOSTS or any(host.endswith(s) for s in PUSH_HOST_SUFFIXES)
 

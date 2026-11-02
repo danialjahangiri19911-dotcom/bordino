@@ -77,6 +77,17 @@ class EndpointSerializer(serializers.Serializer):
     endpoint = serializers.CharField(max_length=1000)
 
 
+# Devices kept per player (each kind): a new one beyond this replaces the one unused longest, so one
+# account can never make a notification go out to an unbounded number of addresses.
+MAX_DEVICES = 10
+
+
+def _keep_newest(queryset):
+    stale = list(queryset.order_by("-update_time", "-pk").values_list("pk", flat=True)[MAX_DEVICES:])
+    if stale:
+        queryset.filter(pk__in=stale).delete()
+
+
 class PushSubscriptionView(APIView):
     """This device's Web Push subscription: saved when the player allows notifications here."""
 
@@ -99,6 +110,7 @@ class PushSubscriptionView(APIView):
                 "user_agent": request.headers.get("User-Agent", "")[:300],
             },
         )
+        _keep_newest(PushSubscription.objects.filter(customer=request.user.customer))
         return Response(_body(request.user.customer), status=status.HTTP_201_CREATED)
 
 
@@ -137,6 +149,7 @@ class AppDeviceView(APIView):
             device_id=data.validated_data["device_id"],
             defaults={"customer": request.user.customer},
         )
+        _keep_newest(AppDevice.objects.filter(customer=request.user.customer))
         return Response(_body(request.user.customer), status=status.HTTP_201_CREATED)
 
 

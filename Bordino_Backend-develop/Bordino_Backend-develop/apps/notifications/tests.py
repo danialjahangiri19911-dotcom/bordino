@@ -76,6 +76,19 @@ class ReviewFixTests(TestCase):
                      "https://wns2-db5p.notify.windows.com/w/?token=a", "https://web.push.apple.com/a"]:
             self.assertEqual(self.api.post(SUBS, {"endpoint": good, "keys": {"p256dh": "k", "auth": "a"}}, format="json").status_code, 201, good)
 
+    def test_one_player_cannot_multiply_their_devices(self):
+        """Security review 2026-11-02: «<address>#1», «#2»… were saved as separate devices, each sent to."""
+        sub = lambda endpoint: self.api.post(SUBS, {"endpoint": endpoint, "keys": {"p256dh": "k", "auth": "a"}}, format="json")  # noqa: E731
+        self.assertEqual(sub("https://fcm.googleapis.com/fcm/send/a#1").status_code, 400)
+        for i in range(15):
+            self.assertEqual(sub(f"https://fcm.googleapis.com/fcm/send/d{i}").status_code, 201)
+        mine = PushSubscription.objects.filter(customer=self.user.customer)
+        self.assertEqual(mine.count(), 10)
+        self.assertTrue(mine.filter(endpoint__endswith="/d14").exists())  # the newest are kept
+        for i in range(15):
+            self.api.post("/api/v1/notifications/app-devices/", {"device_id": f"device-{i:03d}"}, format="json")
+        self.assertEqual(AppDevice.objects.filter(customer=self.user.customer).count(), 10)
+
     def test_a_stored_foreign_endpoint_is_never_contacted(self):
         try:
             import pywebpush  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import

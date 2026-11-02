@@ -1,3 +1,5 @@
+import { readLimited } from "@/libs/http/readLimited";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -11,8 +13,9 @@ const MAX_BYTES = 200_000;
 
 export async function POST(request: Request) {
 	try {
-		const envelope = await request.text();
-		if (!envelope || envelope.length > MAX_BYTES) {
+		const envelope = await readLimited(request, MAX_BYTES);
+		if (envelope === null) return new Response(null, { status: 413 });
+		if (!envelope) {
 			return new Response(null, { status: 400 });
 		}
 		const header = JSON.parse(envelope.split("\n")[0]);

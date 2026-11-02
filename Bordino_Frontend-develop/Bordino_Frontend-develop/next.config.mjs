@@ -60,6 +60,10 @@ const nextConfig = {
 		removeConsole: process.env.NODE_ENV !== "development",
 	},
 	images: {
+		// The optimizer's cache on disk: bounded, and a local image only under its own address (no
+		// "?anything" variants, each of which was a new cached file — CVE-2026-27980).
+		maximumDiskCacheSize: 200_000_000,
+		localPatterns: [{ pathname: "/**", search: "" }],
 		domains: [
 			"localhost",
 			// TODO: Later add production image source url
