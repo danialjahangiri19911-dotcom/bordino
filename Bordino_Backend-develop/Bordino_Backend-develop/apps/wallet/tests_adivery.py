@@ -156,3 +156,15 @@ class AdiveryTests(TestCase):
         out = StringIO()
         call_command("adivery_callback_url", stdout=out)
         self.assertTrue(out.getvalue().strip().endswith(f"/api/v1/wallet/ad-reward/adivery/{self.secret}/"))
+
+    def test_an_admin_change_of_the_provider_applies_at_once(self):
+        import gc  # pylint: disable=import-outside-toplevel
+
+        gc.collect()  # the save's cache clearing must survive a garbage collection
+        self.assertEqual(ad_reward.provider().name, "adivery")  # read: now cached
+        row = SystemConfiguration.objects.get_queryset().get(key="AD_REWARD_PROVIDER")
+        row.value = "demo"
+        row.save()  # as the admin saves it, with no cache.clear()
+        self.assertEqual(ad_reward.provider().name, "demo")
+        row.delete()
+        self.assertEqual(ad_reward.provider().name, "demo")  # the built-in default again
