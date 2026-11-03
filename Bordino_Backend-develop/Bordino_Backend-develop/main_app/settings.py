@@ -50,6 +50,7 @@ LOCAL_APPS = [
     "apps.crash.apps.CrashConfig",
     "apps.notifications.apps.NotificationsConfig",
     "apps.missions.apps.MissionsConfig",
+    "apps.pantomime.apps.PantomimeConfig",
 ]
 
 THIRD_PARTY_APPS = [

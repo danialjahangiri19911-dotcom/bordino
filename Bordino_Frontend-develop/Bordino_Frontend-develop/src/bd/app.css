@@ -376,3 +376,7 @@ body { margin: 0; }
 #bordino-directions .mi-proof .rt-field { margin: 8px 0; text-align: right; font-size: 12px; }
 #bordino-directions .mi-proof-preview { display: block; max-width: 100%; max-height: 220px; margin: 6px auto 10px; border: 2px solid var(--bd-outline); border-radius: 8px; object-fit: contain; }
 #bordino-directions .mi-qr-result { margin-top: 8px; }
+
+/* «پانتومیم» in the games list: the design's yellow on a deep purple. */
+#bordino-directions .ng-game[data-game=pantomime]{ --ng-game-accent:#ffe332; --ng-game-bg:#3a2c55}
+:root[data-bd-scheme="dark"] #bordino-directions .ng-game[data-game=pantomime]{ --ng-game-accent:#ffe95c; --ng-game-bg:#2c2242}

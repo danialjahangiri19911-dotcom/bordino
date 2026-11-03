@@ -56,6 +56,7 @@ export default function Games() {
 						["all", "همه"],
 						["puzzle", "فکری"],
 						["arcade", "آرکید"],
+						["party", "دورهمی"],
 					]}
 				/>
 				<div className="ng-games">

@@ -48,6 +48,7 @@ export const R = {
 	game2048: "/pwa/2048",
 	crash: "/pwa/crash",
 	chicken: "/pwa/chicken",
+	pantomime: "/pwa/pantomime",
 	hafez: "/pwa/hafez",
 	tarot: "/pwa/tarot",
 } as const;
