@@ -34,6 +34,19 @@ const LEAVE = {
 type Dialog = "" | "help" | "reset";
 type Save = "" | "saving" | "saved" | "failed";
 
+/**
+ * A game left without «خروج» (the browser's history menu can skip the question, and a browser lets a
+ * page stop that only once per tap): kept here, paused, for as long as the app is open, and picked up
+ * again when pantomime opens. Leaving by «خروج» or returning to the settings drops it.
+ */
+interface Parked {
+	game: Game;
+	id: string;
+	topics: Topic[];
+	settings: Settings;
+}
+let parked: Parked | null = null;
+
 interface Settings {
 	teams: string[];
 	members: string[][];
@@ -71,7 +84,9 @@ export default function PantomimeGame() {
 	const config = configQuery.data?.result;
 	const recent = useRecentGames();
 
-	const [settings, setSettings] = useState<Settings>({
+	// A game set aside when the page went away mid-game comes back as it was (paused).
+	const [restored] = useState<Parked | null>(() => parked);
+	const [settings, setSettings] = useState<Settings>(() => restored?.settings ?? {
 		teams: ["", ""],
 		members: [
 			["", ""],
@@ -84,6 +99,9 @@ export default function PantomimeGame() {
 		format: "challenge",
 		categories: [],
 	});
+	const settingsRef = useRef(settings);
+	settingsRef.current = settings;
+	const leaving = useRef(false);
 	const [setupStep, setSetupStep] = useState<1 | 2>(1);
 	const [setupError, setSetupError] = useState("");
 	const [choice, setChoice] = useState({ category: "", difficulty: 1 });
@@ -97,8 +115,8 @@ export default function PantomimeGame() {
 	const [save, setSave] = useState<Save>("");
 	const [, rerender] = useReducer((n: number) => n + 1, 0);
 
-	const gameRef = useRef<Game | null>(null);
-	const gameId = useRef("");
+	const gameRef = useRef<Game | null>(restored?.game ?? null);
+	const gameId = useRef(restored?.id ?? "");
 	const savedFor = useRef("");
 	const audio = useRef<PantomimeSound | null>(null);
 	const soundBusy = useRef(false);
@@ -116,7 +134,23 @@ export default function PantomimeGame() {
 	const limits = useMemo(() => (config ? limitsOf(config) : null), [config]);
 	const liveTopics = useMemo(() => config?.categories ?? [], [config]);
 	// A game keeps the topics it started with: the admin's later edits apply to the next game.
-	const gameTopics = useRef<Topic[]>([]);
+	const gameTopics = useRef<Topic[]>(restored?.topics ?? []);
+
+	// Taken up: no longer set aside (a new one is kept if this page goes away mid-game again).
+	useEffect(() => {
+		if (restored) {
+			parked = null;
+			configured.current = true; // its settings are the game's own
+			announce("بازی قبلی همان‌جا که مانده بود ادامه دارد.");
+		}
+		return () => {
+			const g = gameRef.current;
+			if (!g || g.phase === "finished" || leaving.current) return;
+			if (g.phase === "playing") g.pause(performance.now());
+			parked = { game: g, id: gameId.current, topics: gameTopics.current, settings: settingsRef.current };
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 	const topics = game ? gameTopics.current : liveTopics;
 	const weights = useMemo(() => Object.fromEntries(liveTopics.map((t) => [t.id, t.weight])), [liveTopics]);
 	const topic = (id: string): Topic | undefined => topics.find((t) => t.id === id);
@@ -250,6 +284,8 @@ export default function PantomimeGame() {
 	});
 
 	const go = () => {
+		leaving.current = true;
+		parked = null;
 		audio.current?.music(false);
 		push(R.games);
 	};
@@ -430,6 +466,7 @@ export default function PantomimeGame() {
 	};
 
 	const backToSettings = () => {
+		parked = null;
 		gameRef.current = null;
 		setSetupStep(1);
 		audio.current?.music(false);

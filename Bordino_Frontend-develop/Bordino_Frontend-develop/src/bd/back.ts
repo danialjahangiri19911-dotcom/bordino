@@ -93,6 +93,10 @@ export function confirmLeave(go: () => void) {
  * entry copies Next's history state, so its router just shows this page again; it is taken back
  * off when the round is over. (Shared by the games: crash, pantomime.)
  */
+// Set while a guard takes its own entry off (history.back() in its cleanup): that step is not the
+// player's Back, and a guard mounted meanwhile (a page shown again) must not ask about it.
+let ownStep = false;
+
 export function useBrowserBackGuard(active: boolean, onBack: () => void) {
 	const handler = useRef(onBack);
 	handler.current = onBack;
@@ -106,6 +110,10 @@ export function useBrowserBackGuard(active: boolean, onBack: () => void) {
 		window.history.pushState({ ...pageState, ...guard }, "", pageUrl);
 		let armed = true;
 		const onPop = () => {
+			if (ownStep) {
+				ownStep = false;
+				return;
+			}
 			if (!armed) return;
 			// Back left the guard entry: put it back and ask.
 			window.history.pushState({ ...pageState, ...guard }, "", pageUrl);
@@ -121,7 +129,7 @@ export function useBrowserBackGuard(active: boolean, onBack: () => void) {
 		const nav = (window as Window & { navigation?: EventTarget }).navigation;
 		const onNavigate = (event: Event) => {
 			const e = event as NavigateEvent;
-			if (!armed || e.navigationType !== "traverse" || !e.cancelable) return;
+			if (!armed || e.navigationType !== "traverse" || !e.cancelable || ownStep) return;
 			e.preventDefault();
 			if (!handleBackInPage()) handler.current();
 		};
@@ -131,7 +139,14 @@ export function useBrowserBackGuard(active: boolean, onBack: () => void) {
 			nav?.removeEventListener("navigate", onNavigate);
 			window.removeEventListener("popstate", onPop);
 			// The round is over (or the page is leaving): drop the guard entry if it is still on top.
-			if ((window.history.state as { bdBackGuard?: boolean } | null)?.bdBackGuard) window.history.back();
+			if ((window.history.state as { bdBackGuard?: boolean } | null)?.bdBackGuard) {
+				ownStep = true;
+				window.history.back();
+				// Cleared by the step's popstate; also soon after, should that never come.
+				window.setTimeout(() => {
+					ownStep = false;
+				}, 1000);
+			}
 		};
 	}, [active]);
 }
