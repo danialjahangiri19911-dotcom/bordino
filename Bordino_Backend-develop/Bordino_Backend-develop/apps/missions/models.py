@@ -148,6 +148,16 @@ class Mission(AbstractBaseModel):
         default=0, verbose_name=_("ترتیب پیشنهادی"), help_text=_("عدد کمتر = بالاتر در «پیشنهادی».")
     )
     qr_token = models.CharField(max_length=40, unique=True, null=True, blank=True, editable=False)
+    qr_rotating = models.BooleanField(
+        default=False,
+        verbose_name=_("QR متغیر روی نمایشگر محل"),
+        help_text=_(
+            "روشن: به‌جای QR چاپی، یک تبلت یا تلویزیون در محل لینک «نمایشگر» را باز می‌کند و هر ۳۰ ثانیه QR تازه "
+            "نشان می‌دهد. عکسِ فرستاده‌شدهٔ QR بعد از ۲ دقیقه کار نمی‌کند و QR چاپی قبلی هم دیگر پذیرفته نمی‌شود."
+        ),
+    )
+    # The venue screen's address (/venue/<key>): whoever has it can show the current code.
+    qr_display_key = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
     callback_secret = models.CharField(max_length=64, blank=True, editable=False)
 
     class Meta(AbstractBaseModel.Meta):
@@ -170,6 +180,8 @@ class Mission(AbstractBaseModel):
             errors["link_url"] = _("این نوع مأموریت لینک لازم دارد.")
         if self.verification == self.Verification.CALLBACK and "{click_id}" not in (self.link_url or ""):
             errors["link_url"] = _("برای تأیید سرور همکار، {click_id} باید در لینک باشد.")
+        if self.qr_rotating and self.kind != self.Kind.QR:
+            errors["qr_rotating"] = _("QR متغیر فقط برای مأموریت QR است.")
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             errors["ends_at"] = _("پایان باید بعد از شروع باشد.")
         if self.pk and self.attempts.exists():
@@ -183,6 +195,8 @@ class Mission(AbstractBaseModel):
     def save(self, *args, **kwargs):
         if self.kind == self.Kind.QR and not self.qr_token:
             self.qr_token = new_qr_token()
+        if self.kind == self.Kind.QR and self.qr_rotating and not self.qr_display_key:
+            self.qr_display_key = new_callback_secret()
         if self.verification == self.Verification.CALLBACK and not self.callback_secret:
             self.callback_secret = new_callback_secret()
         with transaction.atomic():

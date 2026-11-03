@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { fa } from "../format";
-import { type MissionReward, claimQr } from "../missions/api";
+import { type MissionReward, claimQr, holdQr, isVenueCode } from "../missions/api";
 import { rememberQr } from "../missions/pendingQr";
 import { AppShell, EmptyState, R } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,8 @@ import useAuthStore from "@/libs/stores/authStore";
 
 /**
  * A place's QR, scanned with the phone's camera, opens this page: the server checks the code and pays
- * the mission. Signed out, the code waits through the sign-in (pendingQr) and comes back here.
+ * the mission. Signed out, the code waits through the sign-in (pendingQr) and comes back here; a venue
+ * screen's code (valid two minutes) is first exchanged for a hold that outlasts the sign-in.
  */
 export default function EarnQr({ token }: { token: string }) {
 	const { isLoggedIn } = useAuthStore();
@@ -28,12 +29,23 @@ export default function EarnQr({ token }: { token: string }) {
 	const [problem, setProblem] = useState<string | null>(null);
 
 	useEffect(() => {
+		if (sent.current) return;
 		if (!isLoggedIn) {
-			rememberQr(token);
-			replace(R.login);
+			if (!isVenueCode(token)) {
+				rememberQr(token);
+				replace(R.login);
+				return;
+			}
+			// A venue screen's code lasts two minutes: kept as a hold, it outlasts the sign-in.
+			sent.current = true;
+			holdQr(token)
+				.then((hold) => {
+					rememberQr(hold);
+					replace(R.login);
+				})
+				.catch((e) => setProblem(gameErrorMessage(e)));
 			return;
 		}
-		if (sent.current) return;
 		sent.current = true;
 		claimQr(token)
 			.then((reward) => {
@@ -43,14 +55,14 @@ export default function EarnQr({ token }: { token: string }) {
 			.catch((e) => setProblem(gameErrorMessage(e)));
 	}, [isLoggedIn, token, replace, queryClient]);
 
-	if (!isLoggedIn) return null;
+	if (!isLoggedIn && !problem) return null;
 	const more = (
 		<Link className="bd-action" href={R.earn}>
 			مأموریت‌های دیگر
 		</Link>
 	);
 	return (
-		<AppShell nav="earn" title="دریافت امتیاز">
+		<AppShell nav="earn" title="دریافت امتیاز" allowGuest={!isLoggedIn}>
 			<div className="bd-panel mi-qr-result" role="status">
 				{result ? (
 					<EmptyState

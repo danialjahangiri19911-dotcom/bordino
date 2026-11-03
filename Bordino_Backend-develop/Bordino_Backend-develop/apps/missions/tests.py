@@ -559,3 +559,110 @@ class MissionConcurrencyTests(TransactionTestCase):
             lambda: services.partner_callback(m.pk, b.click_id, m.callback_secret),
         )
         self.assertEqual(self.paid(m), 1)
+
+
+@override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
+class VenueQrTests(TestCase):
+    """A venue screen's QR: a new code every 30 seconds, a photo of it soon useless (2026-11-03)."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_player("9120007301")
+        self.customer = self.user.customer
+        self.mission = Mission.objects.create(
+            title="کافه بردینو", category=MissionCategory.objects.create(name="حضوری"), kind=Mission.Kind.QR,
+            points=20, qr_rotating=True, repeat=Mission.Repeat.DAILY, daily_limit=1,
+        )
+
+    def points(self):
+        return TokenWalletAccount.objects.get(wallet__owner=self.user).amount
+
+    def at(self, seconds):
+        return mock.patch.object(services.time, "time", return_value=seconds)
+
+    def test_a_fresh_code_pays_and_an_old_one_is_refused(self):
+        self.assertTrue(self.mission.qr_display_key)
+        with self.at(1_000_000):
+            code, left = services.display_code(self.mission)
+        self.assertEqual(left, 20)  # 1_000_000 is 10 s into a 30 s step
+        with self.at(1_000_000 + 20 + 120 + 5), self.assertRaises(services.MissionError) as late:
+            services.claim_qr(self.customer, code)  # a photo of it, sent on
+        self.assertEqual(late.exception.code, "qr_expired")
+        with self.at(1_000_000 + 100):
+            self.assertFalse(services.claim_qr(self.customer, code).already)
+        self.assertEqual(self.points(), 20)
+
+    def test_the_printed_token_and_forged_codes_are_refused(self):
+        token = self.mission.qr_token
+        with self.assertRaises(services.MissionError) as printed:
+            services.claim_qr(self.customer, token)
+        self.assertEqual(printed.exception.code, "qr_expired")
+        with self.at(1_000_000):
+            code, _left = services.display_code(self.mission)
+            start = code.split("~")[1]
+            for forged in (f"{token}~{start}~{'0' * 20}", f"{token}~r{int(start[1:]) + 30}~{code.split('~')[2]}",
+                           f"{token}~h{start[1:]}~{code.split('~')[2]}", f"{token}~r~x", "~~", f"{token}~r1~é"):
+                with self.assertRaises(services.MissionError, msg=forged):
+                    services.claim_qr(self.customer, forged)
+        # A printed mission takes no screen codes.
+        printed_mission = Mission.objects.create(title="چاپی", category=self.mission.category, kind=Mission.Kind.QR, points=5)
+        with self.at(1_000_000), self.assertRaises(services.NotFound):
+            services.claim_qr(self.customer, services.display_code(printed_mission)[0])
+        self.assertEqual(self.points(), 0)
+
+    def test_a_scan_while_signed_out_is_held_through_the_sign_in(self):
+        api = APIClient()
+        with self.at(1_000_000):
+            code, _left = services.display_code(self.mission)
+            hold = api.post(f"/api/v1/missions/qr/{code}/hold/").json()["result"]["code"]
+        self.assertIn("~h", hold)
+        with self.at(1_000_000 + 10 * 60):  # ten minutes of SMS sign-in later
+            self.assertFalse(services.claim_qr(self.customer, hold).already)
+        with self.at(1_000_000 + 16 * 60), self.assertRaises(services.MissionError):
+            services.claim_qr(make_player("9120007302").customer, hold)  # a hold lasts 15 minutes
+        with self.at(1_000_000 + 600):
+            self.assertEqual(api.post(f"/api/v1/missions/qr/{code}/hold/").status_code, 410)  # too late to hold
+
+    def test_the_venue_screen_shows_the_current_code(self):
+        try:
+            import segno  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+        except ImportError:
+            self.skipTest("segno is installed with the new image")
+        api = APIClient()
+        r = api.get(f"/api/v1/missions/venue/{self.mission.qr_display_key}/")
+        self.assertEqual(r.status_code, 200, r.content)
+        body = r.json()["result"]
+        self.assertEqual((body["title"], body["points"], body["step"]), ("کافه بردینو", 20, 30))
+        self.assertIn("/pwa/earn/qr/", body["url"])
+        self.assertTrue(body["svg"].startswith("<svg"))
+        self.assertEqual(r["Cache-Control"], "no-store")
+        self.assertEqual(api.get("/api/v1/missions/venue/wrong-key/").status_code, 404)
+        # Scanned and claimed in the app.
+        player = APIClient()
+        player.force_authenticate(self.user)
+        code = body["url"].rsplit("/", 1)[1]
+        self.assertEqual(player.post(f"/api/v1/missions/qr/{code}/").json()["result"]["points"], 20)
+
+    def test_the_admin_shows_the_screen_link_only_to_editors_and_can_replace_it(self):
+        from django.contrib.auth.models import Permission  # pylint: disable=import-outside-toplevel
+
+        url = f"/admin/missions/mission/{self.mission.pk}/change/"
+        viewer = get_user_model().objects.create_user(phone_number="9120007303", password="x-Pass-123")
+        viewer.is_admin = True
+        viewer.save()
+        viewer.user_permissions.add(Permission.objects.get(codename="view_mission"))
+        self.client.force_login(viewer)
+        self.assertNotIn(self.mission.qr_display_key, self.client.get(url).content.decode())
+        boss = get_user_model().objects.create_superuser(phone_number="9120007304", password="x-Pass-123")
+        self.client.force_login(boss)
+        self.assertIn(f"/venue/{self.mission.qr_display_key}", self.client.get(url).content.decode())
+        old_key = self.mission.qr_display_key
+        self.client.post("/admin/missions/mission/", {"action": "new_qr", "_selected_action": [str(self.mission.pk)]})
+        self.mission.refresh_from_db()
+        self.assertNotEqual(self.mission.qr_display_key, old_key)
+        self.assertEqual(APIClient().get(f"/api/v1/missions/venue/{old_key}/").status_code, 404)
+
+    def test_only_a_qr_mission_can_rotate(self):
+        banner = Mission(title="b", category=self.mission.category, kind=Mission.Kind.BANNER, points=1, link_url="https://e.x/", qr_rotating=True)
+        with self.assertRaises(ValidationError):
+            banner.full_clean()

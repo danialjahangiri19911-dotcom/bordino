@@ -6,11 +6,14 @@ tries happen under a lock on the player (as the rewarded ad does), so two reques
 cannot both use the last free try of the day.
 """
 
+import hashlib
 import hmac
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -356,14 +359,89 @@ def submit_proof(customer: Customer, attempt_id, text: str = "", image=None) -> 
         return attempt
 
 
+# ── a place's QR ──
+# A printed QR carries the mission's token for good. A venue screen (qr_rotating) shows a new code
+# every QR_STEP seconds: "<token>~r<start>~<signature>", accepted until QR_GRACE seconds after its
+# step ends, so a photo of it sent on later is refused. Scanned while signed out, a valid code is
+# exchanged for a hold ("<token>~h<time>~<signature>") that outlives the sign-in (QR_HOLD).
+QR_STEP = 30
+QR_GRACE = 120
+QR_HOLD = 15 * 60
+QR_EXPIRED = "این QR منقضی شده؛ دوباره از روی نمایشگرِ محل اسکن کن."
+
+
+def _qr_signature(mission: Mission, kind: str, at: int) -> str:
+    message = f"mission-qr:{mission.pk}:{mission.qr_token}:{kind}:{at}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()[:20]
+
+
+def display_code(mission: Mission, now: float | None = None) -> tuple[str, int]:
+    """The code a venue screen shows now, and the seconds until the next one."""
+    now = time.time() if now is None else now
+    start = int(now) // QR_STEP * QR_STEP
+    return f"{mission.qr_token}~r{start}~{_qr_signature(mission, 'r', start)}", max(1, start + QR_STEP - int(now))
+
+
+def _split_code(code: str) -> tuple[str, str | None, int | None, str | None]:
+    """(token, kind, time, signature); a printed QR's code is the bare token."""
+    parts = (code or "").split("~")
+    if len(parts) == 1:
+        return parts[0], None, None, None
+    if len(parts) == 3 and len(parts[1]) > 1 and parts[1][0] in "rh" and parts[1][1:].isdigit():
+        return parts[0], parts[1][0], int(parts[1][1:]), parts[2]
+    return "", None, None, None
+
+
+def _code_valid(mission: Mission, kind: str | None, at: int | None, signature: str | None, now: float) -> bool:
+    if kind is None or at is None or not signature:
+        return False
+    try:
+        given = signature.encode("ascii")
+    except UnicodeEncodeError:
+        return False
+    if not hmac.compare_digest(given, _qr_signature(mission, kind, at).encode()):
+        return False
+    lasts = QR_STEP + QR_GRACE if kind == "r" else QR_HOLD
+    return at - 5 <= now <= at + lasts  # (a few seconds of clock difference allowed)
+
+
+def _qr_mission(code: str, lock: bool = False) -> tuple[Mission, str | None, int | None, str | None]:
+    token, kind, at, signature = _split_code(code)
+    missions = Mission.objects.select_for_update() if lock else Mission.objects
+    mission = missions.filter(qr_token=token, kind=Mission.Kind.QR).first() if token else None
+    # A venue-screen mission takes only its fresh codes; a printed one only its token.
+    if mission is None or (kind is not None and not mission.qr_rotating):
+        raise NotFound("این کد QR معتبر نیست.")
+    if mission.qr_rotating and not _code_valid(mission, kind, at, signature, time.time()):
+        raise MissionError(QR_EXPIRED, "qr_expired")
+    return mission, kind, at, signature
+
+
+def hold_qr(code: str) -> str:
+    """A fresh venue-screen code scanned while signed out: a hold that lasts through the sign-in."""
+    mission, kind, _at, _signature = _qr_mission(code)
+    if not mission.qr_rotating or kind != "r":
+        return code  # a printed QR's token keeps as it is
+    now = int(time.time())
+    return f"{mission.qr_token}~h{now}~{_qr_signature(mission, 'h', now)}"
+
+
+def venue_display(key: str) -> tuple[Mission, str, int]:
+    mission = (
+        Mission.objects.filter(qr_display_key=key, kind=Mission.Kind.QR, qr_rotating=True).first() if key else None
+    )
+    if mission is None:
+        raise NotFound()
+    code, expires_in = display_code(mission)
+    return mission, code, expires_in
+
+
 def claim_qr(customer: Customer, token: str) -> Claim:
     """A QR at a place, scanned with the phone's camera (its link opens the app)."""
     with transaction.atomic():
         _lock(customer)
         # Locked like start(): an admin's edit of the mission cannot cross the scan.
-        mission = Mission.objects.select_for_update().filter(qr_token=token, kind=Mission.Kind.QR).first() if token else None
-        if mission is None:
-            raise NotFound("این کد QR معتبر نیست.")
+        mission = _qr_mission(token, lock=True)[0]
         done_today = (
             MissionAttempt.objects.filter(customer=customer, mission=mission, status=Status.COMPLETED)
             .order_by("-completed_at")

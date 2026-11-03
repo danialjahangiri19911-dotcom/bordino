@@ -1,5 +1,6 @@
 import { type AdSession, untilConfirmed } from "../ads/api";
 import { call } from "@/api/games/request";
+import requester from "@/libs/http/requester";
 import type { ResponseApiData } from "@/libs/http/interfaces";
 import useQuery from "@/libs/http/query";
 
@@ -112,3 +113,26 @@ export function sendProof(attemptId: string, text: string, image: Blob | null) {
 }
 
 export const claimQr = (token: string) => call<MissionReward>("post", `${MISSIONS}qr/${encodeURIComponent(token)}/`, {});
+
+/** A venue screen's code (it changes every 30 seconds) rather than a printed QR's. */
+export const isVenueCode = (token: string) => /~r\d+~/.test(token);
+
+/** A venue screen's code scanned while signed out: exchanged for a hold that lasts through the sign-in. */
+export const holdQr = async (token: string) =>
+	(await requester.post<ResponseApiData<{ code: string }>>(`${MISSIONS}qr/${encodeURIComponent(token)}/hold/`, {})).data.result.code;
+
+export interface VenueScreen {
+	title: string;
+	points: number;
+	active: boolean;
+	url: string;
+	/** The QR as an SVG image. */
+	svg: string;
+	/** Seconds until the next code. */
+	expires_in: number;
+	step: number;
+}
+
+/** What a venue screen shows now (no sign-in: the screen's own key is its access). */
+export const venueScreen = async (key: string) =>
+	(await requester.get<ResponseApiData<VenueScreen>>(`${MISSIONS}venue/${encodeURIComponent(key)}/`)).data.result;

@@ -7,7 +7,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from apps.missions import services
-from apps.missions.models import Mission, MissionAttempt, MissionCategory, new_qr_token
+from apps.missions.models import Mission, MissionAttempt, MissionCategory, new_callback_secret, new_qr_token
 
 
 def public_url(path_: str) -> str:
@@ -16,6 +16,10 @@ def public_url(path_: str) -> str:
 
 def qr_link(mission: Mission) -> str:
     return public_url(f"/pwa/earn/qr/{mission.qr_token}")
+
+
+def venue_link(mission: Mission) -> str:
+    return public_url(f"/venue/{mission.qr_display_key}")
 
 
 def callback_link(mission: Mission) -> str:
@@ -37,26 +41,34 @@ class MissionAdmin(admin.ModelAdmin):
     readonly_fields = ("qr_code", "partner_callback")
     actions = ("new_qr",)
 
-    @admin.action(description="ساخت QR تازه (QR قبلی دیگر کار نمی‌کند)", permissions=["change"])
+    @admin.action(description="ساخت QR تازه (QR و لینک نمایشگر قبلی دیگر کار نمی‌کنند)", permissions=["change"])
     def new_qr(self, request, queryset):
         done = 0
         for mission in queryset.filter(kind=Mission.Kind.QR):
-            Mission.objects.filter(pk=mission.pk).update(qr_token=new_qr_token())
+            Mission.objects.filter(pk=mission.pk).update(
+                qr_token=new_qr_token(), qr_display_key=new_callback_secret() if mission.qr_rotating else None
+            )
             done += 1
-        self.message_user(request, f"برای {done} مأموریت QR تازه ساخته شد؛ QR جدید را چاپ کنید.", messages.SUCCESS)
+        self.message_user(
+            request,
+            f"برای {done} مأموریت QR تازه ساخته شد؛ QR چاپی را دوباره چاپ کنید و لینک تازهٔ نمایشگر را روی نمایشگر محل باز کنید.",
+            messages.SUCCESS,
+        )
     fieldsets = (
         (None, {"fields": ("title", "summary", "description", "category", "kind", "verification", "points")}),
         ("تکرار و زمان", {"fields": ("repeat", "daily_limit", "starts_at", "ends_at", "capacity")}),
         ("لینک و همکار", {"fields": ("link_url", "partner_name", "image", "min_seconds")}),
         ("مدرک (بررسی ادمین)", {"fields": ("proof_label", "proof_image_required")}),
         ("نمایش", {"fields": ("is_active", "is_visible", "order")}),
-        ("QR و سرور همکار", {"fields": ("qr_code", "partner_callback")}),
+        ("QR و سرور همکار", {"fields": ("qr_rotating", "qr_code", "venue_screen", "partner_callback")}),
     )
 
     @admin.display(description="QR برای چاپ")
     def qr_code(self, obj):
         if not obj or obj.kind != Mission.Kind.QR or not obj.qr_token:
             return "برای مأموریت QR، بعد از ذخیره ساخته می‌شود."
+        if obj.qr_rotating:
+            return "این مأموریت QR متغیر دارد: QR چاپی ندارد؛ لینک نمایشگر را در محل باز کنید."
         import segno  # pylint: disable=import-outside-toplevel
 
         link = qr_link(obj)
@@ -72,18 +84,43 @@ class MissionAdmin(admin.ModelAdmin):
 
     # The partner's key pays points: only those who may change missions see it (others get the
     # same row without the key).
+    # The same for the venue screen's link: whoever has it can show the current code anywhere.
+    SECRET_FIELDS = ("partner_callback", "venue_screen")
+
+    def _secret_field(self, request, obj, name):
+        return name if self.has_change_permission(request, obj) else f"{name}_hidden"
+
     def _callback_field(self, request, obj):
-        return "partner_callback" if self.has_change_permission(request, obj) else "partner_callback_hidden"
+        return self._secret_field(request, obj, "partner_callback")
 
     def get_readonly_fields(self, request, obj=None):
-        return ("qr_code", self._callback_field(request, obj))
+        return ("qr_code", *(self._secret_field(request, obj, f) for f in self.SECRET_FIELDS))
 
     def get_fieldsets(self, request, obj=None):
-        name = self._callback_field(request, obj)
+        names = {f: self._secret_field(request, obj, f) for f in self.SECRET_FIELDS}
         return [
-            (title, {**opts, "fields": tuple(name if f == "partner_callback" else f for f in opts["fields"])})
+            (title, {**opts, "fields": tuple(names.get(f, f) for f in opts["fields"])})
             for title, opts in self.fieldsets
         ]
+
+    @admin.display(description="لینک نمایشگر محل")
+    def venue_screen(self, obj):
+        if not obj or obj.kind != Mission.Kind.QR or not obj.qr_rotating:
+            return "برای «QR متغیر روی نمایشگر محل»، بعد از ذخیره ساخته می‌شود."
+        if not obj.qr_display_key:
+            return "بعد از ذخیره ساخته می‌شود."
+        link = venue_link(obj)
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">{}</a><br>'
+            "این لینک را روی تبلت یا تلویزیونِ محل باز کنید (تمام‌صفحه). هر ۳۰ ثانیه QR عوض می‌شود. "
+            "لینک را به کسی جز مسئول محل ندهید؛ اگر پخش شد، با «ساخت QR تازه» عوضش کنید.",
+            link,
+            link,
+        )
+
+    @admin.display(description="لینک نمایشگر محل")
+    def venue_screen_hidden(self, obj):
+        return "فقط کسی که اجازهٔ ویرایش مأموریت دارد لینک را می‌بیند."
 
     @admin.display(description="آدرس تأیید برای سرور همکار")
     def partner_callback_hidden(self, obj):

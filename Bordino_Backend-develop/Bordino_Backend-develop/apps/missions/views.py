@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -24,7 +25,13 @@ class CallbackThrottle(AnonRateThrottle):
     rate = "120/min"
 
 
-ERROR_STATUS = {"not_found": status.HTTP_404_NOT_FOUND, "forbidden": status.HTTP_403_FORBIDDEN}
+class VenueThrottle(AnonRateThrottle):
+    # A venue screen asks once per code (every 30 s); a scan while signed out asks once.
+    scope = "missions_venue"
+    rate = "30/min"
+
+
+ERROR_STATUS = {"not_found": status.HTTP_404_NOT_FOUND, "forbidden": status.HTTP_403_FORBIDDEN, "qr_expired": status.HTTP_410_GONE}
 
 
 def _error(exc: services.MissionError):
@@ -262,3 +269,50 @@ class MissionCallbackView(APIView):
     @extend_schema(tags=["missions"], summary="Partner confirms a sign-up / install")
     def post(self, request, mission_id):
         return self._handle(request, mission_id)
+
+
+class MissionQrHoldView(APIView):
+    """A venue screen's code scanned while signed out: kept valid through the sign-in (a hold)."""
+
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    throttle_classes = (VenueThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Keep a venue QR code through sign-in")
+    def post(self, request, token):
+        try:
+            return Response({"code": services.hold_qr(token)})
+        except services.MissionError as exc:
+            return _error(exc)
+
+
+class VenueDisplayView(APIView):
+    """The venue screen (/venue/<key>): the code to show now, as a QR image, and when it changes."""
+
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    throttle_classes = (VenueThrottle,)
+
+    @extend_schema(tags=["missions"], summary="The venue screen's current QR")
+    def get(self, request, key):
+        import segno  # pylint: disable=import-outside-toplevel
+
+        try:
+            mission, code, expires_in = services.venue_display(key)
+        except services.MissionError as exc:
+            return _error(exc)
+        url = f"{settings.MISSIONS_PUBLIC_URL.rstrip('/')}/pwa/earn/qr/{code}"
+        svg = segno.make(url, error="m").svg_inline(scale=8, border=2)
+        response = Response(
+            {
+                "title": mission.title,
+                "points": mission.points,
+                "active": mission.is_active,
+                "url": url,
+                "svg": svg,
+                "expires_in": expires_in,
+                "step": services.QR_STEP,
+            }
+        )
+        response["Cache-Control"] = "no-store"
+        return response
