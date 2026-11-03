@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "../Icon";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { fa, faDate } from "../format";
 import { ICONS } from "../icons";
 import { R, useRequireLogin } from "../ui";
@@ -108,8 +108,11 @@ export default function PantomimeGame() {
 
 	const game = gameRef.current;
 	const limits = useMemo(() => (config ? limitsOf(config) : null), [config]);
-	const topics = useMemo(() => config?.categories ?? [], [config]);
-	const weights = useMemo(() => Object.fromEntries(topics.map((t) => [t.id, t.weight])), [topics]);
+	const liveTopics = useMemo(() => config?.categories ?? [], [config]);
+	// A game keeps the topics it started with: the admin's later edits apply to the next game.
+	const gameTopics = useRef<Topic[]>([]);
+	const topics = game ? gameTopics.current : liveTopics;
+	const weights = useMemo(() => Object.fromEntries(liveTopics.map((t) => [t.id, t.weight])), [liveTopics]);
 	const topic = (id: string): Topic | undefined => topics.find((t) => t.id === id);
 	const categoryName = (id: string) => topic(id)?.label ?? (id === "challenge" ? "چالش پیشنهادی" : "کارت");
 
@@ -221,15 +224,19 @@ export default function PantomimeGame() {
 	// A finished game is recorded once (its id makes a retry the same game).
 	const record = () => {
 		const g = gameRef.current;
-		if (!g || g.phase !== "finished" || !gameId.current) return;
-		savedFor.current = gameId.current;
+		const id = gameId.current;
+		if (!g || g.phase !== "finished" || !id) return;
+		savedFor.current = id;
 		setSave("saving");
-		saveGame(gameReport(gameId.current, g.result()))
+		// The answer is shown only while its game is still on screen (a rematch has its own).
+		saveGame(gameReport(id, g.result()))
 			.then(() => {
-				setSave("saved");
+				if (gameId.current === id) setSave("saved");
 				void recent.refetch();
 			})
-			.catch(() => setSave("failed"));
+			.catch(() => {
+				if (gameId.current === id) setSave("failed");
+			});
 	};
 	useEffect(() => {
 		if (game?.phase === "finished" && savedFor.current !== gameId.current) record();
@@ -264,6 +271,8 @@ export default function PantomimeGame() {
 		window.setTimeout(() => headerRef.current?.querySelector<HTMLElement>('[data-act="help"]')?.focus(), 0);
 	};
 	useBackHandler(true, () => (dialog ? closeDialog() : leave()));
+	// The browser's own Back during a game asks too (the Android app's Back is the handler above).
+	useBrowserBackGuard(!!game && game.phase !== "finished", leave);
 
 	const openDialog = (type: Exclude<Dialog, "">) => {
 		const g = gameRef.current;
@@ -302,6 +311,13 @@ export default function PantomimeGame() {
 
 	const startGame = () => {
 		if (!config || !limits) return;
+		// Switched off in the admin meanwhile: no new game (or rematch); the page says so.
+		if (!config.enabled) {
+			gameRef.current = null;
+			setSetupStep(1);
+			rerender();
+			return;
+		}
 		const deck =
 			settings.format === "challenge"
 				? []
@@ -310,6 +326,7 @@ export default function PantomimeGame() {
 					: config.cards.filter((c) => settings.categories.includes(c.category) && (!settings.difficulty || c.difficulty === settings.difficulty));
 		try {
 			gameRef.current = new Game(settings, deck, { limits, weights });
+			gameTopics.current = config.categories;
 			gameId.current = newId();
 			setSave("");
 			setProposalText("");
@@ -317,7 +334,7 @@ export default function PantomimeGame() {
 			setProposalError("");
 			setSetupError("");
 			choices.current = [];
-			setChoice({ category: topics[0]?.id ?? "", difficulty: 1 });
+			setChoice({ category: config.categories[0]?.id ?? "", difficulty: 1 });
 			lastTick.current = -1;
 			rerender();
 			announce("بازی آماده است؛ نوبت " + gameRef.current.config.teams[0]);

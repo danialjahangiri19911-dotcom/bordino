@@ -23,20 +23,26 @@ type State = "loading" | "ok" | "offline" | "gone";
 export default function VenueScreen({ screenKey }: { screenKey: string }) {
 	const [screen, setScreen] = useState<Screen | null>(null);
 	const [state, setState] = useState<State>("loading");
-	const [now, setNow] = useState(() => Date.now());
-	const fetchedAt = useRef(0);
+	const [now, setNow] = useState(() => performance.now());
+	// When the shown code was asked for (a monotonic clock): its life is counted from the request,
+	// never from a late answer, so a slow network cannot keep an expired code on screen.
+	const askedAt = useRef(0);
 
 	useEffect(() => {
 		let stopped = false;
 		let timer: number | undefined;
 		const load = async () => {
+			const asked = performance.now();
 			try {
 				const next = await venueScreen(screenKey);
 				if (stopped) return;
-				fetchedAt.current = Date.now();
+				askedAt.current = asked;
 				setScreen(next);
 				setState("ok");
-				timer = window.setTimeout(load, next.expires_in * 1000 + 250);
+				// The next code when this one's step ends, counted from the request (at once if the
+				// answer came that late).
+				const spent = performance.now() - asked;
+				timer = window.setTimeout(load, Math.max(0, next.expires_in * 1000 - spent) + 250);
 			} catch (e) {
 				if (stopped) return;
 				if (axios.isAxiosError(e) && e.response?.status === 404) {
@@ -56,7 +62,7 @@ export default function VenueScreen({ screenKey }: { screenKey: string }) {
 
 	// The countdown, once a second.
 	useEffect(() => {
-		const t = window.setInterval(() => setNow(Date.now()), 1000);
+		const t = window.setInterval(() => setNow(performance.now()), 1000);
 		return () => window.clearInterval(t);
 	}, []);
 
@@ -66,18 +72,37 @@ export default function VenueScreen({ screenKey }: { screenKey: string }) {
 		const wake = (navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<Lock> } }).wakeLock;
 		if (!wake) return undefined;
 		let lock: Lock | null = null;
+		let asking = false;
+		let disposed = false;
 		const take = () => {
-			if (document.visibilityState === "visible") wake.request("screen").then((l) => (lock = l)).catch(() => undefined);
+			if (disposed || asking || document.visibilityState !== "visible") return;
+			asking = true;
+			wake
+				.request("screen")
+				.then((l) => {
+					asking = false;
+					// Granted after leaving the page, or a second one: let it go at once.
+					if (disposed) void l.release().catch(() => undefined);
+					else {
+						void lock?.release().catch(() => undefined);
+						lock = l;
+					}
+				})
+				.catch(() => {
+					asking = false;
+				});
 		};
 		take();
 		document.addEventListener("visibilitychange", take);
 		return () => {
+			disposed = true;
 			document.removeEventListener("visibilitychange", take);
 			void lock?.release().catch(() => undefined);
+			lock = null;
 		};
 	}, []);
 
-	const age = now - fetchedAt.current;
+	const age = Math.max(0, now - askedAt.current);
 	const left = screen ? Math.max(0, Math.ceil(screen.expires_in - age / 1000)) : 0;
 	// The last code is shown only while the server still takes it.
 	const showCode = !!screen && state !== "gone" && age < screen.expires_in * 1000 + GRACE_MS;

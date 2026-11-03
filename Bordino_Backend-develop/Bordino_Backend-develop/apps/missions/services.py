@@ -384,11 +384,16 @@ def display_code(mission: Mission, now: float | None = None) -> tuple[str, int]:
 
 def _split_code(code: str) -> tuple[str, str | None, int | None, str | None]:
     """(token, kind, time, signature); a printed QR's code is the bare token."""
-    parts = (code or "").split("~")
+    code = code or ""
+    if len(code) > 120:  # a token (24) + a time (~11) + a signature (20): anything longer is not ours
+        return "", None, None, None
+    parts = code.split("~")
     if len(parts) == 1:
         return parts[0], None, None, None
-    if len(parts) == 3 and len(parts[1]) > 1 and parts[1][0] in "rh" and parts[1][1:].isdigit():
-        return parts[0], parts[1][0], int(parts[1][1:]), parts[2]
+    stamp = parts[1][1:] if len(parts) == 3 else ""
+    # ASCII digits only, of a sane length: str.isdigit() also takes «²» and other digits int() refuses.
+    if len(parts) == 3 and parts[1][:1] in ("r", "h") and 0 < len(stamp) <= 12 and stamp.isascii() and stamp.isdigit():
+        return parts[0], parts[1][0], int(stamp), parts[2]
     return "", None, None, None
 
 

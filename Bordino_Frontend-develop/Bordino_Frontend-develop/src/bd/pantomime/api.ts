@@ -51,17 +51,26 @@ export function useRecentGames() {
 	return useQuery<ResponseApiData<GameHistory>>({ url: `${PANTOMIME}games/`, headers: true });
 }
 
-/** A finished game as the server keeps it (the player's record; nothing is paid for it). */
+/** The details the record keeps: up to this many cards a turn, and in all (the count is always true). */
+export const REPORT_TURN_CARDS = 200;
+export const REPORT_CARDS = 1500;
+
+/**
+ * A finished game as the server keeps it (the player's record; nothing is paid for it). Teams stay in
+ * the game's order, each with its rank: a turn's `team` is an index into that list.
+ */
 export function gameReport(
 	requestId: string,
 	result: { format: Format; mode: Mode; rounds: number; teams: string[]; members: string[][]; ranking: Rank[]; history: Turn[] },
 ) {
+	const byTeam = [...result.ranking].sort((a, b) => a.team - b.team);
+	let budget = REPORT_CARDS;
 	return {
 		request_id: requestId,
 		format: result.format,
 		mode: result.mode,
 		rounds: result.rounds,
-		teams: result.ranking.map((r) => ({
+		teams: byTeam.map((r) => ({
 			name: r.name,
 			members: result.members[r.team],
 			score: r.score,
@@ -69,13 +78,18 @@ export function gameReport(
 			correct: r.correct,
 			correct_elapsed_ms: Math.round(r.correctElapsedMs),
 		})),
-		turns: result.history.map((h) => ({
-			team: h.team,
-			round: h.round,
-			player: h.player,
-			points: h.points,
-			cards: h.cards.map((c) => ({ text: c.text, result: c.result, elapsed_ms: Math.max(0, Math.round(c.elapsedMs)) })),
-		})),
+		turns: result.history.map((h) => {
+			const kept = h.cards.slice(0, Math.min(REPORT_TURN_CARDS, budget));
+			budget -= kept.length;
+			return {
+				team: h.team,
+				round: h.round,
+				player: h.player,
+				points: h.points,
+				cards_total: h.cards.length,
+				cards: kept.map((c) => ({ text: c.text, result: c.result, elapsed_ms: Math.max(0, Math.round(c.elapsedMs)) })),
+			};
+		}),
 	};
 }
 

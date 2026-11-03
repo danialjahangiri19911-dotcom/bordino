@@ -662,6 +662,27 @@ class VenueQrTests(TestCase):
         self.assertNotEqual(self.mission.qr_display_key, old_key)
         self.assertEqual(APIClient().get(f"/api/v1/missions/venue/{old_key}/").status_code, 404)
 
+    def test_hostile_codes_are_refused_cleanly(self):
+        """Codex review 2026-11-03: «²» passes str.isdigit() but not int(); a huge number neither."""
+        api = APIClient()
+        player = APIClient()
+        player.force_authenticate(self.user)
+        token = self.mission.qr_token
+        for code in ("unknown~r²~x", f"{token}~r{'9' * 4301}~x", f"{token}~r١٢٣~x", "~~", f"{token}~r1~é", "x" * 500, f"{token}~q1~x"):
+            self.assertIn(api.post(f"/api/v1/missions/qr/{code}/hold/").status_code, (404, 410), code)
+            self.assertIn(player.post(f"/api/v1/missions/qr/{code}/").status_code, (404, 410), code)
+        self.assertEqual(self.points(), 0)
+
+    def test_guest_scans_never_use_up_the_screens_budget(self):
+        api = APIClient()
+        for _ in range(40):  # a room full of guests on the venue's Wi-Fi (one address)
+            api.post("/api/v1/missions/qr/invalid/hold/")
+        try:
+            import segno  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+        except ImportError:
+            self.skipTest("segno is installed with the new image")
+        self.assertEqual(api.get(f"/api/v1/missions/venue/{self.mission.qr_display_key}/").status_code, 200)
+
     def test_only_a_qr_mission_can_rotate(self):
         banner = Mission(title="b", category=self.mission.category, kind=Mission.Kind.BANNER, points=1, link_url="https://e.x/", qr_rotating=True)
         with self.assertRaises(ValidationError):

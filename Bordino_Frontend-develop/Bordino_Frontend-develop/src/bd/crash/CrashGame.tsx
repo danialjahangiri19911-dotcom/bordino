@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
-import { askLeave, handleBackInPage, useBackHandler } from "../back";
+import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
@@ -65,36 +65,6 @@ function useFrameClock(active: boolean) {
 	}, [active]);
 }
 
-/**
- * The browser's own Back (a browser, not the Android app, whose Back is useBackHandler's): while
- * `active`, one extra history entry for this same page catches it and `onBack` asks instead. The
- * entry copies Next's history state, so its router just shows this page again; it is taken back
- * off when the round is over.
- */
-function useBrowserBackGuard(active: boolean, onBack: () => void) {
-	const handler = useRef(onBack);
-	handler.current = onBack;
-	useEffect(() => {
-		if (!active || typeof window === "undefined") return undefined;
-		const guard = { crashGuard: true };
-		window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
-		let armed = true;
-		const onPop = () => {
-			if (!armed) return;
-			// Back left the guard entry: put it back and ask.
-			window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
-			// Like Android Back: the newest overlay first (an open question closes), else the game.
-			if (!handleBackInPage()) handler.current();
-		};
-		window.addEventListener("popstate", onPop);
-		return () => {
-			armed = false;
-			window.removeEventListener("popstate", onPop);
-			// The round is over (or the page is leaving): drop the guard entry if it is still on top.
-			if ((window.history.state as { crashGuard?: boolean } | null)?.crashGuard) window.history.back();
-		};
-	}, [active]);
-}
 
 /**
  * «انفجار» in the Bordino-Crash-Game-Design look (neobrutalism, like the rest of the app), driven by

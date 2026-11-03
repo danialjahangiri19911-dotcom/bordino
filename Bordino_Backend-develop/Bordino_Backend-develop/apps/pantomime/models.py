@@ -160,9 +160,10 @@ class PantomimeGame(AbstractBaseModel):
     rounds = models.PositiveSmallIntegerField(verbose_name=_("دورها"))
     team_count = models.PositiveSmallIntegerField(verbose_name=_("تیم‌ها"))
     winners = models.CharField(max_length=200, blank=True, verbose_name=_("برنده"))
-    # [{name, members, score, rank, correct, correct_elapsed_ms}], in ranking order.
+    # [{name, members, score, rank, correct, correct_elapsed_ms}], in the game's team order.
     teams = models.JSONField(default=list, blank=True, verbose_name=_("تیم‌ها و امتیازها"))
-    # The turns as played ({team, round, player, points, cards: [{text, result}]}), for the record.
+    # The turns as played ({team (index into teams), round, player, points, cards_total, cards: [{text,
+    # result, elapsed_ms}] — the first 200}), for the record.
     turns = models.JSONField(default=list, blank=True, verbose_name=_("نوبت‌ها"))
 
     def __str__(self):

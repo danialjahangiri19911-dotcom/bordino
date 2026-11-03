@@ -132,3 +132,57 @@ class PantomimeTests(TestCase):
         for url in ("/admin/pantomime/pantomimecard/", "/admin/pantomime/pantomimecategory/", "/admin/pantomime/pantomimegame/",
                     f"/admin/pantomime/pantomimecategory/{PantomimeCategory.objects.first().pk}/change/"):
             self.assertEqual(self.client.get(url).status_code, 200, url)
+
+
+@override_settings(CACHES=LOCMEM)
+class PantomimeReviewTests(TestCase):
+    """Codex review of the game, 2026-11-03."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_customer("9120008101")
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_turns_keep_pointing_at_their_team(self):
+        # B won: the teams are kept in the game's order (A, B), each with its rank.
+        body = game("t-1", teams=[{**game()["teams"][0], "rank": 2, "score": 0}, {**game()["teams"][1], "rank": 1, "score": 1}])
+        self.assertEqual(self.api.post(GAMES, body, format="json").status_code, 201)
+        saved = PantomimeGame.objects.get()
+        self.assertEqual([t["name"] for t in saved.teams], ["تیم A", "تیم B"])
+        self.assertEqual(saved.teams[saved.turns[0]["team"]]["members"], ["سارا", "علی"])
+        self.assertEqual(saved.winners, "تیم B")
+        listed = result(self.api.get(GAMES))["results"][0]["teams"]
+        self.assertEqual([t["name"] for t in listed], ["تیم B", "تیم A"])  # shown ranked
+
+    def test_a_long_marathon_turn_is_kept_with_its_true_count(self):
+        turn = {"team": 0, "round": 1, "player": "سارا", "points": 450, "cards_total": 900, "cards": [{"text": "x", "result": "correct"}] * 200}
+        r = self.api.post(GAMES, game("m-1", format="marathon", turns=[turn]), format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(PantomimeGame.objects.get().turns[0]["cards_total"], 900)
+        short = {**turn, "cards_total": 3}  # never fewer than the cards sent
+        self.api.post(GAMES, game("m-2", format="marathon", turns=[short]), format="json")
+        self.assertEqual(PantomimeGame.objects.get(request_id="m-2").turns[0]["cards_total"], 200)
+
+    def test_the_same_game_sent_twice_at_once_is_one_record(self):
+        from unittest import mock  # pylint: disable=import-outside-toplevel
+
+        from apps.pantomime import services  # pylint: disable=import-outside-toplevel
+        from apps.pantomime.views import GameSerializer  # pylint: disable=import-outside-toplevel
+
+        data = GameSerializer(data=game("race"))
+        data.is_valid(raise_exception=True)
+        first, created = services.save_game(self.user.customer, data.validated_data)
+        self.assertTrue(created)
+        # The other copy looked before the first was saved: it runs into the record at save time.
+        real = PantomimeGame.objects.filter
+        calls = {"n": 0}
+
+        def blind_first(*args, **kwargs):
+            calls["n"] += 1
+            return PantomimeGame.objects.none() if calls["n"] == 1 else real(*args, **kwargs)
+
+        with mock.patch.object(PantomimeGame.objects, "filter", side_effect=blind_first):
+            again, created = services.save_game(self.user.customer, data.validated_data)
+        self.assertEqual((again.pk, created), (first.pk, False))
+        self.assertEqual(PantomimeGame.objects.count(), 1)

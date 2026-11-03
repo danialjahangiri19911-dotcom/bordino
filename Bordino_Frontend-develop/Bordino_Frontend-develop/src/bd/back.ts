@@ -86,3 +86,34 @@ export function confirmLeave(go: () => void) {
 	if (q && ask) ask(q, go);
 	else go();
 }
+
+/**
+ * The browser's own Back (a browser, not the Android app, whose Back is useBackHandler's): while
+ * `active`, one extra history entry for this same page catches it and `onBack` asks instead. The
+ * entry copies Next's history state, so its router just shows this page again; it is taken back
+ * off when the round is over. (Shared by the games: crash, pantomime.)
+ */
+export function useBrowserBackGuard(active: boolean, onBack: () => void) {
+	const handler = useRef(onBack);
+	handler.current = onBack;
+	useEffect(() => {
+		if (!active || typeof window === "undefined") return undefined;
+		const guard = { bdBackGuard: true };
+		window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+		let armed = true;
+		const onPop = () => {
+			if (!armed) return;
+			// Back left the guard entry: put it back and ask.
+			window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+			// Like Android Back: the newest overlay first (an open question closes), else the game.
+			if (!handleBackInPage()) handler.current();
+		};
+		window.addEventListener("popstate", onPop);
+		return () => {
+			armed = false;
+			window.removeEventListener("popstate", onPop);
+			// The round is over (or the page is leaving): drop the guard entry if it is still on top.
+			if ((window.history.state as { bdBackGuard?: boolean } | null)?.bdBackGuard) window.history.back();
+		};
+	}, [active]);
+}

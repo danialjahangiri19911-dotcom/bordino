@@ -10,7 +10,9 @@ from apps.pantomime import services
 from apps.pantomime.models import MEMBERS_RANGE, ROUNDS_RANGE, TEAMS_RANGE, PantomimeGame
 
 NAME = 24  # team and player names (the app cuts them at the same length)
-MAX_TURN_CARDS = 200  # a «رکورد در زمان» turn shows one card after another
+# The record keeps up to this many cards' details (a «رکورد در زمان» turn can show hundreds; the app
+# sends the first ones and the true count in cards_total).
+MAX_TURN_CARDS = 200
 MAX_CARDS = 1500
 
 
@@ -20,6 +22,7 @@ class SaveThrottle(UserRateThrottle):
 
 
 class TeamSerializer(serializers.Serializer):
+    # In the game's own order: a turn's `team` is an index into this list.
     name = serializers.CharField(max_length=NAME)
     members = serializers.ListField(
         child=serializers.CharField(max_length=NAME), min_length=MEMBERS_RANGE[0], max_length=MEMBERS_RANGE[1]
@@ -42,6 +45,11 @@ class TurnSerializer(serializers.Serializer):
     player = serializers.CharField(max_length=NAME)
     points = serializers.IntegerField(min_value=0, max_value=1_000_000)
     cards = serializers.ListField(child=CardSerializer(), max_length=MAX_TURN_CARDS)
+    cards_total = serializers.IntegerField(min_value=0, max_value=100_000, required=False)
+
+    def validate(self, attrs):
+        attrs["cards_total"] = max(attrs.get("cards_total") or 0, len(attrs["cards"]))
+        return attrs
 
 
 class GameSerializer(serializers.Serializer):

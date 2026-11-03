@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 
@@ -40,8 +41,9 @@ def save_game(customer: Customer, data: dict) -> tuple[PantomimeGame, bool]:
     earlier = PantomimeGame.objects.filter(customer=customer, request_id=request_id).first()
     if earlier:
         return earlier, False
-    teams = sorted(data["teams"], key=lambda t: t["rank"])
-    best = teams[0]["rank"]
+    # Kept in the game's order (turns point at them by index); ranked only for showing.
+    teams = data["teams"]
+    best = min(t["rank"] for t in teams)
     try:
         with transaction.atomic():
             game = PantomimeGame.objects.create(
@@ -55,9 +57,13 @@ def save_game(customer: Customer, data: dict) -> tuple[PantomimeGame, bool]:
                 teams=teams,
                 turns=data["turns"],
             )
-    except IntegrityError:
-        # The same game sent twice at once: the other request recorded it.
-        return PantomimeGame.objects.get(customer=customer, request_id=request_id), False
+    except (IntegrityError, ValidationError):
+        # The same game sent twice at once: the other request recorded it (seen by the save's own
+        # validation, or by the database's unique constraint).
+        earlier = PantomimeGame.objects.filter(customer=customer, request_id=request_id).first()
+        if earlier is None:
+            raise
+        return earlier, False
     return game, True
 
 
@@ -69,7 +75,9 @@ def summary(game: PantomimeGame) -> dict:
         "mode": game.mode,
         "rounds": game.rounds,
         "winners": game.winners,
-        "teams": [{"name": t["name"], "score": t["score"], "rank": t["rank"]} for t in game.teams],
+        "teams": [
+            {"name": t["name"], "score": t["score"], "rank": t["rank"]} for t in sorted(game.teams, key=lambda t: t["rank"])
+        ],
     }
 
 

@@ -26,9 +26,16 @@ class CallbackThrottle(AnonRateThrottle):
 
 
 class VenueThrottle(AnonRateThrottle):
-    # A venue screen asks once per code (every 30 s); a scan while signed out asks once.
+    # A venue screen asks once per code (every 30 s). Its own budget: guests scanning on the same
+    # Wi-Fi (one address) never use it up.
     scope = "missions_venue"
     rate = "30/min"
+
+
+class QrHoldThrottle(AnonRateThrottle):
+    # A scan while signed out asks once; a full room on one Wi-Fi address may scan together.
+    scope = "missions_qr_hold"
+    rate = "120/min"
 
 
 ERROR_STATUS = {"not_found": status.HTTP_404_NOT_FOUND, "forbidden": status.HTTP_403_FORBIDDEN, "qr_expired": status.HTTP_410_GONE}
@@ -276,7 +283,7 @@ class MissionQrHoldView(APIView):
 
     permission_classes = (AllowAny,)
     authentication_classes = ()
-    throttle_classes = (VenueThrottle,)
+    throttle_classes = (QrHoldThrottle,)
 
     @extend_schema(tags=["missions"], summary="Keep a venue QR code through sign-in")
     def post(self, request, token):
