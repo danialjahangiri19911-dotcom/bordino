@@ -49,6 +49,13 @@ function newRequestId() {
 	return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/** The id still waiting for an answer under `key` (this account), if any — without making one. */
+export function pendingRequestId(key: string): string | null {
+	const k = scoped(key);
+	const all = load();
+	return (all ? all[k] : memory.get(k)) ?? null;
+}
+
 /** The id for `key` (this account): the pending one if there is one, else a new one. */
 export function requestIdFor(key: string): string {
 	const k = scoped(key);

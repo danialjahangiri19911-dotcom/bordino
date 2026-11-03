@@ -19,14 +19,15 @@ class GamePlayChargeService:
     @staticmethod
     def price(game_name: str, difficulty: str | None = None) -> int:
         """The play's price. With a difficulty: that difficulty's own active configuration only (the
-        app starts a level only when it has one) — never another difficulty's price. Without one:
+        app starts a level only when it has one; none = refused) — never another level's price. Without one:
         the game's general configuration (no difficulty), else its first."""
         configs = list(GameConfigurationQueryRepository.filter_by_game_name(game_name=game_name))
         if not difficulty:
             config = next((c for c in configs if not c.difficulty_level), None) or (configs[0] if configs else None)
         else:
             config = next((c for c in configs if c.difficulty_level == difficulty), None)
-            if config is None and configs:
+            # Also when no level is on at all: a level with no price of its own is never free.
+            if config is None:
                 raise ValidationError(_("این سطح بازی فعلاً فعال نیست."))
         return int(config.play_cost) if config else 0
 

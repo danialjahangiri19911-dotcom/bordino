@@ -1,4 +1,4 @@
-import { isUncertain, requestIdFor, settleRequestId, withRequestId } from "./requestId";
+import { isUncertain, pendingRequestId, requestIdFor, settleRequestId, withRequestId } from "./requestId";
 import useAuthStore from "@/libs/stores/authStore";
 
 const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
@@ -59,6 +59,13 @@ describe("money-action request ids (Codex audit phase 4 + final review)", () => 
 		expect(isUncertain({ response: { status: 502 } })).toBe(true);
 		expect(isUncertain(new Error("network"))).toBe(true);
 		expect(isUncertain({ response: { status: 409 } })).toBe(false);
+	});
+
+	it("a pending id can be looked at without making one", async () => {
+		expect(pendingRequestId("charge:sudoku")).toBeNull();
+		expect(pendingRequestId("charge:sudoku")).toBeNull(); // looking made none
+		await expect(withRequestId("charge:sudoku", async () => lost())).rejects.toThrow();
+		expect(pendingRequestId("charge:sudoku")).toBe(requestIdFor("charge:sudoku"));
 	});
 
 	it("a spin at another multiplier is another action", async () => {

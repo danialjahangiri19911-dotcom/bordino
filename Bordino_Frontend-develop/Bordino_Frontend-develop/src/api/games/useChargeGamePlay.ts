@@ -4,7 +4,7 @@ import type { ChargeApiResponse, GameName } from "@/api/games/types";
 import { WALLET } from "@/api/urls";
 import { withAuth } from "@/libs/http/query";
 import requester, { type RequestError } from "@/libs/http/requester";
-import { withRequestId } from "@/libs/http/requestId";
+import { pendingRequestId, withRequestId } from "@/libs/http/requestId";
 
 /**
  * کسرِ هزینهٔ بازی از کیفِ امتیاز (هر بار بازی/ادامه).
@@ -17,19 +17,23 @@ export default function useChargeGamePlay() {
 		{ game_name: GameName; difficulty?: string }
 	>({
 		// Through withAuth: an expired access token is renewed and the request sent again.
-		mutationFn: (payload) =>
-			// Without a level the key is as before, so a charge still waiting from an older
-			// version keeps its id.
-			withRequestId(payload.difficulty ? `charge:${payload.game_name}:${payload.difficulty}` : `charge:${payload.game_name}`, async (requestId) => {
+		mutationFn: (payload) => {
+			// A charge still waiting from a version before levels were sent (its key had no level) is
+			// sent again exactly as it was, so the server answers it instead of charging again.
+			const legacy = payload.difficulty && pendingRequestId(`charge:${payload.game_name}`) ? `charge:${payload.game_name}` : null;
+			const body = legacy ? { game_name: payload.game_name } : payload;
+			const key = legacy ?? (payload.difficulty ? `charge:${payload.game_name}:${payload.difficulty}` : `charge:${payload.game_name}`);
+			return withRequestId(key, async (requestId) => {
 				const { data } = await withAuth((token) =>
 					requester.post<ChargeApiResponse>(
 						WALLET.GAME_PLAY_CHARGE,
-						{ ...payload, request_id: requestId },
+						{ ...body, request_id: requestId },
 						{ headers: { Authorization: `Bearer ${token}` } },
 					),
 				);
 				return data;
-			}),
+			});
+		},
 	});
 
 	return {

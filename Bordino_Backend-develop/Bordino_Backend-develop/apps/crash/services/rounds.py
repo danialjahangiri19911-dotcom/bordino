@@ -86,6 +86,16 @@ def seed_for(customer: Customer) -> CrashSeed:
 
 
 def place_bet(user, bet: int, auto_cashout=None, now=None, request_id: str | None = None) -> tuple[CrashRound, int]:
+    if request_id:
+        # A resent bet is answered first, before the game's settings (switched off or a new range
+        # since): its round is what was bought. (Checked again under the lock, for copies at once.)
+        earlier = CrashRound.objects.filter(customer=customer_for(user), request_id=request_id).first()
+        if earlier:
+            wanted = fair.floor_cents(auto_cashout) if auto_cashout is not None else None
+            if earlier.bet != bet or earlier.auto_cashout != wanted:
+                raise CrashError("این درخواست قبلاً برای شرط دیگری ثبت شده است.")
+            account = points_account(user)
+            return earlier, account.amount if account else 0
     config = CrashConfiguration.current()
     if not config.enabled:
         raise CrashError("بازی انفجار فعلاً غیرفعال است.")

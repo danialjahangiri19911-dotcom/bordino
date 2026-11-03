@@ -90,6 +90,15 @@ def payout_cap_lane(round_: ChickenRound, multipliers) -> int | None:
 
 
 def place_bet(user, bet: int, difficulty: str, now=None, request_id: str | None = None) -> tuple[ChickenRound, int]:
+    if request_id:
+        # A resent bet is answered first, before the game's settings (switched off or a new range
+        # since): its round is what was bought. (Checked again under the lock, for copies at once.)
+        earlier = ChickenRound.objects.filter(customer=customer_for(user), request_id=request_id).first()
+        if earlier:
+            if earlier.bet != bet or earlier.difficulty != difficulty:
+                raise CrashError("این درخواست قبلاً برای شرط دیگری ثبت شده است.")
+            account = points_account(user)
+            return earlier, account.amount if account else 0
     config = ChickenConfiguration.current()
     if not config.enabled:
         raise CrashError("بازی مرغ فراری فعلاً غیرفعال است.")

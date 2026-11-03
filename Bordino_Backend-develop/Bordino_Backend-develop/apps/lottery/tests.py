@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -759,3 +760,51 @@ class AccountingFollowUpTests(TestCase):
         self.assertEqual(chicken().json()["result"]["round"]["id"], first.json()["result"]["round"]["id"])
         self.assertEqual(self.points(), 800)
         self.assertEqual(self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy"}, format="json").status_code, 400)
+
+
+@override_settings(CACHES=LOCMEM)
+class AccountingThirdCheckTests(TestCase):
+    """Codex's third check, 2026-11-03."""
+
+    def setUp(self):
+        self.player = make_customer("9120004301", points=1000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+
+    def points(self):
+        return balance.points_account(self.player).amount
+
+    def test_a_resent_bet_is_answered_after_the_game_is_switched_off_or_its_range_changes(self):
+        from apps.crash.models import ChickenConfiguration, CrashConfiguration  # pylint: disable=import-outside-toplevel
+
+        crash = lambda: self.api.post("/api/v1/games/crash/rounds/", {"bet": 100, "request_id": "q-1"}, format="json")  # noqa: E731
+        chicken = lambda: self.api.post("/api/v1/games/chicken/rounds/", {"bet": 100, "difficulty": "easy", "request_id": "q-2"}, format="json")  # noqa: E731
+        first_crash, first_chicken = crash(), chicken()
+        self.assertEqual((first_crash.status_code, first_chicken.status_code), (201, 201), first_chicken.content)
+        CrashConfiguration.objects.update(enabled=False)
+        ChickenConfiguration.objects.update(min_bet=500)
+        cache.clear()
+        self.assertEqual(crash().json()["result"]["round"]["id"], first_crash.json()["result"]["round"]["id"])
+        self.assertEqual(chicken().json()["result"]["round"]["id"], first_chicken.json()["result"]["round"]["id"])
+        self.assertEqual(self.points(), 800)
+
+    def test_a_level_is_never_free_when_every_price_is_switched_off(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        GameConfiguration.objects.create(game_name="sudoku", difficulty_level="easy", play_cost=5, is_active=False)
+        r = self.api.post("/api/v1/wallet/games/charge/", {"game_name": "sudoku", "request_id": "z-1", "difficulty": "easy"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        quote = self.api.get("/api/v1/wallet/games/charge/?game_name=sudoku&difficulty_level=easy").json()["result"]["play_cost"]
+        self.assertIsNone(quote)
+        self.assertEqual(self.points(), 1000)
+
+    def test_a_setting_is_cleared_again_once_its_save_is_committed(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            SystemConfiguration.objects.create(key="TEST_COMMIT_CLEAR", value="9", value_type="int")
+            cache.set("system_config:TEST_COMMIT_CLEAR", 5)  # a read between the save and its commit
+        self.assertEqual(SystemConfiguration.objects.get("TEST_COMMIT_CLEAR"), 5)
+        for callback in callbacks:
+            callback()
+        self.assertEqual(SystemConfiguration.objects.get("TEST_COMMIT_CLEAR"), 9)
