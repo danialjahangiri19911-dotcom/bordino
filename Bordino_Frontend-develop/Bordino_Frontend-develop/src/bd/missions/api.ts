@@ -130,6 +130,8 @@ export interface VenueScreen {
 	svg: string;
 	/** Seconds until the next code. */
 	expires_in: number;
+	/** Exact seconds the shown code is still accepted (older servers: absent). */
+	valid_for?: number;
 	step: number;
 }
 

@@ -99,18 +99,36 @@ export function useBrowserBackGuard(active: boolean, onBack: () => void) {
 	useEffect(() => {
 		if (!active || typeof window === "undefined") return undefined;
 		const guard = { bdBackGuard: true };
-		window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+		// This page as it is now: whatever Back reached (one step, or several from the browser's
+		// history menu, which skips the guard entry), this page is put back and the game asks.
+		const pageUrl = window.location.href;
+		const pageState = { ...(window.history.state ?? {}) };
+		window.history.pushState({ ...pageState, ...guard }, "", pageUrl);
 		let armed = true;
 		const onPop = () => {
 			if (!armed) return;
 			// Back left the guard entry: put it back and ask.
-			window.history.pushState({ ...(window.history.state ?? {}), ...guard }, "", window.location.href);
+			window.history.pushState({ ...pageState, ...guard }, "", pageUrl);
 			// Like Android Back: the newest overlay first (an open question closes), else the game.
 			if (!handleBackInPage()) handler.current();
 		};
 		window.addEventListener("popstate", onPop);
+		// Where the browser has the Navigation API (Chrome, the Android WebView): any move through the
+		// history (several steps from its Back menu too) is cancelled before the router sees it, and
+		// the game asks. popstate above is the fallback; it cannot stop a jump of several steps, as
+		// the router unmounts this page before that listener's turn.
+		type NavigateEvent = Event & { navigationType?: string; cancelable: boolean };
+		const nav = (window as Window & { navigation?: EventTarget }).navigation;
+		const onNavigate = (event: Event) => {
+			const e = event as NavigateEvent;
+			if (!armed || e.navigationType !== "traverse" || !e.cancelable) return;
+			e.preventDefault();
+			if (!handleBackInPage()) handler.current();
+		};
+		nav?.addEventListener("navigate", onNavigate);
 		return () => {
 			armed = false;
+			nav?.removeEventListener("navigate", onNavigate);
 			window.removeEventListener("popstate", onPop);
 			// The round is over (or the page is leaving): drop the guard entry if it is still on top.
 			if ((window.history.state as { bdBackGuard?: boolean } | null)?.bdBackGuard) window.history.back();

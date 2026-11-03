@@ -186,3 +186,15 @@ class PantomimeReviewTests(TestCase):
             again, created = services.save_game(self.user.customer, data.validated_data)
         self.assertEqual((again.pk, created), (first.pk, False))
         self.assertEqual(PantomimeGame.objects.count(), 1)
+
+
+@override_settings(CACHES=LOCMEM)
+class PantomimeLongGameTests(TestCase):
+    def test_the_longest_marathon_totals_are_accepted(self):
+        """Codex re-check 2026-11-03: 1,510 correct answers and 113,250 s of them must still save."""
+        user = make_customer("9120008201")
+        api = APIClient()
+        api.force_authenticate(user)
+        teams = [{**t, "correct": 1510, "score": 1510, "correct_elapsed_ms": 113_250_000} for t in game()["teams"]]
+        r = api.post(GAMES, game("long", format="marathon", rounds=2, teams=teams), format="json")
+        self.assertEqual(r.status_code, 201, r.content)

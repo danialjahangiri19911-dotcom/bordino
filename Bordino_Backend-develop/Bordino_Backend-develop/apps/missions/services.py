@@ -431,14 +431,18 @@ def hold_qr(code: str) -> str:
     return f"{mission.qr_token}~h{now}~{_qr_signature(mission, 'h', now)}"
 
 
-def venue_display(key: str) -> tuple[Mission, str, int]:
+def venue_display(key: str) -> tuple[Mission, str, int, float]:
+    """The screen's code now, the whole seconds until the next one, and the exact seconds the shown
+    code is still accepted (the screen hides it before then)."""
     mission = (
         Mission.objects.filter(qr_display_key=key, kind=Mission.Kind.QR, qr_rotating=True).first() if key else None
     )
     if mission is None:
         raise NotFound()
-    code, expires_in = display_code(mission)
-    return mission, code, expires_in
+    now = time.time()
+    code, expires_in = display_code(mission, now)
+    start = int(now) // QR_STEP * QR_STEP
+    return mission, code, expires_in, round(start + QR_STEP + QR_GRACE - now, 3)
 
 
 def claim_qr(customer: Customer, token: str) -> Claim:

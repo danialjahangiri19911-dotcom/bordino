@@ -633,6 +633,7 @@ class VenueQrTests(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         body = r.json()["result"]
         self.assertEqual((body["title"], body["points"], body["step"]), ("کافه بردینو", 20, 30))
+        self.assertTrue(120 < body["valid_for"] <= 150)
         self.assertIn("/pwa/earn/qr/", body["url"])
         self.assertTrue(body["svg"].startswith("<svg"))
         self.assertEqual(r["Cache-Control"], "no-store")

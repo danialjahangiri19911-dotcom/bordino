@@ -11,6 +11,7 @@ import "./venue.css";
 /** How long a shown code is still accepted after its 30 seconds (services.QR_GRACE). */
 const GRACE_MS = 120_000;
 const RETRY_MS = 5_000;
+const SAFETY_MS = 2_000;
 
 type State = "loading" | "ok" | "offline" | "gone";
 
@@ -105,7 +106,9 @@ export default function VenueScreen({ screenKey }: { screenKey: string }) {
 	const age = Math.max(0, now - askedAt.current);
 	const left = screen ? Math.max(0, Math.ceil(screen.expires_in - age / 1000)) : 0;
 	// The last code is shown only while the server still takes it.
-	const showCode = !!screen && state !== "gone" && age < screen.expires_in * 1000 + GRACE_MS;
+	// Hidden a little before the server stops taking it (clock steps and rounding stay on the safe side).
+	const acceptedMs = screen ? (screen.valid_for !== undefined ? screen.valid_for * 1000 : screen.expires_in * 1000 + GRACE_MS) : 0;
+	const showCode = !!screen && state !== "gone" && age < acceptedMs - SAFETY_MS;
 
 	const fullScreen = () => {
 		void document.documentElement.requestFullscreen?.().catch(() => undefined);

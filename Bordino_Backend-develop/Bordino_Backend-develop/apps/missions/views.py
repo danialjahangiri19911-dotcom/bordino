@@ -305,7 +305,7 @@ class VenueDisplayView(APIView):
         import segno  # pylint: disable=import-outside-toplevel
 
         try:
-            mission, code, expires_in = services.venue_display(key)
+            mission, code, expires_in, valid_for = services.venue_display(key)
         except services.MissionError as exc:
             return _error(exc)
         url = f"{settings.MISSIONS_PUBLIC_URL.rstrip('/')}/pwa/earn/qr/{code}"
@@ -318,6 +318,7 @@ class VenueDisplayView(APIView):
                 "url": url,
                 "svg": svg,
                 "expires_in": expires_in,
+                "valid_for": valid_for,
                 "step": services.QR_STEP,
             }
         )
