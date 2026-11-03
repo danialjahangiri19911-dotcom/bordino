@@ -18,6 +18,10 @@ import "./pantomime.css";
 import { gameErrorMessage } from "@/api/games/request";
 
 const SECONDS = [30, 60, 90, 120, 180, 240, 300, 600, 900];
+// The player's sound choice, kept like the other games' (on unless turned off).
+const SOUND_KEY = "bd-pantomime-sound";
+// The last seconds of a turn ticked louder (the same ten the design shows as urgent).
+const URGENT_SECONDS = 10;
 const LEVELS = ["ترکیبی", "آسان", "متوسط", "سخت"];
 const FORMAT_NAME: Record<Format, string> = { challenge: "چالش با کارت‌های خودتان", duel: "تک‌کلمه‌ای نوبتی", marathon: "رکورد در زمان" };
 const LEAVE = {
@@ -88,7 +92,7 @@ export default function PantomimeGame() {
 	const [proposalSeconds, setProposalSeconds] = useState("90");
 	const [proposalError, setProposalError] = useState("");
 	const [dialog, setDialog] = useState<Dialog>("");
-	const [muted, setMuted] = useState(true);
+	const [muted, setMuted] = useState(false);
 	const [announcement, setAnnouncement] = useState("");
 	const [save, setSave] = useState<Save>("");
 	const [, rerender] = useReducer((n: number) => n + 1, 0);
@@ -100,6 +104,8 @@ export default function PantomimeGame() {
 	const soundBusy = useRef(false);
 	const lastClick = useRef(-Infinity);
 	const lastTick = useRef(-1);
+	// Whether audio was started by a tap yet (browsers allow it only then).
+	const unlocked = useRef(false);
 	const focusNext = useRef<string | null>(null);
 	const mainRef = useRef<HTMLElement>(null);
 	const headerRef = useRef<HTMLElement>(null);
@@ -189,9 +195,10 @@ export default function PantomimeGame() {
 				focusAct("next");
 				announce("زمان تمام شد");
 			} else {
+				// A tick as each second goes (not at the turn's very start).
 				const seconds = Math.ceil(g.remaining / 1000);
-				if (seconds <= 5 && seconds !== lastTick.current) {
-					audio.current?.effect("tick");
+				if (seconds !== lastTick.current) {
+					if (lastTick.current !== -1) audio.current?.effect(seconds <= URGENT_SECONDS ? "urgent" : "tick");
 					lastTick.current = seconds;
 				}
 			}
@@ -284,6 +291,25 @@ export default function PantomimeGame() {
 		setDialog(type);
 	};
 
+	// The saved choice (after the first render: the server's page has no storage).
+	useEffect(() => {
+		try {
+			setMuted(localStorage.getItem(SOUND_KEY) === "off");
+		} catch {
+			// no storage: sound stays on
+		}
+	}, []);
+
+	/** The first tap in the game starts the audio (when sound is on): a browser allows it only then. */
+	const unlockAudio = () => {
+		if (unlocked.current || muted || !audio.current) return;
+		unlocked.current = true;
+		void audio.current.enable(true).then((ok) => {
+			if (!ok) unlocked.current = false;
+			else if (gameRef.current?.phase === "playing" && !document.hidden) audio.current?.music(true);
+		});
+	};
+
 	const toggleSound = async () => {
 		if (soundBusy.current || !audio.current) return;
 		soundBusy.current = true;
@@ -291,7 +317,13 @@ export default function PantomimeGame() {
 		const ok = await audio.current.enable(requested);
 		soundBusy.current = false;
 		if (!audio.current) return;
+		unlocked.current = ok;
 		setMuted(!ok);
+		try {
+			localStorage.setItem(SOUND_KEY, ok ? "on" : "off");
+		} catch {
+			// not remembered
+		}
 		audio.current.music(ok && gameRef.current?.phase === "playing" && !document.hidden);
 		if (!ok && requested) announce("صدا در این مرورگر در دسترس نیست.");
 	};
@@ -1227,7 +1259,14 @@ export default function PantomimeGame() {
 
 	return (
 		<div className="bd-pm-page">
-			<article className={`pm pm-brutal ${urgent ? "pm-urgent" : ""}`} dir="rtl" aria-label="پانتومیم" data-pantomime>
+			<article
+				className={`pm pm-brutal ${urgent ? "pm-urgent" : ""}`}
+				dir="rtl"
+				aria-label="پانتومیم"
+				data-pantomime
+				onPointerDownCapture={unlockAudio}
+				onKeyDownCapture={unlockAudio}
+			>
 				<GameBar playing={game?.phase === "playing"}>
 					<header className="pm-header" ref={headerRef}>
 						<div className="pm-brand">

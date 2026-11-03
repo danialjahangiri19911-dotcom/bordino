@@ -1,8 +1,11 @@
 /**
- * The design's music and effects (pantomime.js `sound()`), made with Web Audio: no files. Off until
- * the player turns it on (a tap is what lets a browser start audio).
+ * The design's music and effects (pantomime.js `sound()`), made with Web Audio: no files. A browser
+ * lets audio start only from a tap, so the game turns it on at the player's first tap (when sound
+ * is on, as it is unless they turned it off). The design's tick in the last five seconds is now a
+ * soft tick each second and a louder one in the last ten.
  */
-export type Effect = "correct" | "pass" | "end" | "tick";
+/** `tick`: each second of a turn (soft); `urgent`: each of its last ten (louder, higher). */
+export type Effect = "correct" | "pass" | "end" | "tick" | "urgent";
 
 export interface PantomimeSound {
 	enable(on: boolean): Promise<boolean>;
@@ -79,7 +82,8 @@ export function createSound(): PantomimeSound {
 			else if (kind === "end") {
 				tone(523, 0.28);
 				after(150, () => tone(784, 0.4));
-			} else tone(440, 0.07, "sine", 0.022);
+			} else if (kind === "urgent") tone(880, 0.09, "triangle", 0.06);
+			else tone(520, 0.05, "sine", 0.016);
 		},
 		destroy() {
 			on = false;
