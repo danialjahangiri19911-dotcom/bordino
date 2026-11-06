@@ -380,3 +380,6 @@ body { margin: 0; }
 /* «پانتومیم» in the games list: the design's yellow on a deep purple. */
 #bordino-directions .ng-game[data-game=pantomime]{ --ng-game-accent:#ffe332; --ng-game-bg:#3a2c55}
 :root[data-bd-scheme="dark"] #bordino-directions .ng-game[data-game=pantomime]{ --ng-game-accent:#ffe95c; --ng-game-bg:#2c2242}
+
+/* «دریافت امتیاز» while its list loads: about a list's height, so nothing below jumps when it arrives. */
+#bordino-directions .mi-loading { min-height: min(520px, 60vh); }

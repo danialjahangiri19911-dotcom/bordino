@@ -78,7 +78,10 @@ export default function Earn() {
 				<div className="ng-filterbar">
 					<h3>
 						<Icon name="coins" /> مأموریت‌های امتیاز
-						{list ? <span className="bd-tag">{fa(doable)} قابل انجام</span> : null}
+						{/* Its room is kept while loading (invisible), so the heading never grows and moves the sort menu. */}
+						<span className="bd-tag" aria-hidden={!list} style={list ? undefined : { visibility: "hidden" }}>
+							{fa(doable)} قابل انجام
+						</span>
 					</h3>
 					<label className="ng-sort">
 						<Icon name="arrow-down-wide-narrow" />
@@ -99,7 +102,10 @@ export default function Earn() {
 						options={[["all", "همه"], ...list.categories.map((c): [string, string] => [c.id, c.name])]}
 					/>
 				) : null}
-				<LoadState loading={isLoading} error={error} onRetry={refetch} />
+				{/* While loading, about a list's height: the note below does not jump down when the list arrives. */}
+				<div className={isLoading ? "mi-loading" : undefined}>
+					<LoadState loading={isLoading} error={error} onRetry={refetch} />
+				</div>
 				{list && !shown.length ? (
 					<EmptyState title="فعلاً مأموریتی نیست" text="مأموریت‌های تازه همین‌جا اضافه می‌شوند؛ بعداً سر بزن." />
 				) : null}
