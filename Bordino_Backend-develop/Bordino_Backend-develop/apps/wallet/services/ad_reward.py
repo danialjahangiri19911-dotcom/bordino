@@ -42,6 +42,9 @@ DEFAULTS = {
     # Adivery (docs.adivery.com): the app's id and its «جایزه‌ای» (rewarded) placement.
     "ADIVERY_APP_ID": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee",
     "ADIVERY_REWARDED_PLACEMENT_ID": "e7e3f382-c0d7-4b9b-b754-b06e5ee5fac1",
+    # The full-screen («میان‌صفحه‌ای») placement of the «دیدن تبلیغ تمام‌صفحه» missions. Adivery confirms
+    # only rewarded views to our server: these are paid like a banner (shown, then a wait).
+    "ADIVERY_INTERSTITIAL_PLACEMENT_ID": "f720b85e-b057-4f06-9ca8-77a83824568b",
     # Until Adivery calls our confirmation address (set by Adivery for the placement): trust the
     # app's «watched» after this many seconds — as safe as the demo, within the same daily limit.
     "ADIVERY_TRUST_APP": False,
@@ -298,3 +301,11 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         return Callback(paid=False, already=False, reason=str(exc))
     # Anything else (a database hiccup) is not caught: the answer is an error, Adivery calls again,
     # and the already-recorded confirmation pays then (once).
+
+
+def interstitial_creative() -> dict | None:
+    """What the app needs to show a full-screen ad (Adivery SDK), or None when none is set up."""
+    app_id, placement = setting("ADIVERY_APP_ID"), setting("ADIVERY_INTERSTITIAL_PLACEMENT_ID")
+    if not app_id or not placement:
+        return None
+    return {"app_id": app_id, "placement_id": placement}

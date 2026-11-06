@@ -5,6 +5,7 @@ import type { Mission, MissionKind, MissionState } from "./api";
 export const KIND_ICON: Record<MissionKind, IconName> = {
 	video: "clapperboard",
 	banner: "mouse-pointer-click",
+	interstitial: "monitor",
 	signup: "user-plus",
 	install: "smartphone",
 	qr: "qr-code",

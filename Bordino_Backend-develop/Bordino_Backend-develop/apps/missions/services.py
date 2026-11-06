@@ -183,6 +183,8 @@ def listing(customer: Customer) -> list[View]:
             state = "done_today" if daily else "done"
         elif reason:
             state = reason
+        elif m.kind == Mission.Kind.INTERSTITIAL and ad_reward.interstitial_creative() is None:
+            state = "inactive"  # no full-screen placement set up
         elif m.kind == Mission.Kind.VIDEO and not (video := video or ad_reward.offer(customer)).available:
             # Every rewarded video of the day (before games too) counts against one limit.
             state = "done_today" if video.provider and video.remaining_today == 0 else "inactive"
@@ -200,7 +202,8 @@ def listing(customer: Customer) -> list[View]:
 
 
 def start(customer: Customer, mission_id) -> MissionAttempt:
-    """Starts (or continues) a try. A video gets its rewarded-ad session; the others get the link."""
+    """Starts (or continues) a try. A video gets its rewarded-ad session; a full-screen ad its
+    placement (in the try's payload); the others get the link."""
     with transaction.atomic():
         _lock(customer)
         # Locked: an admin's edit of the mission (its kind) and a first start never cross.
@@ -208,6 +211,8 @@ def start(customer: Customer, mission_id) -> MissionAttempt:
         if mission is None or not mission.is_visible:
             raise NotFound()
         mission = _check_can_take(customer, mission)
+        if mission.kind == Mission.Kind.INTERSTITIAL and ad_reward.interstitial_creative() is None:
+            raise MissionError("فعلاً تبلیغی برای این مأموریت نیست.", "inactive")
         if mission.kind != Mission.Kind.VIDEO:
             open_try = (
                 MissionAttempt.objects.filter(customer=customer, mission=mission, status=Status.STARTED)
@@ -275,7 +280,7 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
         if attempt.status == Status.COMPLETED:
             return Claim(attempt, already=True)
         mission = attempt.mission
-        if attempt.status != Status.STARTED or mission.kind not in (Mission.Kind.VIDEO, Mission.Kind.BANNER):
+        if attempt.status != Status.STARTED or mission.kind not in (Mission.Kind.VIDEO, Mission.Kind.BANNER, Mission.Kind.INTERSTITIAL):
             raise MissionError("این مأموریت این‌طور انجام نمی‌شود.")
         mission = _check_can_take(customer, mission)
         if mission.kind == Mission.Kind.VIDEO:
@@ -287,8 +292,11 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
                 raise MissionError(str(exc), exc.code) from exc
             _pay(attempt, result.session.activity_transaction)
         else:
+            # A banner (its link opened) or a full-screen ad (shown): paid after the mission's wait.
             if attempt.opened_at is None:
-                raise MissionError("اول بنر را باز کن.", "not_opened")
+                raise MissionError(
+                    "اول تبلیغ را ببین." if mission.kind == Mission.Kind.INTERSTITIAL else "اول بنر را باز کن.", "not_opened"
+                )
             wait = mission.min_seconds - (timezone.now() - attempt.opened_at).total_seconds()
             if wait > 0:
                 raise MissionError(f"{int(wait) + 1} ثانیهٔ دیگر امتیاز را بگیر.", "too_soon")

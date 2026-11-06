@@ -72,13 +72,16 @@ def attempt_payload(attempt: MissionAttempt | None) -> dict | None:
     if attempt.status == MissionAttempt.Status.STARTED:
         if mission.link_url:
             body["link"] = services.link_for(attempt)
-        if mission.kind == Mission.Kind.BANNER:
+        if mission.kind in (Mission.Kind.BANNER, Mission.Kind.INTERSTITIAL):
             body["opened"] = attempt.opened_at is not None
             if attempt.opened_at:
                 wait = mission.min_seconds - (timezone.now() - attempt.opened_at).total_seconds()
                 body["claim_in"] = max(0, int(wait + 0.999))
             else:
                 body["claim_in"] = mission.min_seconds
+        if mission.kind == Mission.Kind.INTERSTITIAL:
+            # The full-screen ad the app shows; «opened» is sent when it is shown.
+            body["ad"] = {"provider": "adivery", "format": "interstitial", "creative": ad_reward.interstitial_creative() or {}}
         if attempt.ad_session_id and mission.kind == Mission.Kind.VIDEO:
             session = attempt.ad_session
             body["ad"] = {

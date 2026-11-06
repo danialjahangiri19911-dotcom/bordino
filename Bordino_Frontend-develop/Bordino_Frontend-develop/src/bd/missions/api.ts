@@ -4,7 +4,7 @@ import requester from "@/libs/http/requester";
 import type { ResponseApiData } from "@/libs/http/interfaces";
 import useQuery from "@/libs/http/query";
 
-export type MissionKind = "video" | "banner" | "signup" | "install" | "qr";
+export type MissionKind = "video" | "banner" | "interstitial" | "signup" | "install" | "qr";
 export type MissionState =
 	| "available"
 	| "in_progress"
@@ -29,9 +29,21 @@ export interface MissionAttempt {
 	/** A banner: whether its link was opened (its wait counts from then), and the seconds left. */
 	opened?: boolean;
 	claim_in?: number;
-	/** A video mission's rewarded-ad session. */
-	ad?: Omit<AdSession, "session_id"> & { session_id: string };
+	/** A video mission's rewarded-ad session, or a full-screen mission's placement. */
+	ad?: VideoAd | FullScreenAd;
 }
+
+export type VideoAd = Omit<AdSession, "session_id"> & { session_id: string };
+
+/** «دیدن تبلیغ تمام‌صفحه»: Adivery's full-screen placement, shown by the Android app (1.3+). */
+export interface FullScreenAd {
+	provider: "adivery";
+	format: "interstitial";
+	creative: { app_id?: string; placement_id?: string };
+}
+
+export const isFullScreenAd = (ad: MissionAttempt["ad"]): ad is FullScreenAd => !!ad && "format" in ad && ad.format === "interstitial";
+export const videoAd = (ad: MissionAttempt["ad"]): VideoAd | null => (ad && !isFullScreenAd(ad) ? ad : null);
 
 export interface Mission {
 	id: string;

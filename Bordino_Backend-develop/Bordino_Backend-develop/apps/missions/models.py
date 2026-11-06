@@ -73,6 +73,7 @@ class Mission(AbstractBaseModel):
     class Kind(models.TextChoices):
         VIDEO = "video", _("تماشای ویدیو")
         BANNER = "banner", _("کلیک روی بنر")
+        INTERSTITIAL = "interstitial", _("دیدن تبلیغ تمام‌صفحه")
         SIGNUP = "signup", _("ثبت‌نام در سایت یا اپ همکار")
         INSTALL = "install", _("نصب اپلیکیشن")
         QR = "qr", _("حضور در محل و اسکن QR")
@@ -92,7 +93,7 @@ class Mission(AbstractBaseModel):
     category = models.ForeignKey(
         MissionCategory, on_delete=models.PROTECT, related_name="missions", verbose_name=_("دسته")
     )
-    kind = models.CharField(max_length=10, choices=Kind.choices, verbose_name=_("نوع"))
+    kind = models.CharField(max_length=20, choices=Kind.choices, verbose_name=_("نوع"))
     verification = models.CharField(
         max_length=10,
         choices=Verification.choices,
@@ -121,8 +122,8 @@ class Mission(AbstractBaseModel):
     image = models.ImageField(upload_to="missions/", blank=True, verbose_name=_("تصویر یا لوگو"))
     min_seconds = models.PositiveSmallIntegerField(
         default=10,
-        verbose_name=_("ثانیه تا دریافت (بنر)"),
-        help_text=_("بعد از باز کردن لینک بنر، چند ثانیه بعد امتیاز قابل دریافت است."),
+        verbose_name=_("ثانیه تا دریافت (بنر، تبلیغ تمام‌صفحه)"),
+        help_text=_("بعد از باز کردن لینک بنر یا نمایش تبلیغ تمام‌صفحه، چند ثانیه بعد امتیاز قابل دریافت است."),
     )
     proof_label = models.CharField(
         max_length=120,
@@ -171,9 +172,9 @@ class Mission(AbstractBaseModel):
     def clean(self):
         super().clean()
         errors = {}
-        auto_only = (self.Kind.VIDEO, self.Kind.BANNER, self.Kind.QR)
+        auto_only = (self.Kind.VIDEO, self.Kind.BANNER, self.Kind.INTERSTITIAL, self.Kind.QR)
         if self.kind in auto_only and self.verification != self.Verification.AUTO:
-            errors["verification"] = _("ویدیو، بنر و QR فقط تأیید خودکار دارند.")
+            errors["verification"] = _("ویدیو، بنر، تبلیغ تمام‌صفحه و QR فقط تأیید خودکار دارند.")
         if self.kind in (self.Kind.SIGNUP, self.Kind.INSTALL) and self.verification == self.Verification.AUTO:
             errors["verification"] = _("ثبت‌نام و نصب اپ: بررسی مدرک یا تأیید سرور همکار.")
         if self.kind in (self.Kind.BANNER, self.Kind.SIGNUP, self.Kind.INSTALL) and not self.link_url:

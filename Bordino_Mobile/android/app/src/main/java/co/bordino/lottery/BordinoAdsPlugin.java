@@ -32,6 +32,11 @@ public class BordinoAdsPlugin extends Plugin {
     private static String pendingPlacement = null;
     private static Runnable loadTimeout = null;
     private static boolean listening = false;
+    // The full-screen («میان‌صفحه‌ای») ad of the «دیدن تبلیغ تمام‌صفحه» missions: its own call and state.
+    private static PluginCall pendingInterstitial = null;
+    private static String pendingInterstitialPlacement = null;
+    private static Runnable interstitialTimeout = null;
+    private static boolean interstitialShown = false;
 
     private static final AdiveryListener listener = new AdiveryListener() {
         @Override
@@ -53,6 +58,29 @@ public class BordinoAdsPlugin extends Plugin {
         }
 
         @Override
+        public void onInterstitialAdLoaded(String placementId) {
+            // Asked to show while it was still loading: show now.
+            if (pendingInterstitial != null && placementId.equals(pendingInterstitialPlacement) && interstitialTimeout != null) {
+                main.removeCallbacks(interstitialTimeout);
+                interstitialTimeout = null;
+                Adivery.showAd(placementId);
+            }
+        }
+
+        @Override
+        public void onInterstitialAdShown(String placementId) {
+            if (pendingInterstitial != null && placementId.equals(pendingInterstitialPlacement)) interstitialShown = true;
+        }
+
+        @Override
+        public void onInterstitialAdClosed(String placementId) {
+            if (pendingInterstitial == null || !placementId.equals(pendingInterstitialPlacement)) return;
+            JSObject result = new JSObject();
+            result.put("shown", interstitialShown);
+            finishInterstitial(result, null);
+        }
+
+        @Override
         public void log(String placementId, String message) {
             Log.d(TAG, message);
         }
@@ -65,6 +93,20 @@ public class BordinoAdsPlugin extends Plugin {
         if (loadTimeout != null) {
             main.removeCallbacks(loadTimeout);
             loadTimeout = null;
+        }
+        if (call == null) return;
+        if (error != null) call.reject(error, error);
+        else call.resolve(result);
+    }
+
+    private static void finishInterstitial(JSObject result, String error) {
+        PluginCall call = pendingInterstitial;
+        pendingInterstitial = null;
+        pendingInterstitialPlacement = null;
+        interstitialShown = false;
+        if (interstitialTimeout != null) {
+            main.removeCallbacks(interstitialTimeout);
+            interstitialTimeout = null;
         }
         if (call == null) return;
         if (error != null) call.reject(error, error);
@@ -141,10 +183,45 @@ public class BordinoAdsPlugin extends Plugin {
         });
     }
 
+    /**
+     * Shows the full-screen ad of `placementId`; resolves {shown} when it closes (shown: it was really
+     * on screen), or rejects "no_fill" when none loads in time. Points are the server's business.
+     */
+    @PluginMethod
+    public void showInterstitial(PluginCall call) {
+        String appId = call.getString("appId");
+        String placementId = call.getString("placementId");
+        if (placementId == null || placementId.isEmpty()) {
+            call.reject("placementId is required", "bad_request");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            if (pendingInterstitial != null || pending != null) {
+                call.reject("an ad is already showing", "busy");
+                return;
+            }
+            if (!configure(appId)) {
+                call.reject("appId missing", "bad_request");
+                return;
+            }
+            pendingInterstitial = call;
+            pendingInterstitialPlacement = placementId;
+            interstitialShown = false;
+            if (Adivery.isLoaded(placementId)) {
+                Adivery.showAd(placementId);
+                return;
+            }
+            Adivery.prepareInterstitialAd(getActivity(), placementId);
+            interstitialTimeout = () -> finishInterstitial(null, "no_fill");
+            main.postDelayed(interstitialTimeout, LOAD_WAIT_MS);
+        });
+    }
+
     @Override
     protected void handleOnDestroy() {
         // The page that asked is gone: its question ends here (the view itself is the server's).
         finish(null, "closed");
+        finishInterstitial(null, "closed");
         super.handleOnDestroy();
     }
 }

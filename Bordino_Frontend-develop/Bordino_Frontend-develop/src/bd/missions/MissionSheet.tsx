@@ -10,7 +10,8 @@ import { useBackHandler } from "../back";
 import { fa } from "../format";
 import { KIND_ICON, STATE_LABEL, progressText } from "./labels";
 import { PhotoError, openPhoto } from "../photo";
-import { type Mission, claimMission, openedMission, sendProof, startMission } from "./api";
+import { inAndroidApp, useAdsPlugin } from "../ads/native";
+import { type Mission, type MissionAttempt, claimMission, isFullScreenAd, openedMission, sendProof, startMission, videoAd } from "./api";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -18,6 +19,7 @@ import { gameErrorMessage } from "@/api/games/request";
 const KIND_LABEL: Record<Mission["kind"], string> = {
 	video: "تماشای ویدیو",
 	banner: "کلیک روی بنر",
+	interstitial: "تبلیغ تمام‌صفحه",
 	signup: "ثبت‌نام",
 	install: "نصب اپلیکیشن",
 	qr: "حضور و اسکن QR",
@@ -49,6 +51,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 	// A video mission plays the day's ad provider: Adivery only in the Android app (1.2+).
 	const ads = usePlayableAdOffer();
 	const videoHere = m.kind !== "video" || !(ads.needsAppUpdate || ads.appOnly);
+	// A full-screen ad is shown by the Android app's bridge from 1.3 on (older apps and browsers: no).
+	const plugin = useAdsPlugin();
+	const fullScreenHere = m.kind !== "interstitial" || typeof plugin?.showInterstitial === "function";
 	const file = useRef<HTMLInputElement>(null);
 
 	useEffect(() => setM(mission), [mission]);
@@ -82,7 +87,11 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 		try {
 			const { mission: next } = await startMission(m.id);
 			update(next);
-			setStep(next.kind === "video" && next.attempt?.ad ? { kind: "video" } : { kind: "idle" });
+			if (next.kind === "interstitial" && next.attempt) {
+				await showFullScreen(next.attempt);
+				return;
+			}
+			setStep(next.kind === "video" && videoAd(next.attempt?.ad) ? { kind: "video" } : { kind: "idle" });
 		} catch (e) {
 			setProblem(gameErrorMessage(e));
 			setStep({ kind: "idle" });
@@ -98,12 +107,51 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 			.catch(() => undefined);
 	};
 
-	const claim = async () => {
-		if (!m.attempt) return;
+	/**
+	 * The full-screen ad of this try: shown by the app; once it was really on screen the server hears
+	 * of it (its wait starts then) and, with no wait set, the points are claimed straight away.
+	 */
+	const showFullScreen = async (attempt: MissionAttempt) => {
+		const creative = isFullScreenAd(attempt.ad) ? attempt.ad.creative : null;
+		if (!plugin?.showInterstitial || !creative?.app_id || !creative.placement_id) {
+			setProblem("تبلیغ تمام‌صفحه در این نسخه نمایش داده نمی‌شود.");
+			setStep({ kind: "idle" });
+			return;
+		}
 		setProblem(null);
 		setStep({ kind: "busy" });
 		try {
-			const reward = await claimMission(m.attempt.id);
+			const { shown } = await plugin.showInterstitial({ appId: creative.app_id, placementId: creative.placement_id });
+			if (!shown) {
+				setProblem("تبلیغ کامل نمایش داده نشد؛ دوباره امتحان کن.");
+				setStep({ kind: "idle" });
+				return;
+			}
+			const { mission: next } = await openedMission(attempt.id);
+			update(next);
+			if (next.attempt && (next.attempt.claim_in ?? 0) <= 0) {
+				await claimAttempt(next.attempt.id);
+				return;
+			}
+			setStep({ kind: "idle" });
+		} catch (e) {
+			const code = (e as { code?: string })?.code;
+			setProblem(code === "no_fill" ? "فعلاً تبلیغی برای نمایش نیست؛ کمی بعد دوباره امتحان کن." : gameErrorMessage(e));
+			setStep({ kind: "idle" });
+			onChanged();
+		}
+	};
+
+	const claim = async () => {
+		if (!m.attempt) return;
+		await claimAttempt(m.attempt.id);
+	};
+
+	const claimAttempt = async (attemptId: string) => {
+		setProblem(null);
+		setStep({ kind: "busy" });
+		try {
+			const reward = await claimMission(attemptId);
 			void queryClient.invalidateQueries();
 			update(reward.mission);
 			setStep({ kind: "rewarded", points: reward.points });
@@ -142,11 +190,12 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 		}
 	};
 
-	if (step.kind === "video" && m.attempt?.ad) {
-		const Player = AD_PLAYERS[m.attempt.ad.provider] ?? AD_PLAYERS.demo;
+	const playing = step.kind === "video" ? videoAd(m.attempt?.ad) : null;
+	if (playing) {
+		const Player = AD_PLAYERS[playing.provider] ?? AD_PLAYERS.demo;
 		return (
 			<Player
-				session={m.attempt.ad}
+				session={playing}
 				onWatched={() => void claim()}
 				onAbort={() => {
 					setStep({ kind: "idle" });
@@ -158,7 +207,8 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 
 	const busy = step.kind === "busy";
 	const open = m.attempt?.status === "started" ? m.attempt : null;
-	const canStart = videoHere && (m.state === "available" || m.state === "rejected" || (m.state === "in_progress" && m.kind === "video"));
+	const canStart =
+		videoHere && fullScreenHere && (m.state === "available" || m.state === "rejected" || (m.state === "in_progress" && m.kind === "video"));
 	const partner = m.partner_name || "سایت همکار";
 	const linkTarget = inApp() ? {} : { target: "_blank", rel: "noopener noreferrer" };
 	const proofReady = (!m.proof_label || text.trim()) && (!m.proof_image_required || image) && (text.trim() || image);
@@ -220,6 +270,18 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 								)}
 							</p>
 						) : null}
+						{!fullScreenHere && (m.state === "available" || m.state === "in_progress") ? (
+							<p className="mi-note mi-note-wait">
+								{inAndroidApp() ? (
+									<>
+										تبلیغ تمام‌صفحه در نسخهٔ تازهٔ اپ نمایش داده می‌شود.{" "}
+										<a href={APK_URL}>دریافت نسخهٔ تازه</a>
+									</>
+								) : (
+									"این مأموریت فقط در اپ اندروید بردینو انجام می‌شود."
+								)}
+							</p>
+						) : null}
 						{m.kind === "qr" && m.state === "available" ? (
 							<p className="mi-note">
 								<Icon name="map-pin" /> به محل برو و QR آن‌جا را با دوربین گوشی اسکن کن؛ امتیاز همان لحظه اضافه می‌شود.
@@ -231,7 +293,13 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 								<Icon name="external-link" /> {m.kind === "banner" ? "باز کردن بنر" : `رفتن به ${partner}`}
 							</a>
 						) : null}
-						{open && m.kind === "banner" ? (
+						{open && m.kind === "interstitial" && fullScreenHere && !open.opened ? (
+							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy} onClick={() => void showFullScreen(open)}>
+								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name="play" />}
+								دیدن تبلیغ و دریافت {fa(m.points)} امتیاز
+							</button>
+						) : null}
+						{open && (m.kind === "banner" || (m.kind === "interstitial" && open.opened)) ? (
 							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy || !open.opened || waitSeconds > 0} onClick={() => void claim()}>
 								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name="coins" />}
 								{!open.opened ? "اول بنر را باز کن" : waitSeconds > 0 ? `دریافت امتیاز تا ${fa(waitSeconds)} ثانیهٔ دیگر` : `دریافت ${fa(m.points)} امتیاز`}
@@ -268,8 +336,14 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						) : null}
 						{canStart && m.kind !== "qr" && !(open && m.kind !== "video") ? (
 							<button type="button" className="bd-sheet-item bd-reward-main" autoFocus disabled={busy} onClick={() => void start()}>
-								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name={m.kind === "video" ? "play" : "arrow-left"} />}
-								{m.kind === "video" ? `تماشای ویدیو و دریافت ${fa(m.points)} امتیاز` : m.state === "rejected" ? "تلاش دوباره" : "شروع مأموریت"}
+								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name={m.kind === "video" || m.kind === "interstitial" ? "play" : "arrow-left"} />}
+								{m.kind === "video"
+									? `تماشای ویدیو و دریافت ${fa(m.points)} امتیاز`
+									: m.kind === "interstitial"
+										? `دیدن تبلیغ و دریافت ${fa(m.points)} امتیاز`
+										: m.state === "rejected"
+											? "تلاش دوباره"
+											: "شروع مأموریت"}
 							</button>
 						) : null}
 						{problem ? (

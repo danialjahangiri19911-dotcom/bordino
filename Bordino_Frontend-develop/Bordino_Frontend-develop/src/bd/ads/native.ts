@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 export interface AdsPlugin {
 	prepare(o: { appId: string; placementId: string }): Promise<{ loaded: boolean }>;
 	show(o: { appId: string; placementId: string; userId: string }): Promise<{ rewarded: boolean }>;
+	/** App 1.3+: a full-screen ad; resolves when it closes (shown: it was really on screen). */
+	showInterstitial?(o: { appId: string; placementId: string }): Promise<{ shown: boolean }>;
 }
 
 export function adsPlugin(): AdsPlugin | null {

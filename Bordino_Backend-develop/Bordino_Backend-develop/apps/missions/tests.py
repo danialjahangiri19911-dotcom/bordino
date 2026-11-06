@@ -688,3 +688,60 @@ class VenueQrTests(TestCase):
         banner = Mission(title="b", category=self.mission.category, kind=Mission.Kind.BANNER, points=1, link_url="https://e.x/", qr_rotating=True)
         with self.assertRaises(ValidationError):
             banner.full_clean()
+
+
+@override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
+class InterstitialMissionTests(TestCase):
+    """«دیدن تبلیغ تمام‌صفحه» (2026-11-06): Adivery's full-screen placement, paid like a banner."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_player("9120007401")
+        self.customer = self.user.customer
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        self.mission = Mission.objects.create(
+            title="تبلیغ تمام‌صفحه", category=MissionCategory.objects.create(name="تبلیغات"), kind=Mission.Kind.INTERSTITIAL,
+            points=4, repeat=Mission.Repeat.DAILY, daily_limit=3, min_seconds=5,
+        )
+
+    def points(self):
+        return TokenWalletAccount.objects.get(wallet__owner=self.user).amount
+
+    def test_it_is_shown_then_paid_after_its_wait(self):
+        listed = self.api.get("/api/v1/missions/").json()["result"]["missions"]
+        self.assertEqual(next(m for m in listed if m["id"] == str(self.mission.pk))["state"], "available")
+        attempt = self.api.post(f"/api/v1/missions/{self.mission.pk}/start/").json()["result"]["mission"]["attempt"]
+        self.assertEqual(attempt["ad"]["format"], "interstitial")
+        self.assertEqual(attempt["ad"]["creative"]["placement_id"], "f720b85e-b057-4f06-9ca8-77a83824568b")
+        self.assertFalse(attempt["opened"])
+        with self.assertRaises(services.MissionError) as early:
+            services.claim(self.customer, attempt["id"])
+        self.assertEqual(early.exception.code, "not_opened")
+        services.mark_opened(self.customer, attempt["id"])  # the app: the ad is on screen
+        with self.assertRaises(services.MissionError) as soon:
+            services.claim(self.customer, attempt["id"])
+        self.assertEqual(soon.exception.code, "too_soon")
+        MissionAttempt.objects.filter(pk=attempt["id"]).update(opened_at=timezone.now() - timedelta(seconds=6))
+        self.assertFalse(services.claim(self.customer, attempt["id"]).already)
+        self.assertEqual(self.points(), 4)
+        self.assertTrue(services.claim(self.customer, attempt["id"]).already)  # paid once
+        self.assertEqual(self.points(), 4)
+
+    def test_without_a_placement_it_is_not_offered(self):
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services import ad_reward  # pylint: disable=import-outside-toplevel
+
+        with mock.patch.dict(ad_reward.DEFAULTS, {"ADIVERY_INTERSTITIAL_PLACEMENT_ID": ""}):
+            SystemConfiguration.objects.filter(key="ADIVERY_INTERSTITIAL_PLACEMENT_ID").delete()
+            cache.clear()
+            listed = self.api.get("/api/v1/missions/").json()["result"]["missions"]
+            self.assertEqual(next(m for m in listed if m["id"] == str(self.mission.pk))["state"], "inactive")
+            with self.assertRaises(services.MissionError):
+                services.start(self.customer, self.mission.pk)
+
+    def test_it_takes_no_link_and_only_automatic_verification(self):
+        self.mission.full_clean()  # no link needed
+        self.mission.verification = Mission.Verification.REVIEW
+        with self.assertRaises(ValidationError):
+            self.mission.full_clean()
