@@ -1,0 +1,148 @@
+# Bordino lottery platform — its OWN compose project, separate from caffemenu,
+# bordino-growth and the rewards stack on this box. Nothing here binds 80/443:
+# the IP entry point is :8097 (proxy below); lottery.bordino.co reaches the same
+# proxy through caffemenu's Caddy (alias lottery-proxy on caffemenu_cafe-net).
+name: bordino-lottery
+
+x-backend: &backend
+  image: bordino-lottery-backend:latest
+  env_file:
+    # The project's own settings first (Kavenegar, email, wallet, OTP...),
+    # then this deployment's overrides — later files win.
+    - ../Bordino/claude/Bordino_Backend-develop/Bordino_Backend-develop/main_app/.env
+    - ./backend.env
+  environment:
+    SECRET_KEY: ${SECRET_KEY:?set in .env}
+    DB_PASSWORD: ${DB_PASSWORD:?set in .env}
+    KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:?set in .env}
+    # Through the connection pool below, not straight to PostgreSQL (backend.env still names db:5432).
+    DB_HOST: pgbouncer
+    DB_PORT: "6432"
+  volumes:
+    - ./data/media:/app/media
+  depends_on:
+    db:
+      condition: service_healthy
+    pgbouncer:
+      condition: service_started
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # Connection pool in front of PostgreSQL, session mode (the app sees an ordinary connection). The
+  # API opens a connection per request; through here that no longer starts a PostgreSQL process each
+  # time (load test 2026-11-06: database CPU 139% -> 28%; with 4 API workers +36% requests/s).
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: lottery
+      DB_PASSWORD: ${DB_PASSWORD:?set in .env}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: session
+      LISTEN_PORT: "6432"
+      MAX_CLIENT_CONN: "400"
+      DEFAULT_POOL_SIZE: "20"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 64m
+
+  db:
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_DB: lottery
+      POSTGRES_USER: lottery
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lottery -d lottery"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 768m
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 320m
+
+  web:
+    <<: *backend
+    build:
+      context: ../Bordino/claude/Bordino_Backend-develop/Bordino_Backend-develop
+      dockerfile: /opt/projects/bordino-lottery/deploy/backend.Dockerfile
+      target: runtime
+      args:
+        ENVIRONMENT: prod
+    # Not the project's web_entrypoint.sh: that runs makemigrations at boot and
+    # gunicorn with --reload/--log-level debug.
+    command: >-
+      sh -c "./confs/postgres_scripts/wait-for-it.sh &&
+      python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput -v 0 &&
+      exec python -m gunicorn main_app.asgi:application -k uvicorn.workers.UvicornWorker
+      -b 0.0.0.0:8000 --workers 4 --timeout 120 --access-logfile -"
+    mem_limit: 1g
+
+  worker:
+    <<: *backend
+    command: python -m celery -A apps.tasks worker --loglevel=info --concurrency 2
+    mem_limit: 768m
+
+  beat:
+    <<: *backend
+    command: >-
+      python -m celery -A apps.tasks beat -l info -s /tmp/celerybeat-schedule
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    mem_limit: 384m
+
+  front:
+    image: bordino-lottery-front:latest
+    build:
+      context: ../Bordino/claude/Bordino_Frontend-develop/Bordino_Frontend-develop
+      dockerfile: /opt/projects/bordino-lottery/deploy/front.Dockerfile
+    restart: unless-stopped
+    mem_limit: 768m
+
+  proxy:
+    image: caddy:2-alpine
+    ports:
+      - "0.0.0.0:8097:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/media:/srv/media:ro
+      # The app's scripts/styles with their .br/.gz, copied by sync-next-static.sh at each front deploy.
+      - ./data/next:/srv/next:ro
+    depends_on:
+      - web
+      - front
+    networks:
+      default:
+      cafe-net:
+        aliases:
+          - lottery-proxy
+    restart: unless-stopped
+    mem_limit: 128m
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  cafe-net:
+    name: caffemenu_cafe-net
+    external: true

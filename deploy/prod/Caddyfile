@@ -1,0 +1,71 @@
+{
+	admin off
+	auto_https off
+	servers {
+		# caffemenu's Caddy terminates TLS for lottery.bordino.co; keep its
+		# X-Forwarded-Proto so Django knows the request was HTTPS.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	encode zstd gzip
+	request_body {
+		max_size 50MB
+	}
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Proof screenshots of «دریافت امتیاز» (media/private) are shown through the admin only.
+	@private path /media/private /media/private/*
+	handle @private {
+		respond 404
+	}
+
+	# Uploaded/backend media lives in /srv/media. The frontend ALSO has
+	# public/media/* (App/, home/, logo.svg...), so only files that really
+	# exist here are served from disk; everything else falls through to Next.
+	@media {
+		path /media/*
+		file {
+			root /srv
+			try_files {path}
+		}
+	}
+	handle @media {
+		root * /srv
+		header Cache-Control "public, max-age=86400"
+		header Content-Security-Policy "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox"
+		file_server
+	}
+
+	# The app's scripts and styles (/_next/static, names change with every build): handed out from
+	# disk, already compressed (brotli/gzip saved at build), copied there by sync-next-static.sh at
+	# each frontend deploy. A file not there yet (a new build before its sync) goes to Next as before.
+	@nextstatic {
+		path /_next/static/*
+		file {
+			root /srv/next
+			try_files {path}
+		}
+	}
+	handle @nextstatic {
+		root * /srv/next
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server {
+			precompressed br gzip
+		}
+	}
+
+	@django path /api/v1/* /admin /admin/* /token/* /schema/* /swagger/* /redoc/* /static/*
+	handle @django {
+		reverse_proxy web:8000
+	}
+
+	handle {
+		reverse_proxy front:3000
+	}
+}
