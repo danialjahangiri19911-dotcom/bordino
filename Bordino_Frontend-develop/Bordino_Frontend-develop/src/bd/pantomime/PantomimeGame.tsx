@@ -16,6 +16,7 @@ import { type Effect, type PantomimeSound, createSound } from "./sound";
 import "./pantomime.css";
 
 import { gameErrorMessage } from "@/api/games/request";
+import { currentUserId } from "@/libs/stores/authStore";
 
 const SECONDS = [30, 60, 90, 120, 180, 240, 300, 600, 900];
 // The player's sound choice, kept like the other games' (on unless turned off).
@@ -40,6 +41,8 @@ type Save = "" | "saving" | "saved" | "failed";
  * again when pantomime opens. Leaving by «خروج» or returning to the settings drops it.
  */
 interface Parked {
+	/** Whose it is: another account signed in on this device never gets it. */
+	user: string;
 	game: Game;
 	id: string;
 	topics: Topic[];
@@ -85,7 +88,7 @@ export default function PantomimeGame() {
 	const recent = useRecentGames();
 
 	// A game set aside when the page went away mid-game comes back as it was (paused).
-	const [restored] = useState<Parked | null>(() => parked);
+	const [restored] = useState<Parked | null>(() => (parked && parked.user === currentUserId() ? parked : null));
 	const [settings, setSettings] = useState<Settings>(() => restored?.settings ?? {
 		teams: ["", ""],
 		members: [
@@ -142,12 +145,14 @@ export default function PantomimeGame() {
 			parked = null;
 			configured.current = true; // its settings are the game's own
 			announce("بازی قبلی همان‌جا که مانده بود ادامه دارد.");
+		} else if (parked) {
+			parked = null; // another account's game: never shown here
 		}
 		return () => {
 			const g = gameRef.current;
 			if (!g || g.phase === "finished" || leaving.current) return;
 			if (g.phase === "playing") g.pause(performance.now());
-			parked = { game: g, id: gameId.current, topics: gameTopics.current, settings: settingsRef.current };
+			parked = { user: currentUserId(), game: g, id: gameId.current, topics: gameTopics.current, settings: settingsRef.current };
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
