@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Count, Max, Min, Q, Sum
+from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
@@ -231,29 +231,101 @@ def _matches(step: MysteryStep, given: str) -> bool:
     return bool(given) and any(given == normalize(a) for a in step.answer_list())
 
 
+# ── help, a level at a time ──
+# A step's help goes from a nudge to the result: the admin's hint lines (least to most), then the
+# place itself (name, address, map), and for an answer step at last the answer. Each level opened
+# takes the mystery's hint_penalty percent of the step's points; the answer leaves none.
+
+
+def hint_levels(step: MysteryStep) -> list[str]:
+    """The kinds of the step's help levels, in order: "text" (one per hint line), "place", "answer"."""
+    levels = ["text"] * len(step.hint_lines()) + ["place"]
+    if step.proof == Proof.ANSWER:
+        levels.append("answer")
+    return levels
+
+
+def step_points(step: MysteryStep, mystery: Mystery, used: int) -> int:
+    """What the step pays after `used` help levels."""
+    levels = hint_levels(step)
+    if used and levels[min(used, len(levels)) - 1] == "answer":
+        return 0
+    return max(0, step.points * (100 - mystery.hint_penalty * used) // 100)
+
+
+def hint_view(step: MysteryStep, mystery: Mystery, used: int) -> dict:
+    """The opened help levels (their content), and what the next one is and costs."""
+    levels, lines = hint_levels(step), step.hint_lines()
+    used = min(used, len(levels))
+    shown = []
+    for i, kind in enumerate(levels[:used]):
+        if kind == "text":
+            shown.append({"kind": "text", "text": lines[i]})
+        elif kind == "place":
+            shown.append({"kind": "place", "name": step.place_name, "address": step.place_address, "map": step.map_link()})
+        else:
+            shown.append({"kind": "answer", "answer": (step.answer_list() or [""])[0]})
+    now = step_points(step, mystery, used)
+    following = levels[used] if used < len(levels) else None
+    return {
+        "hints": shown,
+        "hints_total": len(levels),
+        "next_hint": following,
+        "next_hint_cost": now - step_points(step, mystery, used + 1) if following else 0,
+        "points_now": now,
+    }
+
+
+def reveal_hint(customer: Customer, mystery_id, step_id) -> MysteryRun:
+    """Opens the current step's next help level (its points go down)."""
+    with transaction.atomic():
+        _lock(customer)
+        mystery = Mystery.objects.select_for_update().filter(pk=mystery_id).first()
+        if mystery is None:
+            raise not_found()
+        run = _locked_run(customer, mystery)
+        if run is None:
+            raise MissionError("اول معما را شروع کن.", "not_started")
+        steps = steps_of(mystery)
+        step = next((s for s in steps if str(s.pk) == str(step_id)), None)
+        if step is None:
+            raise NotFound("این مرحله پیدا نشد.")
+        if _step_for(run, step, steps):
+            raise MissionError("این مرحله را حل کرده‌ای.", "done")
+        _check_open(mystery)
+        if run.hints_used >= len(hint_levels(step)):
+            raise MissionError("راهنمایی دیگری برای این مرحله نیست.", "no_more_hints")
+        run.hints_used += 1
+        run.save(update_fields=["hints_used", "update_time"])
+        return run
+
+
 def _pay(run: MysteryRun, step: MysteryStep, method: str, distance=None, accuracy=None) -> Result:
-    """Records the visit, pays the step (and the finish bonus after the last step)."""
+    """Records the visit, pays the step (less its help) and the finish bonus after the last step."""
     mystery = run.mystery
+    points = step_points(step, mystery, run.hints_used)
     checkin = MysteryCheckin.objects.create(
-        run=run, step=step, customer=run.customer, method=method, points=step.points, distance_m=distance, accuracy_m=accuracy
+        run=run, step=step, customer=run.customer, method=method, points=points, hints_used=run.hints_used,
+        distance_m=distance, accuracy_m=accuracy,
     )
-    if step.points:
+    if points:
         # The points reach the points wallet through the ActivityTransaction post_save signal.
         checkin.activity_transaction = ActivityTransaction.objects.create(
             customer=run.customer,
             section=SECTION,
             action_type=f"mystery-step:{checkin.pk}",
-            score_value=step.points,
-            reward_data={"score": step.points},
+            score_value=points,
+            reward_data={"score": points},
             metadata={"mystery": str(mystery.pk), "step": str(step.pk), "title": f"معمای «{mystery.title}» — {step.place_name}"},
             status=ActivityTransaction.Status.COMPLETED,
             description=f"Mystery: {mystery.title} / {step.place_name}"[:255],
         )
         checkin.save(update_fields=["activity_transaction", "update_time"])
-    run.points_earned += step.points
+    run.points_earned += points
     run.wrong_tries = 0
     run.locked_until = None
-    result = Result(run, step, already=False, points=step.points)
+    run.hints_used = 0
+    result = Result(run, step, already=False, points=points)
     done = set(run.checkins.values_list("step_id", flat=True))
     if current_step(steps_of(mystery), done) is None:
         run.status = RunStatus.COMPLETED
@@ -395,6 +467,7 @@ def report(mystery: Mystery) -> dict:
             month=Count("id", filter=Q(create_time__gte=now - timedelta(days=30))),
             first=Min("create_time"),
             last=Max("create_time"),
+            hints=Avg("hints_used"),
         )
     }
     since = (timezone.localtime(now, timezone=DAY_ZONE) - timedelta(days=13)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -419,6 +492,7 @@ def report(mystery: Mystery) -> dict:
                 "month": rows.get(s.pk, {}).get("month", 0),
                 "first": rows.get(s.pk, {}).get("first"),
                 "last": rows.get(s.pk, {}).get("last"),
+                "hints": round(rows.get(s.pk, {}).get("hints") or 0, 1),
                 "daily": [daily.get((s.pk, d), 0) for d in days],
             }
             for s in steps

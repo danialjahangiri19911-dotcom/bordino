@@ -306,14 +306,14 @@ class MysteryStepInline(admin.StackedInline):
     extra = 0
     ordering = ("order", "create_time")
     fieldsets = (
-        ("سرنخ", {"fields": ("order", "clue", "clue_image", "hint", "points")}),
+        ("سرنخ و راهنمایی", {"fields": ("order", "clue", "clue_image", "hints", "points")}),
         (
             "محل (بعد از رسیدن به بازیکن نشان داده می‌شود)",
             {"fields": ("place_name", "place_logo", "place_address", "place_about", "place_offer", "place_url", "point", "map_url")},
         ),
         (
             "تأیید حضور",
-            {"fields": ("proof", "question", "answers", "staff_code", "radius_m", "check_location", "qr_rotating", "qr_code", "venue_screen")},
+            {"fields": ("proof", "question", "answer_type", "answers", "staff_code", "radius_m", "check_location", "qr_rotating", "qr_code", "venue_screen")},
         ),
     )
 
@@ -355,7 +355,7 @@ class MysteryAdmin(admin.ModelAdmin):
     actions = ("new_season", "new_qr")
     fieldsets = (
         (None, {"fields": ("title", "summary", "story", "cover", "area", "duration_minutes")}),
-        ("جایزه، زمان و ظرفیت", {"fields": ("finish_points", "starts_at", "ends_at", "capacity")}),
+        ("جایزه، زمان و ظرفیت", {"fields": ("finish_points", "hint_penalty", "starts_at", "ends_at", "capacity")}),
         ("نمایش", {"fields": ("is_active", "is_visible", "order")}),
     )
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
@@ -288,6 +288,12 @@ class Mystery(AbstractBaseModel):
     finish_points = models.PositiveIntegerField(
         default=0, verbose_name=_("جایزهٔ پایان"), help_text=_("امتیازی که با حل آخرین مرحله، جدا از امتیاز مرحله‌ها، می‌گیرد.")
     )
+    hint_penalty = models.PositiveSmallIntegerField(
+        default=25,
+        validators=[MaxValueValidator(100)],
+        verbose_name=_("هزینهٔ هر راهنمایی (درصد)"),
+        help_text=_("هر راهنمایی این درصد از امتیاز همان مرحله را کم می‌کند. «نشان دادن جواب» امتیاز مرحله را صفر می‌کند."),
+    )
     starts_at = models.DateTimeField(null=True, blank=True, verbose_name=_("شروع"))
     ends_at = models.DateTimeField(
         null=True, blank=True, verbose_name=_("پایان"), help_text=_("بعد از آن هیچ مرحله‌ای پذیرفته نمی‌شود.")
@@ -328,12 +334,28 @@ class MysteryStep(AbstractBaseModel):
     order = models.PositiveSmallIntegerField(default=1, verbose_name=_("مرحله"))
     clue = models.TextField(verbose_name=_("سرنخ"), help_text=_("متنی که بازیکن را به این محل می‌رساند (بدون نام محل)."))
     clue_image = models.ImageField(upload_to=mystery_upload, blank=True, verbose_name=_("تصویر سرنخ"))
-    hint = models.CharField(
-        max_length=300, blank=True, verbose_name=_("راهنمایی"), help_text=_("اگر بازیکن گیر کرد، با زدن «راهنمایی» می‌بیند.")
+    hints = models.TextField(
+        blank=True,
+        verbose_name=_("راهنمایی‌ها"),
+        help_text=_(
+            "هر خط یک راهنمایی، از کم به زیاد (اولی فقط یک اشاره، آخری تقریباً جواب). بعد از آن‌ها خودکار «نشان دادن محل» "
+            "و برای «پاسخ در محل» در آخر «نشان دادن جواب» می‌آید. هر راهنمایی بخشی از امتیاز مرحله را کم می‌کند."
+        ),
     )
     points = models.PositiveIntegerField(default=10, verbose_name=_("امتیاز مرحله"))
 
     proof = models.CharField(max_length=10, choices=Proof.choices, default=Proof.QR, verbose_name=_("روش تأیید حضور"))
+    class AnswerType(models.TextChoices):
+        TEXT = "text", _("متن")
+        NUMBER = "number", _("عدد")
+
+    answer_type = models.CharField(
+        max_length=10,
+        choices=AnswerType.choices,
+        default=AnswerType.TEXT,
+        verbose_name=_("نوع پاسخ"),
+        help_text=_("عدد: صفحه‌کلید عددی باز می‌شود و رقم فارسی و انگلیسی یکی حساب می‌شود."),
+    )
     question = models.CharField(
         max_length=200,
         blank=True,
@@ -412,6 +434,9 @@ class MysteryStep(AbstractBaseModel):
             return f"https://neshan.org/maps/@{self.latitude},{self.longitude},17z"
         return ""
 
+    def hint_lines(self) -> list[str]:
+        return [line.strip() for line in (self.hints or "").splitlines() if line.strip()]
+
     def answer_list(self) -> list[str]:
         source = self.staff_code if self.proof == self.Proof.STAFF else self.answers
         return [a for a in (part.strip() for part in (source or "").split("|")) if a]
@@ -461,6 +486,8 @@ class MysteryRun(AbstractBaseModel):
     # Wrong answers / codes at the current step: after a few, a short wait (no guessing by brute force).
     wrong_tries = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
+    # Hint levels opened at the current step (they lower its points); back to 0 at the next step.
+    hints_used = models.PositiveSmallIntegerField(default=0)
     points_earned = models.PositiveIntegerField(default=0, verbose_name=_("امتیاز گرفته"))
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("زمان پایان"))
     finish_transaction = models.OneToOneField(
@@ -484,6 +511,7 @@ class MysteryCheckin(AbstractBaseModel):
     customer = models.ForeignKey("users.Customer", on_delete=models.PROTECT, related_name="mystery_checkins")
     method = models.CharField(max_length=10, choices=MysteryStep.Proof.choices, verbose_name=_("روش"))
     points = models.PositiveIntegerField(default=0, verbose_name=_("امتیاز"))
+    hints_used = models.PositiveSmallIntegerField(default=0, verbose_name=_("راهنمایی‌های دیده‌شده"))
     # How far from the place the phone said it was (when the location was checked).
     distance_m = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("فاصله (متر)"))
     accuracy_m = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("دقت موقعیت (متر)"))

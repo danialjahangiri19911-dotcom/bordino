@@ -475,3 +475,16 @@ body { margin: 0; }
 #bordino-directions .my-scan-close { position: relative; display: inline-flex; align-items: center; gap: 6px; }
 #bordino-directions .my-scan-close svg { width: 16px; height: 16px; }
 @media (prefers-reduced-motion: reduce) { #bordino-directions .my-progress span { transition: none; } }
+#bordino-directions .my-hints { margin: 4px 0 8px; display: grid; gap: 6px; }
+#bordino-directions .my-hint b { display: block; font-size: 11px; color: var(--bd-muted); }
+#bordino-directions .my-hint p { margin: 2px 0 0; }
+#bordino-directions .my-hint a { color: var(--bd-accent); font-weight: 700; text-decoration: none; white-space: nowrap; }
+#bordino-directions .my-hint a svg { width: 14px; height: 14px; vertical-align: -2px; }
+#bordino-directions .my-hint-place { background: color-mix(in srgb, var(--bd-accent) 12%, var(--bd-surface)); }
+#bordino-directions .my-hint-answer { font-weight: 700; font-size: 15px; }
+#bordino-directions .my-hint-button small { font-weight: 400; color: var(--bd-muted); font-size: 11px; }
+#bordino-directions .my-hint-button:disabled { opacity: .6; cursor: default; }
+#bordino-directions .my-hint-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; border: 2px dashed var(--bd-outline); }
+#bordino-directions .my-hint-ask span { flex: 1 1 100%; }
+#bordino-directions .my-hint-ask .bd-action, #bordino-directions .my-hint-ask .bd-secondary { min-height: 36px; padding: 6px 14px; font-size: 12px; }
+#bordino-directions .my-step-points s { margin-inline-end: 4px; color: var(--bd-muted); font-weight: 400; font-size: 12px; }

@@ -37,6 +37,12 @@ export interface MysteryPlace {
 	map: string;
 }
 
+/** One help level: a hint line, the place itself, or (an answer step's last) the answer. */
+export type MysteryHint =
+	| { kind: "text"; text: string }
+	| { kind: "place"; name: string; address: string; map: string }
+	| { kind: "answer"; answer: string };
+
 export type MysteryStep =
 	| { id: string; number: number; points: number; state: "done"; clue: string; place: MysteryPlace; visited_at: string }
 	| {
@@ -46,7 +52,15 @@ export type MysteryStep =
 			state: "current";
 			clue: string;
 			clue_image: string | null;
-			hint: string;
+			/** The help levels opened so far, and the next one (null: none left) and its cost. */
+			hints: MysteryHint[];
+			hints_total: number;
+			next_hint: MysteryHint["kind"] | null;
+			next_hint_cost: number;
+			/** What the step pays now (less the help opened). */
+			points_now: number;
+			/** «پاسخ در محل»: a number gets the number keypad. */
+			answer_type: "text" | "number";
 			proof: MysteryProof;
 			/** «پاسخ در محل»: what to find out there. */
 			question: string;
@@ -89,6 +103,10 @@ export function useMystery(id: string) {
 }
 
 export const startMystery = (id: string) => call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}${id}/start/`, {});
+
+/** Opens the current step's next help level (its points go down). */
+export const revealHint = (id: string, stepId: string) =>
+	call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}${id}/steps/${stepId}/hint/`, {});
 
 export interface Proof {
 	answer?: string;

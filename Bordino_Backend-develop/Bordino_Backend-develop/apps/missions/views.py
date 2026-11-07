@@ -426,7 +426,8 @@ def mystery_detail(view: mystery.View) -> dict:
                 state="current",
                 clue=step.clue,
                 clue_image=_media(step.clue_image),
-                hint=step.hint,
+                answer_type=step.answer_type if step.proof == MysteryStep.Proof.ANSWER else "text",
+                **mystery.hint_view(step, m, run.hints_used),
                 proof=step.proof,
                 question=step.question if step.proof == MysteryStep.Proof.ANSWER else "",
                 check_location=step.proof == MysteryStep.Proof.GPS or step.check_location,
@@ -465,6 +466,24 @@ class MysteryStartView(APIView):
         except services.MissionError as exc:
             return _error(exc)
         return Response({"mystery": mystery_detail(view)}, status=status.HTTP_201_CREATED)
+
+
+class MysteryHintView(APIView):
+    """Opens the current step's next help level (a nudge, more, the place, the answer); it lowers
+    the step's points."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Open the next hint of a city mystery step")
+    def post(self, request, mystery_id, step_id):
+        try:
+            customer = _customer(request)
+            mystery.reveal_hint(customer, mystery_id, step_id)
+            view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response({"mystery": mystery_detail(view)})
 
 
 class CheckinSerializer(serializers.Serializer):

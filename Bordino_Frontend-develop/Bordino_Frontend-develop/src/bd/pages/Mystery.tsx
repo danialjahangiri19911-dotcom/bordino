@@ -12,6 +12,7 @@ import QrScanner, { canScanQr } from "../missions/QrScanner";
 import {
 	LocationError,
 	type MysteryDetail,
+	type MysteryHint,
 	type MysteryPlace,
 	type MysteryQrReward,
 	type MysteryStep,
@@ -20,6 +21,7 @@ import {
 	checkinMystery,
 	codeFromScan,
 	currentPosition,
+	revealHint,
 	startMystery,
 	useMystery,
 } from "../missions/mystery";
@@ -85,31 +87,96 @@ const PROOF_HELP: Record<Current["proof"], string> = {
 	staff: "به محل که رسیدی، از کارکنان آنجا «کد بردینو» را بگیر.",
 };
 
-/** The step to solve now: its clue, a hint, and the way to prove the player is there. */
+const NEXT_HINT: Record<MysteryHint["kind"], string> = {
+	text: "راهنمایی",
+	place: "نشان دادن محل",
+	answer: "نشان دادن جواب",
+};
+
+/** The step's help, a level at a time: each costs some of its points, so it asks once first. */
+function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: () => void }) {
+	const [asking, setAsking] = useState(false);
+	useEffect(() => setAsking(false), [step.id, step.hints.length]);
+	const next = step.next_hint;
+	return (
+		<div className="my-hints">
+			{step.hints.map((h, i) => (
+				<div key={i} className={`my-hint my-hint-${h.kind}`}>
+					<b>{h.kind === "text" ? `راهنمایی ${fa(i + 1)}` : h.kind === "place" ? "محل" : "جواب"}</b>
+					{h.kind === "text" ? <p>{h.text}</p> : null}
+					{h.kind === "place" ? (
+						<p>
+							{h.name}
+							{h.address ? ` — ${h.address}` : ""}
+							{h.map ? (
+								<>
+									{" "}
+									<a href={h.map} target="_blank" rel="noopener noreferrer">
+										<Icon name="map-pin" /> مسیریابی
+									</a>
+								</>
+							) : null}
+						</p>
+					) : null}
+					{h.kind === "answer" ? (
+						<p>
+							<bdi className="my-hint-answer">{h.answer}</bdi> — همین را بنویس؛ این مرحله امتیازی ندارد.
+						</p>
+					) : null}
+				</div>
+			))}
+			{next ? (
+				asking ? (
+					<div className="my-hint-ask" role="group" aria-label="تأیید راهنمایی">
+						<span>
+							{next === "answer"
+								? "با دیدن جواب، امتیاز این مرحله صفر می‌شود."
+								: `${fa(step.next_hint_cost)} امتیاز از این مرحله کم می‌شود.`}
+						</span>
+						<button type="button" className="bd-action" disabled={busy} onClick={onHint}>
+							{NEXT_HINT[next]}
+						</button>
+						<button type="button" className="bd-secondary" disabled={busy} onClick={() => setAsking(false)}>
+							نه
+						</button>
+					</div>
+				) : (
+					<button type="button" className="my-hint-button" disabled={busy} onClick={() => setAsking(true)}>
+						<Icon name="lightbulb" /> {step.hints.length && next === "text" ? "راهنمایی بیشتر" : NEXT_HINT[next]}
+						<small>
+							({fa(step.hints.length + 1)} از {fa(step.hints_total)}
+							{step.next_hint_cost && next !== "answer" ? ` · −${fa(step.next_hint_cost)} امتیاز` : ""})
+						</small>
+					</button>
+				)
+			) : null}
+		</div>
+	);
+}
+
+/** The step to solve now: its clue, its help, and the way to prove the player is there. */
 function CurrentStep({
 	step,
 	lockedIn,
 	busy,
 	onProve,
 	onScan,
+	onHint,
 }: {
 	step: Current;
 	lockedIn: number;
 	busy: boolean;
 	onProve: (proof: Proof) => void;
 	onScan: () => void;
+	onHint: () => void;
 }) {
-	const [hint, setHint] = useState(false);
 	const [text, setText] = useState("");
 	const [scanHere, setScanHere] = useState(false);
 	const oldApp = appTooOld();
 	useEffect(() => {
 		if (!appTooOld()) void canScanQr().then(setScanHere);
 	}, []);
-	useEffect(() => {
-		setHint(false);
-		setText("");
-	}, [step.id]);
+	useEffect(() => setText(""), [step.id]);
 	const typed = step.proof === "answer" || step.proof === "staff";
 	const submit = (e: FormEvent) => {
 		e.preventDefault();
@@ -120,17 +187,7 @@ function CurrentStep({
 		<div className="my-current">
 			<p className="my-clue">{step.clue}</p>
 			{step.clue_image ? <img className="my-clue-image" src={step.clue_image} alt="تصویر سرنخ" /> : null}
-			{step.hint ? (
-				hint ? (
-					<p className="my-hint">
-						<Icon name="lightbulb" /> {step.hint}
-					</p>
-				) : (
-					<button type="button" className="my-hint-button" onClick={() => setHint(true)}>
-						<Icon name="lightbulb" /> راهنمایی
-					</button>
-				)
-			) : null}
+			<Hints step={step} busy={busy} onHint={onHint} />
 			<p className="my-proof-help">
 				<Icon name="info" /> {PROOF_HELP[step.proof]}
 				{step.check_location && step.proof !== "gps" ? " موقعیت گوشی هم سنجیده می‌شود." : ""}
@@ -169,6 +226,7 @@ function CurrentStep({
 							onChange={(e) => setText(e.target.value)}
 							maxLength={100}
 							autoComplete="off"
+							{...(step.answer_type === "number" && step.proof === "answer" ? { inputMode: "numeric" as const, dir: "ltr" } : {})}
 							enterKeyHint="send"
 							disabled={busy || lockedIn > 0}
 							placeholder={step.proof === "staff" ? "کدی که گرفتی" : "جوابت"}
@@ -240,6 +298,19 @@ export default function Mystery({ id }: { id: string }) {
 		} catch (e) {
 			setProblem(e instanceof LocationError ? e.message : gameErrorMessage(e));
 			void refetch(); // a wrong answer's count and wait
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const hint = async () => {
+		if (!current) return;
+		setBusy(true);
+		setProblem(null);
+		try {
+			setLive((await revealHint(id, current.id)).mystery);
+		} catch (e) {
+			setProblem(gameErrorMessage(e));
 		} finally {
 			setBusy(false);
 		}
@@ -366,7 +437,10 @@ export default function Mystery({ id }: { id: string }) {
 							<div className="my-step-head">
 								<span className="my-step-number">{step.state === "done" ? <Icon name="check" /> : fa(step.number)}</span>
 								<b>{step.state === "done" ? step.place.name : `مرحلهٔ ${fa(step.number)}`}</b>
-								<span className="my-step-points">+{fa(step.points)}</span>
+								<span className="my-step-points">
+									{step.state === "current" && step.points_now < step.points ? <s>+{fa(step.points)}</s> : null}+
+									{fa(step.state === "current" ? step.points_now : step.points)}
+								</span>
 							</div>
 							{step.state === "done" ? (
 								<>
@@ -378,7 +452,7 @@ export default function Mystery({ id }: { id: string }) {
 								</>
 							) : step.state === "current" ? (
 								m.state === "in_progress" ? (
-									<CurrentStep step={step} lockedIn={lockedIn} busy={busy} onProve={(p) => void prove(p)} onScan={() => setScanning(true)} />
+									<CurrentStep step={step} lockedIn={lockedIn} busy={busy} onProve={(p) => void prove(p)} onScan={() => setScanning(true)} onHint={() => void hint()} />
 								) : (
 									<>
 										<p className="my-clue">{step.clue}</p>

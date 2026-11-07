@@ -951,7 +951,7 @@ class MysteryTests(TestCase):
 
         self.assertEqual(parse_point("۳۵٫۷۰۰۱، ۵۱٫۳۹۱۲"), (__import__("decimal").Decimal("35.700100"), __import__("decimal").Decimal("51.391200")))
         self.assertIsNone(parse_point("35.7"))
-        data = {"mystery": self.mystery.pk, "order": 9, "clue": "c", "points": 5, "proof": "gps", "radius_m": 100, "place_name": "p", "point": ""}
+        data = {"mystery": self.mystery.pk, "order": 9, "clue": "c", "points": 5, "proof": "gps", "answer_type": "text", "radius_m": 100, "place_name": "p", "point": ""}
         form = MysteryStepForm(data=data)
         self.assertFalse(form.is_valid())
         self.assertIn("point", form.errors)  # a GPS step needs its point (shown on the one field)
@@ -967,3 +967,63 @@ class MysteryTests(TestCase):
         bad = self.Step(mystery=self.mystery, order=7, clue="c", place_name="p", proof=self.Step.Proof.GPS, qr_rotating=True)
         with self.assertRaises(ValidationError):
             bad.full_clean()
+
+    # ── help, a level at a time (2026-11-07) ──
+
+    def hint(self, step):
+        return self.api.post(f"/api/v1/missions/mysteries/{self.mystery.pk}/steps/{step.pk}/hint/", {}, format="json")
+
+    def test_hints_open_one_level_at_a_time_and_cost_points(self):
+        self.answer.order = 0  # first: the answer step
+        self.answer.hints = "به بالای در نگاه کن\nعددی چهار رقمی است"
+        self.answer.save()
+        self.start()
+        current = self.detail()["step_list"][0]
+        self.assertEqual((current["hints"], current["hints_total"], current["next_hint"]), ([], 4, "text"))
+        self.assertEqual((current["points_now"], current["next_hint_cost"]), (20, 5))
+        raw = self.api.get(f"/api/v1/missions/mysteries/{self.mystery.pk}/").content.decode()
+        self.assertNotIn("بالای در", raw)  # unopened hints never leave the server
+        self.hint(self.answer)
+        self.hint(self.answer)
+        current = self.detail()["step_list"][0]
+        self.assertEqual([h["text"] for h in current["hints"]], ["به بالای در نگاه کن", "عددی چهار رقمی است"])
+        self.assertEqual((current["points_now"], current["next_hint"]), (10, "place"))
+        self.hint(self.answer)
+        current = self.detail()["step_list"][0]
+        self.assertEqual(current["hints"][2]["name"], "خانهٔ قدیمی")
+        self.assertEqual(current["next_hint"], "answer")
+        before = self.points()
+        r = self.checkin(self.answer, answer="1305")
+        self.assertEqual(self.body(r)["points"], 5)
+        self.assertEqual(self.points(), before + 5)
+        self.assertEqual(self.mystery.runs.get().hints_used, 0)  # the next step starts afresh
+        self.assertEqual(self.mystery.runs.get().checkins.get().hints_used, 3)
+
+    def test_the_last_level_shows_the_answer_and_leaves_no_points(self):
+        self.answer.order = 0
+        self.answer.save()
+        self.start()
+        for _ in range(2):
+            self.assertEqual(self.hint(self.answer).status_code, 200)
+        current = self.detail()["step_list"][0]
+        self.assertEqual((current["hints"][-1]["answer"], current["points_now"], current["next_hint"]), ("۱۳۰۵", 0, None))
+        self.assertEqual(self.body(self.hint(self.answer))["code"], "no_more_hints")
+        self.assertEqual(self.body(self.checkin(self.answer, answer="۱۳۰۵"))["points"], 0)
+        self.assertEqual(self.detail()["step_list"][1]["state"], "current")
+
+    def test_hints_of_another_step_or_a_staff_code_are_refused_or_kept_secret(self):
+        self.start()
+        self.assertEqual(self.body(self.hint(self.gps))["code"], "not_current")
+        self.qr.order, self.staff.order = 9, 0
+        self.qr.save()
+        self.staff.save()
+        self.hint(self.staff)
+        current = self.detail()["step_list"][0]
+        self.assertEqual(current["hints_total"], 1)  # the place only: a staff code is never shown
+        self.assertNotIn("نان-۴۷", self.api.get(f"/api/v1/missions/mysteries/{self.mystery.pk}/").content.decode())
+
+    def test_a_qr_step_pays_less_after_hints(self):
+        self.start()
+        self.hint(self.qr)  # the place
+        r = self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json")
+        self.assertEqual(self.body(r)["points"], 7)  # 10 less 25%, rounded down

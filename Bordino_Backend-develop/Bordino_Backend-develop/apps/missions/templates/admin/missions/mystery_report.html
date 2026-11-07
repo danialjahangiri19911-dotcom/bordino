@@ -29,7 +29,7 @@
 <table class="mr-table">
   <thead><tr>
     <th>مرحله</th><th class="mr-place">محل</th><th>روش تأیید</th><th>همه</th><th>۷ روز اخیر</th><th>۳۰ روز اخیر</th>
-    <th>نسبت به شروع‌کنندگان</th><th>اولین بازدید</th><th>آخرین بازدید</th>
+    <th>نسبت به شروع‌کنندگان</th><th>میانگین راهنمایی</th><th>اولین بازدید</th><th>آخرین بازدید</th>
   </tr></thead>
   <tbody>
   {% for row in report.steps %}
@@ -41,11 +41,12 @@
       <td>{{ row.week }}</td>
       <td>{{ row.month }}</td>
       <td>{% if report.started %}{% widthratio row.total report.started 100 %}٪{% else %}—{% endif %}</td>
+      <td>{{ row.hints }}</td>
       <td>{{ row.first|default:"—" }}</td>
       <td>{{ row.last|default:"—" }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="9">این معما هنوز مرحله‌ای ندارد.</td></tr>
+    <tr><td colspan="10">این معما هنوز مرحله‌ای ندارد.</td></tr>
   {% endfor %}
   </tbody>
 </table>

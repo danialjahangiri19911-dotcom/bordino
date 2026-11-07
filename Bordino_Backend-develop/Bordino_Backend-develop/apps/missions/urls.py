@@ -11,6 +11,7 @@ from apps.missions.views import (
     MissionStartView,
     MysteryCheckinView,
     MysteryDetailView,
+    MysteryHintView,
     MysteryStartView,
     VenueDisplayView,
 )
@@ -30,6 +31,11 @@ urlpatterns = [
         "api/v1/missions/mysteries/<uuid:mystery_id>/steps/<uuid:step_id>/checkin/",
         MysteryCheckinView.as_view(),
         name="mystery_checkin",
+    ),
+    path(
+        "api/v1/missions/mysteries/<uuid:mystery_id>/steps/<uuid:step_id>/hint/",
+        MysteryHintView.as_view(),
+        name="mystery_hint",
     ),
     path("api/v1/missions/callback/<uuid:mission_id>/", MissionCallbackView.as_view(), name="mission_callback"),
 ]
