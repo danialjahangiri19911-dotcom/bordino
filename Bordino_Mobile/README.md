@@ -27,7 +27,7 @@ to uninstall the app before they can install a new version. Keep a copy somewher
 
 ## Notes
 
-- The app adds `BordinoApp/1` to the browser user-agent; the landing page uses it to hide the
+- The app adds `BordinoApp/<version>` (1.4 on, `BordinoApp/1` before) to the browser user-agent; the landing page uses it to hide the
   «بردینو روی گوشی» install section inside the app.
 - Offline: the app shows `www/offline.html` and reloads by itself when the connection is back.
 - iPhone: there is no iOS build (needs a Mac + Apple developer account); the landing page shows

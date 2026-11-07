@@ -9,6 +9,9 @@ from apps.missions.views import (
     MissionQrHoldView,
     MissionQrView,
     MissionStartView,
+    MysteryCheckinView,
+    MysteryDetailView,
+    MysteryStartView,
     VenueDisplayView,
 )
 
@@ -21,5 +24,12 @@ urlpatterns = [
     path("api/v1/missions/qr/<str:token>/", MissionQrView.as_view(), name="mission_qr"),
     path("api/v1/missions/qr/<str:token>/hold/", MissionQrHoldView.as_view(), name="mission_qr_hold"),
     path("api/v1/missions/venue/<str:key>/", VenueDisplayView.as_view(), name="mission_venue"),
+    path("api/v1/missions/mysteries/<uuid:mystery_id>/", MysteryDetailView.as_view(), name="mystery"),
+    path("api/v1/missions/mysteries/<uuid:mystery_id>/start/", MysteryStartView.as_view(), name="mystery_start"),
+    path(
+        "api/v1/missions/mysteries/<uuid:mystery_id>/steps/<uuid:step_id>/checkin/",
+        MysteryCheckinView.as_view(),
+        name="mystery_checkin",
+    ),
     path("api/v1/missions/callback/<uuid:mission_id>/", MissionCallbackView.as_view(), name="mission_callback"),
 ]

@@ -745,3 +745,225 @@ class InterstitialMissionTests(TestCase):
         self.mission.verification = Mission.Verification.REVIEW
         with self.assertRaises(ValidationError):
             self.mission.full_clean()
+
+
+@override_settings(CACHES=LOCMEM, MEDIA_ROOT=__import__("pathlib").Path(MEDIA))
+class MysteryTests(TestCase):
+    """«معمای شهری» (2026-11-07): a chain of clues, each step proved at its place."""
+
+    def setUp(self):
+        cache.clear()
+        from apps.missions.models import Mystery, MysteryStep  # pylint: disable=import-outside-toplevel
+
+        self.Mystery, self.Step = Mystery, MysteryStep
+        self.user = make_player("9120007501")
+        self.customer = self.user.customer
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+        self.mystery = Mystery.objects.create(title="راز میدان", story="یک نامه پیدا شد…", finish_points=50)
+        P = MysteryStep.Proof
+        self.qr = MysteryStep.objects.create(mystery=self.mystery, order=1, clue="جایی که قهوه بوی کتاب می‌دهد", place_name="کافه کتاب", points=10, proof=P.QR)
+        self.gps = MysteryStep.objects.create(
+            mystery=self.mystery, order=2, clue="زیر برج ساعت", place_name="برج ساعت", points=15, proof=P.GPS,
+            latitude="35.700000", longitude="51.400000", radius_m=100,
+        )
+        self.answer = MysteryStep.objects.create(
+            mystery=self.mystery, order=3, clue="سردر قدیمی", place_name="خانهٔ قدیمی", points=20, proof=P.ANSWER,
+            question="سال ساخت روی سردر؟", answers="۱۳۰۵|هزار و سیصد و پنج",
+        )
+        self.staff = MysteryStep.objects.create(
+            mystery=self.mystery, order=4, clue="نان تازه", place_name="نانوایی سنگک", points=25, proof=P.STAFF,
+            staff_code="نان-۴۷", check_location=True, latitude="35.710000", longitude="51.410000", radius_m=80,
+            place_offer="۱۰٪ تخفیف",
+        )
+
+    def points(self):
+        return TokenWalletAccount.objects.get(wallet__owner=self.user).amount
+
+    def detail(self):
+        r = self.api.get(f"/api/v1/missions/mysteries/{self.mystery.pk}/")
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json()["result"]["mystery"] if "result" in r.json() else r.json()["mystery"]
+
+    def checkin(self, step, **data):
+        return self.api.post(f"/api/v1/missions/mysteries/{self.mystery.pk}/steps/{step.pk}/checkin/", data, format="json")
+
+    def start(self):
+        r = self.api.post(f"/api/v1/missions/mysteries/{self.mystery.pk}/start/", {}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def body(self, r):
+        data = r.json()
+        return data["result"] if data["is_successful"] else data["errors"]
+
+    def test_the_list_shows_it_and_no_secret_ever_leaves(self):
+        r = self.api.get("/api/v1/missions/")
+        card = self.body(r)["mysteries"][0]
+        self.assertEqual((card["state"], card["steps"], card["done"], card["points"]), ("available", 4, 0, 10 + 15 + 20 + 25 + 50))
+        self.start()
+        raw = self.api.get(f"/api/v1/missions/mysteries/{self.mystery.pk}/").content.decode()
+        for secret in ("1305", "۱۳۰۵", "نان-۴۷", "35.7", "51.4", self.qr.qr_token, "کافه کتاب", "خانهٔ قدیمی"):
+            self.assertNotIn(secret, raw)
+        steps = self.detail()["step_list"]
+        self.assertEqual([s["state"] for s in steps], ["current", "locked", "locked", "locked"])
+        self.assertNotIn("clue", steps[1])
+
+    def test_a_whole_game_pays_every_step_and_the_bonus_once(self):
+        start = self.points()
+        # Step 1's QR starts the mystery by itself (a poster at the first place is the way in).
+        r = self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.body(r)["mystery"]["id"], str(self.mystery.pk))
+        self.assertEqual(self.points(), start + 10)
+        again = self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json")
+        self.assertTrue(self.body(again)["already_rewarded"])
+        self.assertEqual(self.points(), start + 10)
+
+        far = self.checkin(self.gps, lat=35.71, lng=51.40, accuracy=10)
+        self.assertEqual((far.status_code, self.body(far)["code"]), (409, "too_far"))
+        vague = self.checkin(self.gps, lat=35.7, lng=51.4, accuracy=2000)
+        self.assertEqual(self.body(vague)["code"], "location_inaccurate")
+        ok = self.checkin(self.gps, lat=35.7008, lng=51.4, accuracy=20)  # ~89 m
+        self.assertEqual(ok.status_code, 200, ok.content)
+        self.assertEqual(self.points(), start + 25)
+
+        self.assertEqual(self.body(self.checkin(self.answer, answer="1306"))["code"], "wrong")
+        good = self.checkin(self.answer, answer=" 1305 ")
+        self.assertEqual(good.status_code, 200, good.content)
+
+        near_code = self.checkin(self.staff, code="نان۴۷", lat=35.70, lng=51.40, accuracy=10)
+        self.assertEqual(self.body(near_code)["code"], "too_far")  # the right code, from the wrong place
+        last = self.checkin(self.staff, code="نان ۴۷", lat=35.7101, lng=51.41, accuracy=15)
+        self.assertEqual(last.status_code, 200, last.content)
+        body = self.body(last)
+        self.assertEqual((body["finished"], body["bonus"]), (True, 50))
+        self.assertEqual(self.points(), start + 10 + 15 + 20 + 25 + 50)
+        steps = body["mystery"]["step_list"]
+        self.assertEqual([s["state"] for s in steps], ["done"] * 4)
+        self.assertEqual(steps[3]["place"]["offer"], "۱۰٪ تخفیف")
+        self.assertIn("neshan.org", steps[3]["place"]["map"])
+        self.assertEqual(self.body(self.checkin(self.staff, code="نان-۴۷", lat=35.7101, lng=51.41, accuracy=15))["already_rewarded"], True)
+        self.assertEqual(self.points(), start + 120)
+        self.assertEqual(ActivityTransaction.objects.filter(customer=self.customer, action_type__startswith="mystery").count(), 5)
+
+    def test_steps_open_in_order(self):
+        self.start()
+        r = self.checkin(self.gps, lat=35.7, lng=51.4, accuracy=5)
+        self.assertEqual(self.body(r)["code"], "not_current")
+        self.assertIn("مرحلهٔ 1", self.body(r)["error"])
+        # A later QR, or a QR step proved without its QR: refused.
+        late = self.Step.objects.create(mystery=self.mystery, order=5, clue="?", place_name="آخر", proof=self.Step.Proof.QR)
+        self.assertEqual(self.body(self.api.post(f"/api/v1/missions/qr/{late.qr_token}/", {}, format="json"))["code"], "not_current")
+        self.assertEqual(self.body(self.checkin(self.qr))["code"], "use_qr")
+
+    def test_a_hidden_mystery_starts_from_its_first_qr_only(self):
+        self.mystery.is_visible = False
+        self.mystery.save()
+        self.assertEqual(self.body(self.api.get("/api/v1/missions/"))["mysteries"], [])
+        r = self.api.post(f"/api/v1/missions/mysteries/{self.mystery.pk}/start/", {}, format="json")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json").status_code, 200)
+        self.assertEqual(self.detail()["step_list"][1]["state"], "current")  # its player still sees it
+
+    def test_a_later_steps_qr_does_not_start_the_mystery(self):
+        late = self.Step.objects.create(mystery=self.mystery, order=5, clue="?", place_name="آخر", proof=self.Step.Proof.QR)
+        r = self.api.post(f"/api/v1/missions/qr/{late.qr_token}/", {}, format="json")
+        self.assertEqual(self.body(r)["code"], "not_started")
+        self.assertFalse(self.mystery.runs.exists())
+
+    def test_wrong_answers_lead_to_a_wait_that_is_kept(self):
+        self.answer.order = 0  # first: the answer step is the one to solve
+        self.answer.save()
+        self.start()
+        for _ in range(4):
+            self.assertEqual(self.body(self.checkin(self.answer, answer="no"))["code"], "wrong")
+        self.assertEqual(self.body(self.checkin(self.answer, answer="no"))["code"], "locked")
+        # Even the right answer waits now.
+        r = self.checkin(self.answer, answer="1305")
+        self.assertEqual(self.body(r)["code"], "locked")
+        self.assertGreater(self.detail()["run"]["locked_in"], 0)
+        run = self.mystery.runs.get()
+        run.locked_until = timezone.now() - timedelta(seconds=1)
+        run.save()
+        self.assertEqual(self.checkin(self.answer, answer="هزار و سیصد و پنج").status_code, 200)
+
+    def test_persian_forms_of_an_answer_match(self):
+        from apps.missions.mystery import normalize  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(normalize("كافهٔ  علي ۱۲"), normalize("کافه علی 12"))
+        self.assertEqual(normalize("آب‌انبار"), normalize("ابانبار"))
+        self.assertEqual(normalize("   "), "")
+
+    def test_capacity_stops_new_players_only_and_the_end_stops_everyone(self):
+        self.start()
+        self.mystery.capacity = 1
+        self.mystery.save()
+        other = APIClient()
+        other.force_authenticate(make_player("9120007502"))
+        r = other.post(f"/api/v1/missions/mysteries/{self.mystery.pk}/start/", {}, format="json")
+        self.assertEqual(self.body(r)["code"], "full")
+        self.assertEqual(self.body(other.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json"))["code"], "full")
+        self.assertEqual(self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json").status_code, 200)
+        self.mystery.ends_at = timezone.now() - timedelta(minutes=1)
+        self.mystery.save()
+        self.assertEqual(self.body(self.checkin(self.gps, lat=35.7, lng=51.4, accuracy=5))["code"], "expired")
+        self.assertEqual(self.detail()["state"], "expired")
+
+    def test_a_venue_screen_works_for_a_step_and_codes_never_cross(self):
+        self.qr.qr_rotating = True
+        self.qr.save()
+        r = self.client.get(f"/api/v1/missions/venue/{self.qr.qr_display_key}/")
+        self.assertEqual(r.status_code, 200)
+        data = r.json().get("result", r.json())
+        self.assertEqual(data["title"], "کافه کتاب")
+        code = data["url"].rsplit("/", 1)[-1]
+        # A QR mission with the same token could never take this step's signature.
+        self.assertFalse(services._code_valid(Mission(pk=self.qr.pk, qr_token=self.qr.qr_token), *services._split_code(code)[1:], services.time.time()))
+        self.assertEqual(self.api.post(f"/api/v1/missions/qr/{code}/", {}, format="json").status_code, 200)
+        # The bare token (an old printed QR) no longer counts: scan the screen.
+        self.assertEqual(self.body(self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json"))["code"], "qr_expired")
+        hold = self.client.post(f"/api/v1/missions/qr/{code}/hold/")
+        self.assertEqual(hold.status_code, 200)
+
+    def test_the_admin_report_and_a_new_season(self):
+        self.api.post(f"/api/v1/missions/qr/{self.qr.qr_token}/", {}, format="json")
+        staff = get_user_model().objects.create_superuser(phone_number="9120007599", password="x-Pass-123")
+        self.client.force_login(staff)
+        page = self.client.get(f"/admin/missions/mystery/{self.mystery.pk}/report/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "کافه کتاب")
+        from apps.missions import mystery  # pylint: disable=import-outside-toplevel
+
+        report = mystery.report(self.mystery)
+        self.assertEqual((report["started"], report["steps"][0]["total"], report["steps"][0]["daily"][-1]), (1, 1, 1))
+        self.assertEqual(self.client.get(f"/admin/missions/mystery/{self.mystery.pk}/change/").status_code, 200)
+        self.assertEqual(self.client.get("/admin/missions/mystery/").status_code, 200)
+        self.assertEqual(self.client.get("/admin/missions/mysterycheckin/").status_code, 200)
+        self.client.post("/admin/missions/mystery/", {"action": "new_season", "_selected_action": [str(self.mystery.pk)]})
+        copy = self.Mystery.objects.exclude(pk=self.mystery.pk).get()
+        self.assertFalse(copy.is_active)
+        self.assertEqual(copy.steps.count(), 4)
+        new_qr = copy.steps.get(order=1).qr_token
+        self.assertTrue(new_qr and new_qr != self.qr.qr_token)
+
+    def test_the_admin_step_form_takes_copied_coordinates(self):
+        from apps.missions.admin import MysteryStepForm, parse_point  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(parse_point("۳۵٫۷۰۰۱، ۵۱٫۳۹۱۲"), (__import__("decimal").Decimal("35.700100"), __import__("decimal").Decimal("51.391200")))
+        self.assertIsNone(parse_point("35.7"))
+        data = {"mystery": self.mystery.pk, "order": 9, "clue": "c", "points": 5, "proof": "gps", "radius_m": 100, "place_name": "p", "point": ""}
+        form = MysteryStepForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("point", form.errors)  # a GPS step needs its point (shown on the one field)
+        form = MysteryStepForm(data={**data, "point": "35.7001, 51.3912"})
+        self.assertTrue(form.is_valid(), form.errors)
+        step = form.save()
+        self.assertEqual(str(step.latitude), "35.700100")
+
+    def test_steps_check_their_own_settings(self):
+        bad = self.Step(mystery=self.mystery, order=7, clue="c", place_name="p", proof=self.Step.Proof.ANSWER)
+        with self.assertRaises(ValidationError):
+            bad.full_clean()
+        bad = self.Step(mystery=self.mystery, order=7, clue="c", place_name="p", proof=self.Step.Proof.GPS, qr_rotating=True)
+        with self.assertRaises(ValidationError):
+            bad.full_clean()

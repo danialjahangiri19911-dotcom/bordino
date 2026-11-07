@@ -1,4 +1,5 @@
 import { type AdSession, untilConfirmed } from "../ads/api";
+import type { MysteryCard } from "./mystery";
 import { call } from "@/api/games/request";
 import requester from "@/libs/http/requester";
 import type { ResponseApiData } from "@/libs/http/interfaces";
@@ -82,6 +83,8 @@ export interface MissionCategory {
 export interface MissionList {
 	categories: MissionCategory[];
 	missions: Mission[];
+	/** «معمای شهری» (servers from 2026-11-07). */
+	mysteries?: MysteryCard[];
 }
 
 export interface MissionReward {

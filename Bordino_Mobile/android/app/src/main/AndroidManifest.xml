@@ -51,6 +51,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+: asked from «مدیریت اعلان‌ها» when the player turns notifications on. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- «معمای شهری»: «من اینجام» reads the phone's location, and «اسکن QR محل» the camera (each
+         asked only when the player uses it; the WebView passes the site's request on). -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <!-- Pushe adds the advertising-id permission; notifications do not need it. -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />
 </manifest>

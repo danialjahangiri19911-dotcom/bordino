@@ -23,6 +23,7 @@ export const R = {
 	games: "/pwa/gameNet",
 	earn: "/pwa/earn",
 	earnQr: (token: string) => `/pwa/earn/qr/${token}`,
+	mystery: (id: string) => `/pwa/earn/mystery/${id}`,
 	wallet: "/pwa/wallet",
 	transactions: "/pwa/wallet/transactions",
 	withdraw: "/pwa/wallet/withdraw",

@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { fa } from "../format";
-import { type MissionReward, claimQr, holdQr, isVenueCode } from "../missions/api";
+import { claimQr, holdQr, isVenueCode } from "../missions/api";
+import type { MysteryQrReward } from "../missions/mystery";
 import { rememberQr } from "../missions/pendingQr";
 import { AppShell, EmptyState, R } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ export default function EarnQr({ token }: { token: string }) {
 	const { replace } = useRouter();
 	const queryClient = useQueryClient();
 	const sent = useRef(false);
-	const [result, setResult] = useState<MissionReward | null>(null);
+	const [result, setResult] = useState<MysteryQrReward | null>(null);
 	const [problem, setProblem] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -56,7 +57,12 @@ export default function EarnQr({ token }: { token: string }) {
 	}, [isLoggedIn, token, replace, queryClient]);
 
 	if (!isLoggedIn && !problem) return null;
-	const more = (
+	// A «معمای شهری» step's QR: back to its mystery (the next clue is open there).
+	const more = result?.mystery ? (
+		<Link className="bd-action" href={R.mystery(result.mystery.id)}>
+			{result.mystery.finished ? "دیدن معما" : "سرنخ بعدی"}
+		</Link>
+	) : (
 		<Link className="bd-action" href={R.earn}>
 			مأموریت‌های دیگر
 		</Link>
@@ -68,7 +74,13 @@ export default function EarnQr({ token }: { token: string }) {
 					<EmptyState
 						icon={result.already_rewarded ? "badge-check" : "coins"}
 						title={result.already_rewarded ? "امتیاز این QR را قبلاً گرفته‌ای" : `+${fa(result.points)} امتیاز گرفتی!`}
-						text={result.title ? `«${result.title}»${result.already_rewarded ? "" : " — به کیف امتیازت اضافه شد."}` : undefined}
+						text={
+							result.mystery
+								? `«${result.title}» در معمای «${result.summary}»${result.already_rewarded ? "" : result.mystery.finished ? " — معما را حل کردی!" : " — مرحلهٔ بعد باز شد."}`
+								: result.title
+									? `«${result.title}»${result.already_rewarded ? "" : " — به کیف امتیازت اضافه شد."}`
+									: undefined
+						}
 						action={more}
 					/>
 				) : problem ? (

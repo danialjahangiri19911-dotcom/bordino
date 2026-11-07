@@ -383,3 +383,95 @@ body { margin: 0; }
 
 /* «دریافت امتیاز» while its list loads: about a list's height, so nothing below jumps when it arrives. */
 #bordino-directions .mi-loading { min-height: min(520px, 60vh); }
+
+/* «معمای شهری» (2026-11-07): the list above the missions, and a mystery's page. */
+#bordino-directions .my-list { margin-bottom: 18px; }
+#bordino-directions .my-list h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 4px; font-size: 16px; }
+#bordino-directions .my-list h3 svg { width: 18px; height: 18px; }
+#bordino-directions .my-list-text { margin: 0 0 10px; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .my-cards { display: grid; gap: 12px; }
+#bordino-directions a.my-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+#bordino-directions a.my-card:hover b, #bordino-directions a.my-card:focus-visible b { text-decoration: underline; text-underline-offset: 4px; }
+#bordino-directions a.my-card[data-state="expired"], #bordino-directions a.my-card[data-state="inactive"], #bordino-directions a.my-card[data-state="full"] { opacity: .62; }
+#bordino-directions .my-card-cover { flex: none; width: 64px; height: 64px; object-fit: cover; border: 2px solid var(--bd-outline); background: color-mix(in srgb, var(--bd-accent) 14%, var(--bd-surface)); }
+#bordino-directions .my-card-art { display: grid; place-items: center; color: var(--bd-accent); }
+#bordino-directions .my-card-art svg { width: 28px; height: 28px; }
+#bordino-directions .my-card-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#bordino-directions .my-card-copy b { font-size: 14px; }
+#bordino-directions .my-card-copy small { font-size: 11px; color: var(--bd-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bordino-directions .my-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11px; color: var(--bd-muted); }
+#bordino-directions .my-card-meta .bd-tag { font-size: 10px; padding: 2px 9px; }
+#bordino-directions .bd-tag.my-tag-in_progress, #bordino-directions .bd-tag.my-tag-upcoming { background: color-mix(in srgb, #e3a21a 20%, var(--bd-surface)); color: var(--bd-fg); }
+#bordino-directions .bd-tag.my-tag-done { background: color-mix(in srgb, #2f8f5b 20%, var(--bd-surface)); color: var(--bd-fg); }
+
+#bordino-directions a.my-back { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 13px; color: var(--bd-muted); text-decoration: none; }
+#bordino-directions a.my-back svg { width: 16px; height: 16px; }
+#bordino-directions .my-hero { margin-bottom: 16px; }
+#bordino-directions .my-cover { display: block; width: 100%; max-height: 220px; object-fit: cover; margin: 0 0 12px; border: 2px solid var(--bd-outline); }
+#bordino-directions .my-kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; }
+#bordino-directions .my-kicker svg { width: 13px; height: 13px; }
+#bordino-directions .my-hero h2 { margin: 8px 0 4px; font-size: 22px; line-height: 1.5; }
+#bordino-directions .my-summary { margin: 0 0 8px; font-size: 13px; color: var(--bd-muted); }
+#bordino-directions .my-facts { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 10px; padding: 0; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .my-facts li { display: inline-flex; align-items: center; gap: 4px; }
+#bordino-directions .my-facts svg { width: 14px; height: 14px; }
+#bordino-directions .my-story { margin: 0 0 12px; font-size: 13px; line-height: 2; white-space: pre-line; }
+#bordino-directions .my-progress { height: 10px; margin: 4px 0 2px; border: 2px solid var(--bd-outline); background: var(--bd-surface); overflow: hidden; }
+#bordino-directions .my-progress span { display: block; height: 100%; background: var(--bd-accent); transition: width .4s ease; }
+#bordino-directions .bd-action.my-go { width: 100%; margin-top: 6px; }
+#bordino-directions .bd-action.my-go svg { width: 18px; height: 18px; }
+#bordino-directions .my-note { margin: 8px 0 0; padding: 10px 12px; font-size: 12px; line-height: 1.8; background: color-mix(in srgb, var(--bd-muted) 12%, var(--bd-surface)); }
+#bordino-directions .my-win { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; background: color-mix(in srgb, #2f8f5b 18%, var(--bd-surface)); }
+#bordino-directions .my-win > svg { flex: none; width: 30px; height: 30px; color: #2f8f5b; }
+#bordino-directions .my-win div { display: flex; flex-direction: column; gap: 2px; }
+#bordino-directions .my-win small { font-size: 12px; }
+#bordino-directions .my-win-final > svg { color: #e3a21a; }
+#bordino-directions .my-problem { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 14px; padding: 10px 12px; font-size: 13px; line-height: 1.8; border: 2px solid var(--bd-outline); background: color-mix(in srgb, var(--bd-accent) 16%, var(--bd-surface)); }
+#bordino-directions .my-problem svg { flex: none; width: 17px; height: 17px; margin-top: 3px; }
+
+#bordino-directions .my-steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 14px; }
+#bordino-directions .my-step-head { display: flex; align-items: center; gap: 10px; }
+#bordino-directions .my-step-head b { flex: 1; font-size: 14px; }
+#bordino-directions .my-step-number { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--bd-outline); font-weight: 700; font-size: 13px; }
+#bordino-directions .my-step-number svg { width: 17px; height: 17px; }
+#bordino-directions .my-done .my-step-number { background: #2f8f5b; border-color: #2f8f5b; color: #fff; }
+#bordino-directions .my-current .my-step-number, #bordino-directions li.my-current .my-step-number { background: var(--bd-accent); color: var(--bd-on); }
+#bordino-directions .my-step-points { flex: none; color: var(--bd-accent); font-weight: 700; font-size: 14px; direction: ltr; }
+#bordino-directions li.my-locked { opacity: .6; }
+#bordino-directions .my-locked-text { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .my-locked-text svg { width: 14px; height: 14px; }
+#bordino-directions .my-clue { margin: 12px 0 8px; padding: 12px 14px; font-size: 15px; line-height: 2; white-space: pre-line; border-inline-start: 4px solid var(--bd-accent); background: color-mix(in srgb, var(--bd-accent) 8%, var(--bd-surface)); }
+#bordino-directions .my-clue-image { display: block; max-width: 100%; max-height: 260px; margin: 0 auto 8px; border: 2px solid var(--bd-outline); object-fit: contain; }
+#bordino-directions .my-hint-button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 0; border: 0; background: none; color: var(--bd-accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+#bordino-directions .my-hint-button svg, #bordino-directions .my-hint svg, #bordino-directions .my-proof-help svg, #bordino-directions .my-locked svg { width: 15px; height: 15px; vertical-align: -3px; flex: none; }
+#bordino-directions .my-hint { margin: 4px 0 8px; padding: 8px 12px; font-size: 13px; line-height: 1.9; background: color-mix(in srgb, #e3a21a 16%, var(--bd-surface)); }
+#bordino-directions .my-proof-help { margin: 6px 0; font-size: 12px; line-height: 1.8; color: var(--bd-muted); }
+#bordino-directions .my-locked { margin: 6px 0; padding: 8px 12px; font-size: 12px; background: color-mix(in srgb, #e3a21a 18%, var(--bd-surface)); }
+#bordino-directions .my-answer { margin-top: 8px; }
+#bordino-directions .my-answer label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+#bordino-directions .my-answer div { display: flex; gap: 8px; }
+#bordino-directions .my-answer input { flex: 1; min-width: 0; min-height: 43px; padding: 8px 12px; border: 2px solid var(--bd-outline); background: var(--bd-surface); color: var(--bd-fg); font: inherit; font-size: 15px; }
+#bordino-directions .my-answer .bd-action { flex: none; min-width: 72px; }
+#bordino-directions .my-place { margin-top: 10px; }
+#bordino-directions .my-place-head { display: flex; align-items: center; gap: 10px; }
+#bordino-directions .my-place-head img { flex: none; width: 48px; height: 48px; object-fit: cover; border: 2px solid var(--bd-outline); }
+#bordino-directions .my-place-head > svg { flex: none; width: 26px; height: 26px; color: var(--bd-accent); }
+#bordino-directions .my-place-head div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#bordino-directions .my-place-head small { font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .my-place-about { margin: 8px 0; font-size: 13px; line-height: 1.9; white-space: pre-line; }
+#bordino-directions .my-offer { display: flex; align-items: center; gap: 6px; margin: 8px 0; padding: 8px 12px; font-size: 13px; font-weight: 700; background: color-mix(in srgb, #2f8f5b 16%, var(--bd-surface)); }
+#bordino-directions .my-offer svg { flex: none; width: 16px; height: 16px; }
+#bordino-directions .my-place-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+#bordino-directions .my-place-links a { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 6px 14px; font-size: 12px; text-decoration: none; color: inherit; }
+#bordino-directions .my-place-links svg { width: 15px; height: 15px; }
+#bordino-directions .my-old-clue { margin-top: 8px; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .my-old-clue summary { cursor: pointer; }
+#bordino-directions .my-old-clue p { margin: 6px 0 0; line-height: 1.9; white-space: pre-line; }
+
+#bordino-directions .my-scan { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 14px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: #000; color: #fff; }
+#bordino-directions .my-scan video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#bordino-directions .my-scan-frame { position: absolute; top: 50%; left: 50%; width: min(64vw, 280px); aspect-ratio: 1; transform: translate(-50%, -58%); border: 3px solid #fff; box-shadow: 0 0 0 100vmax rgb(0 0 0 / .45); }
+#bordino-directions .my-scan-text { position: relative; margin: 0; padding: 8px 14px; font-size: 14px; text-align: center; background: rgb(0 0 0 / .6); }
+#bordino-directions .my-scan-close { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+#bordino-directions .my-scan-close svg { width: 16px; height: 16px; }
+@media (prefers-reduced-motion: reduce) { #bordino-directions .my-progress span { transition: none; } }

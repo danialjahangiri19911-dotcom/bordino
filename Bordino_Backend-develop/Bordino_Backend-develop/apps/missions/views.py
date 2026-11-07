@@ -9,8 +9,8 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
-from apps.missions import services
-from apps.missions.models import Mission, MissionAttempt, MissionCategory
+from apps.missions import mystery, services
+from apps.missions.models import Mission, MissionAttempt, MissionCategory, MysteryStep
 from apps.wallet.services import ad_reward
 from apps.wallet.services.balance import points_account
 
@@ -148,7 +148,13 @@ class MissionListView(APIView):
             {"id": str(c.pk), "name": c.name, "icon": c.icon}
             for c in MissionCategory.objects.filter(is_active=True, pk__in=used)
         ]
-        return Response({"categories": categories, "missions": [mission_payload(v) for v in views]})
+        return Response(
+            {
+                "categories": categories,
+                "missions": [mission_payload(v) for v in views],
+                "mysteries": [mystery_card(v) for v in mystery.listing(customer)],
+            }
+        )
 
 
 class MissionStartView(APIView):
@@ -244,6 +250,18 @@ class MissionQrView(APIView):
             result = services.claim_qr(customer, token)
         except services.MissionError as exc:
             return _error(exc)
+        if isinstance(result, mystery.Result):
+            return Response(
+                {
+                    "rewarded": True,
+                    "already_rewarded": result.already,
+                    "points": result.points + result.bonus,
+                    "points_balance": _balance(request),
+                    "title": result.step.place_name,
+                    "summary": result.run.mystery.title,
+                    "mystery": {"id": str(result.run.mystery_id), "finished": result.finished, "bonus": result.bonus},
+                }
+            )
         mission = result.attempt.mission
         return Response(
             {
@@ -313,11 +331,16 @@ class VenueDisplayView(APIView):
             return _error(exc)
         url = f"{settings.MISSIONS_PUBLIC_URL.rstrip('/')}/pwa/earn/qr/{code}"
         svg = segno.make(url, error="m").svg_inline(scale=8, border=2)
+        if isinstance(mission, MysteryStep):
+            # A mystery step's screen: the place's name (the players are there already).
+            title, points, active = mission.place_name, mission.points, mission.mystery.is_active
+        else:
+            title, points, active = mission.title, mission.points, mission.is_active
         response = Response(
             {
-                "title": mission.title,
-                "points": mission.points,
-                "active": mission.is_active,
+                "title": title,
+                "points": points,
+                "active": active,
                 "url": url,
                 "svg": svg,
                 "expires_in": expires_in,
@@ -327,3 +350,156 @@ class VenueDisplayView(APIView):
         )
         response["Cache-Control"] = "no-store"
         return response
+
+
+# ── «معمای شهری» ──
+
+
+def _media(field) -> str | None:
+    return field.url if field else None
+
+
+def _when(value):
+    return value.isoformat() if value else None
+
+
+def mystery_card(view: mystery.View) -> dict:
+    m = view.mystery
+    return {
+        "id": str(m.pk),
+        "title": m.title,
+        "summary": m.summary,
+        "cover": _media(m.cover),
+        "area": m.area,
+        "duration_minutes": m.duration_minutes,
+        "steps": view.steps,
+        "done": view.done,
+        "points": view.points,
+        "finish_points": m.finish_points,
+        "starts_at": _when(m.starts_at),
+        "ends_at": _when(m.ends_at),
+        "order": m.order,
+        "state": view.state,
+    }
+
+
+def _place(step: MysteryStep) -> dict:
+    return {
+        "name": step.place_name,
+        "logo": _media(step.place_logo),
+        "address": step.place_address,
+        "about": step.place_about,
+        "offer": step.place_offer,
+        "url": step.place_url,
+        "map": step.map_link(),
+    }
+
+
+def mystery_detail(view: mystery.View) -> dict:
+    """The mystery and this player's steps: the solved ones with their place, the current one's clue
+    and how it is proved, the later ones locked. Never a place's position, answer, code or QR."""
+    m, run = view.mystery, view.run
+    body = mystery_card(view)
+    body["story"] = m.story
+    steps = mystery.steps_of(m)
+    visits = {c.step_id: c for c in run.checkins.all()} if run else {}
+    current = mystery.current_step(steps, set(visits)) if run and run.status == run.Status.ACTIVE else None
+    now = timezone.now()
+    body["run"] = (
+        {
+            "status": run.status,
+            "started_at": run.create_time.isoformat(),
+            "completed_at": _when(run.completed_at),
+            "points_earned": run.points_earned,
+            "locked_in": max(0, int((run.locked_until - now).total_seconds() + 0.999)) if run.locked_until and run.locked_until > now else 0,
+        }
+        if run
+        else None
+    )
+    shown = []
+    for number, step in enumerate(steps, 1):
+        item = {"id": str(step.pk), "number": number, "points": step.points}
+        if step.pk in visits:
+            item.update(state="done", clue=step.clue, place=_place(step), visited_at=visits[step.pk].create_time.isoformat())
+        elif current is not None and step.pk == current.pk:
+            item.update(
+                state="current",
+                clue=step.clue,
+                clue_image=_media(step.clue_image),
+                hint=step.hint,
+                proof=step.proof,
+                question=step.question if step.proof == MysteryStep.Proof.ANSWER else "",
+                check_location=step.proof == MysteryStep.Proof.GPS or step.check_location,
+                radius_m=step.radius_m,
+            )
+        else:
+            item.update(state="locked")
+        shown.append(item)
+    body["step_list"] = shown
+    return body
+
+
+class MysteryDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=["missions"], summary="A city mystery and this player's progress")
+    def get(self, request, mystery_id):
+        try:
+            customer = _customer(request)
+            view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response({"mystery": mystery_detail(view)})
+
+
+class MysteryStartView(APIView):
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Start a city mystery")
+    def post(self, request, mystery_id):
+        try:
+            customer = _customer(request)
+            mystery.start(customer, mystery_id)
+            view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response({"mystery": mystery_detail(view)}, status=status.HTTP_201_CREATED)
+
+
+class CheckinSerializer(serializers.Serializer):
+    answer = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    code = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    lat = serializers.FloatField(required=False, allow_null=True)
+    lng = serializers.FloatField(required=False, allow_null=True)
+    accuracy = serializers.FloatField(required=False, allow_null=True)
+
+
+class MysteryCheckinView(APIView):
+    """The current step proved by its answer, the staff's code or the phone's location (a QR step
+    goes through the QR address instead)."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Prove a city mystery step", request=CheckinSerializer)
+    def post(self, request, mystery_id, step_id):
+        data = CheckinSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            customer = _customer(request)
+            result = mystery.checkin(customer, mystery_id, step_id, data.validated_data)
+            view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response(
+            {
+                "rewarded": True,
+                "already_rewarded": result.already,
+                "points": result.points,
+                "bonus": result.bonus,
+                "finished": result.finished,
+                "points_balance": _balance(request),
+                "mystery": mystery_detail(view),
+            }
+        )

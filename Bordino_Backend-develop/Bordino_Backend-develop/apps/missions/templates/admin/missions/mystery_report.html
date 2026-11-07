@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:missions_mystery_changelist' %}">{{ opts.verbose_name_plural }}</a>
+  &rsaquo; <a href="{% url 'admin:missions_mystery_change' mystery.pk %}">{{ mystery.title }}</a>
+  &rsaquo; بازدید محل‌ها
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  .mr-cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 18px; }
+  .mr-card { border: 1px solid var(--hairline-color, #ddd); border-radius: 6px; padding: 10px 16px; min-width: 130px; }
+  .mr-card b { display: block; font-size: 22px; }
+  .mr-table td, .mr-table th { text-align: center; white-space: nowrap; }
+  .mr-table td.mr-place, .mr-table th.mr-place { text-align: right; white-space: normal; }
+  .mr-days td { font-size: 11px; min-width: 26px; }
+  .mr-zero { color: var(--body-quiet-color, #999); }
+</style>
+<div class="mr-cards">
+  <div class="mr-card">بازیکنانی که شروع کرده‌اند<b>{{ report.started }}</b></div>
+  <div class="mr-card">تمام کرده‌اند<b>{{ report.completed }}</b></div>
+  <div class="mr-card">مرحله‌ها<b>{{ report.steps|length }}</b></div>
+</div>
+<h2>بازدید هر محل</h2>
+<p>هر بازدید یعنی بازیکنی که به محل رسید و حضورش تأیید شد (هر بازیکن یک بار برای هر محل).
+  <a href="{{ checkins_url }}">فهرست کامل بازدیدها</a></p>
+<table class="mr-table">
+  <thead><tr>
+    <th>مرحله</th><th class="mr-place">محل</th><th>روش تأیید</th><th>همه</th><th>۷ روز اخیر</th><th>۳۰ روز اخیر</th>
+    <th>نسبت به شروع‌کنندگان</th><th>اولین بازدید</th><th>آخرین بازدید</th>
+  </tr></thead>
+  <tbody>
+  {% for row in report.steps %}
+    <tr>
+      <td>{{ row.step.order }}</td>
+      <td class="mr-place"><b>{{ row.step.place_name }}</b>{% if row.step.place_address %}<br><small>{{ row.step.place_address }}</small>{% endif %}</td>
+      <td>{{ row.step.get_proof_display }}</td>
+      <td><b>{{ row.total }}</b></td>
+      <td>{{ row.week }}</td>
+      <td>{{ row.month }}</td>
+      <td>{% if report.started %}{% widthratio row.total report.started 100 %}٪{% else %}—{% endif %}</td>
+      <td>{{ row.first|default:"—" }}</td>
+      <td>{{ row.last|default:"—" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="9">این معما هنوز مرحله‌ای ندارد.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2 style="margin-top:24px">بازدید روزانه (۱۴ روز اخیر، به وقت تهران)</h2>
+<div style="overflow-x:auto">
+<table class="mr-table mr-days">
+  <thead><tr><th class="mr-place">محل</th>{% for day in report.days %}<th>{{ day|date:"m/d" }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in report.steps %}
+    <tr><td class="mr-place">{{ row.step.order }}. {{ row.step.place_name }}</td>
+      {% for n in row.daily %}<td{% if not n %} class="mr-zero"{% endif %}>{{ n }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

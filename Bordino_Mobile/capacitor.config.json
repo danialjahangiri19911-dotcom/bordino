@@ -14,6 +14,6 @@
     "backgroundColor": "#fff8eb",
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false,
-    "appendUserAgent": "BordinoApp/1"
+    "appendUserAgent": "BordinoApp/1.4"
   }
 }

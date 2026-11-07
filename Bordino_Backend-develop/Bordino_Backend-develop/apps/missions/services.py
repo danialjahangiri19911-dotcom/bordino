@@ -18,7 +18,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from apps.missions.models import Mission, MissionAttempt
+from apps.missions.models import Mission, MissionAttempt, MysteryStep
 from apps.users.models.customer import Customer
 from apps.wallet.models.transactions.activity import ActivityTransaction
 from apps.wallet.services import ad_reward
@@ -378,12 +378,14 @@ QR_HOLD = 15 * 60
 QR_EXPIRED = "این QR منقضی شده؛ دوباره از روی نمایشگرِ محل اسکن کن."
 
 
-def _qr_signature(mission: Mission, kind: str, at: int) -> str:
-    message = f"mission-qr:{mission.pk}:{mission.qr_token}:{kind}:{at}".encode()
+def _qr_signature(owner: "Mission | MysteryStep", kind: str, at: int) -> str:
+    # A mission's codes and a mystery step's never stand for each other.
+    prefix = "mystery-qr" if isinstance(owner, MysteryStep) else "mission-qr"
+    message = f"{prefix}:{owner.pk}:{owner.qr_token}:{kind}:{at}".encode()
     return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()[:20]
 
 
-def display_code(mission: Mission, now: float | None = None) -> tuple[str, int]:
+def display_code(mission: "Mission | MysteryStep", now: float | None = None) -> tuple[str, int]:
     """The code a venue screen shows now, and the seconds until the next one."""
     now = time.time() if now is None else now
     start = int(now) // QR_STEP * QR_STEP
@@ -405,7 +407,7 @@ def _split_code(code: str) -> tuple[str, str | None, int | None, str | None]:
     return "", None, None, None
 
 
-def _code_valid(mission: Mission, kind: str | None, at: int | None, signature: str | None, now: float) -> bool:
+def _code_valid(mission: "Mission | MysteryStep", kind: str | None, at: int | None, signature: str | None, now: float) -> bool:
     if kind is None or at is None or not signature:
         return False
     try:
@@ -418,33 +420,58 @@ def _code_valid(mission: Mission, kind: str | None, at: int | None, signature: s
     return at - 5 <= now <= at + lasts  # (a few seconds of clock difference allowed)
 
 
-def _qr_mission(code: str, lock: bool = False) -> tuple[Mission, str | None, int | None, str | None]:
+def qr_owner(code: str, lock: bool = False) -> tuple["Mission | MysteryStep", str | None, int | None, str | None]:
+    """The QR mission, or the «معمای شهری» step, a scanned code is for; refused when it is not a
+    valid code (a venue screen's must still be fresh). `lock` locks a mission's row."""
     token, kind, at, signature = _split_code(code)
-    missions = Mission.objects.select_for_update() if lock else Mission.objects
-    mission = missions.filter(qr_token=token, kind=Mission.Kind.QR).first() if token else None
-    # A venue-screen mission takes only its fresh codes; a printed one only its token.
-    if mission is None or (kind is not None and not mission.qr_rotating):
+    owner = None
+    if token:
+        missions = Mission.objects.select_for_update() if lock else Mission.objects
+        owner = missions.filter(qr_token=token, kind=Mission.Kind.QR).first()
+        if owner is None:
+            owner = MysteryStep.objects.filter(qr_token=token, proof=MysteryStep.Proof.QR).first()
+    # A venue-screen code takes only its fresh codes; a printed one only its token.
+    if owner is None or (kind is not None and not owner.qr_rotating):
         raise NotFound("این کد QR معتبر نیست.")
-    if mission.qr_rotating and not _code_valid(mission, kind, at, signature, time.time()):
+    if owner.qr_rotating and not _code_valid(owner, kind, at, signature, time.time()):
         raise MissionError(QR_EXPIRED, "qr_expired")
-    return mission, kind, at, signature
+    return owner, kind, at, signature
+
+
+def is_mystery_code(code: str) -> bool:
+    token = _split_code(code)[0]
+    return bool(token) and MysteryStep.objects.filter(qr_token=token).exists()
+
+
+def _qr_mission(code: str, lock: bool = False) -> tuple[Mission, str | None, int | None, str | None]:
+    found = qr_owner(code, lock)
+    if not isinstance(found[0], Mission):
+        raise NotFound("این کد QR معتبر نیست.")
+    return found
 
 
 def hold_qr(code: str) -> str:
     """A fresh venue-screen code scanned while signed out: a hold that lasts through the sign-in."""
-    mission, kind, _at, _signature = _qr_mission(code)
-    if not mission.qr_rotating or kind != "r":
+    owner, kind, _at, _signature = qr_owner(code)
+    if not owner.qr_rotating or kind != "r":
         return code  # a printed QR's token keeps as it is
     now = int(time.time())
-    return f"{mission.qr_token}~h{now}~{_qr_signature(mission, 'h', now)}"
+    return f"{owner.qr_token}~h{now}~{_qr_signature(owner, 'h', now)}"
 
 
-def venue_display(key: str) -> tuple[Mission, str, int, float]:
+def venue_display(key: str) -> tuple["Mission | MysteryStep", str, int, float]:
     """The screen's code now, the whole seconds until the next one, and the exact seconds the shown
-    code is still accepted (the screen hides it before then)."""
+    code is still accepted (the screen hides it before then). The screen is a QR mission's or a
+    mystery step's."""
     mission = (
         Mission.objects.filter(qr_display_key=key, kind=Mission.Kind.QR, qr_rotating=True).first() if key else None
     )
+    if mission is None and key:
+        mission = (
+            MysteryStep.objects.filter(qr_display_key=key, proof=MysteryStep.Proof.QR, qr_rotating=True)
+            .select_related("mystery")
+            .first()
+        )
     if mission is None:
         raise NotFound()
     now = time.time()
@@ -453,8 +480,13 @@ def venue_display(key: str) -> tuple[Mission, str, int, float]:
     return mission, code, expires_in, round(start + QR_STEP + QR_GRACE - now, 3)
 
 
-def claim_qr(customer: Customer, token: str) -> Claim:
-    """A QR at a place, scanned with the phone's camera (its link opens the app)."""
+def claim_qr(customer: Customer, token: str):
+    """A QR at a place, scanned with the phone's camera (its link opens the app). A mystery step's QR
+    gives the mystery's Result instead of a Claim."""
+    if is_mystery_code(token):
+        from apps.missions import mystery  # pylint: disable=import-outside-toplevel
+
+        return mystery.scan(customer, token)
     with transaction.atomic():
         _lock(customer)
         # Locked like start(): an admin's edit of the mission cannot cross the scan.

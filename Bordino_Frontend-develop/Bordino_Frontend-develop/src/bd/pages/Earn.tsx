@@ -2,13 +2,60 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
+
 import Icon from "../Icon";
 import { fa } from "../format";
 import MissionSheet from "../missions/MissionSheet";
 import { type Mission, type MissionState, useMissions } from "../missions/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { KIND_ICON, STATE_LABEL, progressText } from "../missions/labels";
-import { AppShell, Balance, Chips, EmptyState, LoadState } from "../ui";
+import type { MysteryCard, MysteryState } from "../missions/mystery";
+import { AppShell, Balance, Chips, EmptyState, LoadState, R } from "../ui";
+
+const MYSTERY_LABEL: Record<MysteryState, string> = {
+	available: "شروع کن",
+	in_progress: "در حال حل",
+	done: "حل شد",
+	upcoming: "به‌زودی",
+	expired: "پایان‌یافته",
+	full: "ظرفیت تکمیل",
+	inactive: "غیرفعال",
+	empty: "به‌زودی",
+};
+const MYSTERY_RANK: Record<MysteryState, number> = { in_progress: 0, available: 1, upcoming: 2, done: 3, full: 4, inactive: 4, empty: 4, expired: 5 };
+
+/** «معمای شهری»: hunts across real places, above the missions. */
+function Mysteries({ list }: { list: MysteryCard[] }) {
+	const shown = [...list].sort((a, b) => MYSTERY_RANK[a.state] - MYSTERY_RANK[b.state] || a.order - b.order);
+	return (
+		<section className="my-list" aria-labelledby="my-list-title">
+			<h3 id="my-list-title">
+				<Icon name="search" /> معماهای شهری
+			</h3>
+			<p className="my-list-text">سرنخ‌ها را دنبال کن، به جاهای واقعی شهر برو و در هر مقصد امتیاز بگیر.</p>
+			<div className="my-cards">
+				{shown.map((m) => (
+					<Link key={m.id} href={R.mystery(m.id)} className="bd-panel my-card" data-state={m.state}>
+						{m.cover ? <img src={m.cover} alt="" className="my-card-cover" loading="lazy" /> : <span className="my-card-cover my-card-art"><Icon name="map-pin" /></span>}
+						<span className="my-card-copy">
+							<b>{m.title}</b>
+							<small>{m.area || m.summary}</small>
+							<span className="my-card-meta">
+								<span className={`bd-tag my-tag-${m.state}`}>{MYSTERY_LABEL[m.state]}</span>
+								<span>{m.state === "in_progress" || m.state === "done" ? `${fa(m.done)} از ${fa(m.steps)} مرحله` : `${fa(m.steps)} مرحله`}</span>
+							</span>
+						</span>
+						<span className="mi-points">
+							<bdi dir="ltr">+{fa(m.points)}</bdi>
+							<small>امتیاز</small>
+						</span>
+					</Link>
+				))}
+			</div>
+		</section>
+	);
+}
 
 // «پیشنهادی»: what can be done now first, then what is under way, then the rest.
 const STATE_RANK: Record<MissionState, number> = {
@@ -74,6 +121,7 @@ export default function Earn() {
 
 	return (
 		<AppShell nav="earn" title="دریافت امتیاز" headingExtra={<Balance />}>
+			{list?.mysteries?.length ? <Mysteries list={list.mysteries} /> : null}
 			<section className="ng-catalog">
 				<div className="ng-filterbar">
 					<h3>
