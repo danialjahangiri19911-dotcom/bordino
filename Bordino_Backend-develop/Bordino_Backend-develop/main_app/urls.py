@@ -26,6 +26,7 @@ urlpatterns += [
     path("", include("apps.notifications.urls")),
     path("", include("apps.missions.urls")),
     path("", include("apps.pantomime.urls")),
+    path("", include("apps.gamemaster.urls")),
 ]
 
 if settings.DEBUG:

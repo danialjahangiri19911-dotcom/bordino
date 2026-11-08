@@ -51,6 +51,7 @@ LOCAL_APPS = [
     "apps.notifications.apps.NotificationsConfig",
     "apps.missions.apps.MissionsConfig",
     "apps.pantomime.apps.PantomimeConfig",
+    "apps.gamemaster.apps.GameMasterConfig",
 ]
 
 THIRD_PARTY_APPS = [

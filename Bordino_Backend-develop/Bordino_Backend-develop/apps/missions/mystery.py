@@ -6,6 +6,7 @@ Everything that changes a player's game happens under the lock on the player (as
 the mystery's row: two phones of one player cannot both solve the same step.
 """
 
+import hmac
 import math
 import unicodedata
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ WRONG_WAIT = timedelta(minutes=10)
 MAX_ACCURACY_M = 300
 
 UNAVAILABLE = {
+    "audience": "این بازی برای گروه سنی یا مخاطب دیگری ساخته شده است.",
     "inactive": "این معما فعلاً غیرفعال است.",
     "upcoming": "این معما هنوز شروع نشده است.",
     "expired": "زمان این معما تمام شده است.",
@@ -40,13 +42,56 @@ UNAVAILABLE = {
 }
 
 
+# Told of every payout of a creator's game inside the payout's transaction (Game Master's budget
+# ledger registers here): listener(run, step, points, bonus).
+payout_listeners: list = []
+
+
 def not_found():
     return NotFound("این معما پیدا نشد.")
 
 
-def unavailable(mystery: Mystery, now=None, started: int | None = None, steps: int | None = None) -> str | None:
+def max_run_points(mystery: Mystery) -> int:
+    """The most one player can win in the mystery: every step's points and the finish bonus."""
+    return (mystery.steps.aggregate(n=Sum("points"))["n"] or 0) + mystery.finish_points
+
+
+def funded_runs(mystery: Mystery, max_run: int | None = None) -> int | None:
+    """How many players the creator's budget pays in full (None: not a budgeted game)."""
+    if mystery.budget_points is None:
+        return None
+    max_run = max_run_points(mystery) if max_run is None else max_run
+    return mystery.budget_points // max_run if max_run > 0 else None
+
+
+def age_of(customer: Customer, today=None) -> int | None:
+    born = customer.birthdate
+    if not born:
+        return None
+    today = today or timezone.localdate()
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+def outside_audience(customer: Customer, mystery: Mystery) -> bool:
+    """A creator's audience rule this player does not meet (unknown age or gender does not meet a rule)."""
+    if mystery.gender and customer.gender != mystery.gender:
+        return True
+    if mystery.age_min is not None or mystery.age_max is not None:
+        age = age_of(customer)
+        if age is None:
+            return True
+        if mystery.age_min is not None and age < mystery.age_min:
+            return True
+        if mystery.age_max is not None and age > mystery.age_max:
+            return True
+    return False
+
+
+def unavailable(
+    mystery: Mystery, now=None, started: int | None = None, steps: int | None = None, max_run: int | None = None
+) -> str | None:
     """Why a new player cannot start the mystery now, or None. (`full` does not stop those already
-    playing; the rest do.)"""
+    playing; the rest do.) A creator's game is also full once its budget pays no further player."""
     now = now or timezone.now()
     if not mystery.is_active:
         return "inactive"
@@ -56,10 +101,11 @@ def unavailable(mystery: Mystery, now=None, started: int | None = None, steps: i
         return "expired"
     if (steps if steps is not None else mystery.steps.count()) == 0:
         return "empty"
-    if mystery.capacity is not None:
+    limits = [n for n in (mystery.capacity, funded_runs(mystery, max_run)) if n is not None]
+    if limits:
         if started is None:
             started = mystery.runs.count()
-        if started >= mystery.capacity:
+        if started >= min(limits):
             return "full"
     return None
 
@@ -89,7 +135,9 @@ def listing(customer: Customer) -> list[View]:
     """The mysteries in «دریافت امتیاز», each with this player's progress."""
     now = timezone.now()
     mysteries = list(
-        Mystery.objects.filter(is_visible=True).filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now - SHOW_ENDED_FOR))
+        Mystery.objects.filter(is_visible=True)
+        .exclude(access=Mystery.Access.PRIVATE)
+        .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now - SHOW_ENDED_FOR))
     )
     if not mysteries:
         return []
@@ -106,7 +154,12 @@ def listing(customer: Customer) -> list[View]:
     views = []
     for m in mysteries:
         run = runs.get(m.pk)
-        reason = unavailable(m, now, n_runs.get(m.pk, 0), n_steps.get(m.pk, 0))
+        # A creator's game is listed only to its audience, and not while paused (its players still
+        # see theirs).
+        if run is None and m.is_creator_game and (not m.is_active or outside_audience(customer, m)):
+            continue
+        max_run = (step_points.get(m.pk) or 0) + m.finish_points
+        reason = unavailable(m, now, n_runs.get(m.pk, 0), n_steps.get(m.pk, 0), max_run)
         if run and run.status == RunStatus.COMPLETED:
             state = "done"
         elif run and reason not in (None, "full"):
@@ -137,8 +190,19 @@ def view_of(customer: Customer, mystery_id) -> View:
 # ── playing ──
 
 
-def start(customer: Customer, mystery_id) -> MysteryRun:
-    """Starts the player's game (or returns the one they have)."""
+def _new_run(customer: Customer, mystery: Mystery) -> MysteryRun:
+    """A new game, checked: open, not full (nor past its budget), and for this audience."""
+    reason = unavailable(mystery)
+    if reason:
+        raise MissionError(UNAVAILABLE[reason], reason)
+    if outside_audience(customer, mystery):
+        raise MissionError(UNAVAILABLE["audience"], "audience")
+    return MysteryRun.objects.create(customer=customer, mystery=mystery, step_started_at=timezone.now())
+
+
+def start(customer: Customer, mystery_id, invite: str | None = None) -> MysteryRun:
+    """Starts the player's game (or returns the one they have). A private game starts only with
+    its invite."""
     with transaction.atomic():
         _lock(customer)
         # Locked: the last free place goes to one player only.
@@ -148,12 +212,21 @@ def start(customer: Customer, mystery_id) -> MysteryRun:
         run = MysteryRun.objects.filter(customer=customer, mystery=mystery).first()
         if run:
             return run
-        if not mystery.is_visible:
+        if mystery.access == Mystery.Access.PRIVATE:
+            given = (invite or "").encode()
+            if not given or not hmac.compare_digest(given, (mystery.invite_token or "").encode()):
+                raise not_found()
+        elif not mystery.is_visible:
             raise not_found()
-        reason = unavailable(mystery)
-        if reason:
-            raise MissionError(UNAVAILABLE[reason], reason)
-        return MysteryRun.objects.create(customer=customer, mystery=mystery)
+        return _new_run(customer, mystery)
+
+
+def start_by_invite(customer: Customer, token: str) -> MysteryRun:
+    """A private game's invite link (/pwa/play/<token>): joins (or reopens) the game."""
+    mystery = Mystery.objects.filter(invite_token=token, access=Mystery.Access.PRIVATE).first() if token else None
+    if mystery is None:
+        raise NotFound("این لینک دعوت معتبر نیست.")
+    return start(customer, mystery.pk, invite=token)
 
 
 @dataclass
@@ -238,9 +311,14 @@ def _matches(step: MysteryStep, given: str) -> bool:
 
 
 def hint_levels(step: MysteryStep) -> list[str]:
-    """The kinds of the step's help levels, in order: "text" (one per hint line), "place", "answer"."""
-    levels = ["text"] * len(step.hint_lines()) + ["place"]
-    if step.proof == Proof.ANSWER:
+    """The kinds of the step's help levels, in order: "text" (one per hint line), "place" (a step at
+    a real place), "answer" (an answer or choice step). A read-only step has none."""
+    if step.proof == Proof.INFO:
+        return []
+    levels = ["text"] * len(step.hint_lines())
+    if step.is_place:
+        levels.append("place")
+    if step.proof in (Proof.ANSWER, Proof.CHOICE):
         levels.append("answer")
     return levels
 
@@ -303,7 +381,10 @@ def reveal_hint(customer: Customer, mystery_id, step_id) -> MysteryRun:
 def _pay(run: MysteryRun, step: MysteryStep, method: str, distance=None, accuracy=None) -> Result:
     """Records the visit, pays the step (less its help) and the finish bonus after the last step."""
     mystery = run.mystery
+    now = timezone.now()
     points = step_points(step, mystery, run.hints_used)
+    if step.time_limit_s and run.step_started_at and (now - run.step_started_at).total_seconds() > step.time_limit_s:
+        points = 0  # solved, but after its time: no points
     checkin = MysteryCheckin.objects.create(
         run=run, step=step, customer=run.customer, method=method, points=points, hints_used=run.hints_used,
         distance_m=distance, accuracy_m=accuracy,
@@ -325,6 +406,7 @@ def _pay(run: MysteryRun, step: MysteryStep, method: str, distance=None, accurac
     run.wrong_tries = 0
     run.locked_until = None
     run.hints_used = 0
+    run.step_started_at = now
     result = Result(run, step, already=False, points=points)
     done = set(run.checkins.values_list("step_id", flat=True))
     if current_step(steps_of(mystery), done) is None:
@@ -344,6 +426,9 @@ def _pay(run: MysteryRun, step: MysteryStep, method: str, distance=None, accurac
             run.points_earned += mystery.finish_points
             result.bonus = mystery.finish_points
     run.save()
+    if mystery.is_creator_game:
+        for listener in payout_listeners:
+            listener(run, step, result.points, result.bonus)
     return result
 
 
@@ -397,7 +482,7 @@ def checkin(customer: Customer, mystery_id, step_id, data: dict) -> Result:
         distance = accuracy = None
         if step.proof == Proof.GPS or step.check_location:
             distance, accuracy = check_location(step, data)
-        if step.proof == Proof.GPS:
+        if step.proof in (Proof.GPS, Proof.INFO):
             return _pay(run, step, step.proof, distance, accuracy)
         given = str(data.get("code" if step.proof == Proof.STAFF else "answer") or "")[:100]
         if not normalize(given):
@@ -436,11 +521,9 @@ def scan(customer: Customer, code: str) -> Result:
         if run is None:
             if not steps or steps[0].pk != step.pk:
                 raise MissionError(f"این QR مال معمای «{mystery.title}» است؛ اول معما را از «دریافت امتیاز» شروع کن.", "not_started")
-            # (A mystery hidden from the list starts this way too: a poster-only hunt.)
-            reason = unavailable(mystery, steps=len(steps))
-            if reason:
-                raise MissionError(UNAVAILABLE[reason], reason)
-            run = MysteryRun.objects.create(customer=customer, mystery=mystery)
+            # (A mystery hidden from the list starts this way too: a poster-only hunt; a private
+            # game's first QR is as good as its invite.)
+            run = _new_run(customer, mystery)
             run.mystery = mystery
         solved = _step_for(run, step, steps)
         if solved:

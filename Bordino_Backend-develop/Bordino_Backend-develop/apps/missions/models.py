@@ -309,6 +309,36 @@ class Mystery(AbstractBaseModel):
     )
     order = models.PositiveSmallIntegerField(default=0, verbose_name=_("ترتیب"))
 
+    # ── a creator's game (Game Master): compiled from one approved, immutable version ──
+    class Access(models.TextChoices):
+        PUBLIC = "public", _("عمومی")
+        PRIVATE = "private", _("خصوصی (فقط با لینک دعوت)")
+
+    class Audience(models.TextChoices):
+        ANY = "", _("همه")
+        MALE = "M", _("آقایان")
+        FEMALE = "F", _("خانم‌ها")
+
+    owner = models.ForeignKey(
+        "users.Customer", on_delete=models.PROTECT, null=True, blank=True, related_name="owned_mysteries",
+        verbose_name=_("سازنده"), help_text=_("خالی = معمای خود بردینو."),
+    )
+    source_version = models.OneToOneField(
+        "gamemaster.GameVersion", on_delete=models.PROTECT, null=True, blank=True, related_name="mystery",
+        verbose_name=_("نسخهٔ تأییدشده"),
+    )
+    presenter = models.CharField(max_length=120, blank=True, verbose_name=_("ارائه‌دهنده"))
+    access = models.CharField(max_length=10, choices=Access.choices, default=Access.PUBLIC, verbose_name=_("دسترسی"))
+    invite_token = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
+    completion_message = models.TextField(blank=True, verbose_name=_("پیام پایان"))
+    age_min = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name=_("حداقل سن"))
+    age_max = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name=_("حداکثر سن"))
+    gender = models.CharField(max_length=1, choices=Audience.choices, default=Audience.ANY, blank=True, verbose_name=_("مخاطب"))
+    budget_points = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name=_("بودجهٔ امتیاز سازنده"),
+        help_text=_("امتیازهایی که سازنده برای جایزهٔ بازیکنان کنار گذاشته؛ هر بازیکن فقط وقتی شروع می‌کند که جایزهٔ کامل او تأمین باشد."),
+    )
+
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("معمای شهری")
         verbose_name_plural = _("معماهای شهری")
@@ -317,10 +347,24 @@ class Mystery(AbstractBaseModel):
     def __str__(self):
         return self.title
 
+    @property
+    def is_creator_game(self) -> bool:
+        return self.owner_id is not None
+
     def clean(self):
         super().clean()
+        errors = {}
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
-            raise ValidationError({"ends_at": _("پایان باید بعد از شروع باشد.")})
+            errors["ends_at"] = _("پایان باید بعد از شروع باشد.")
+        if self.age_min is not None and self.age_max is not None and self.age_max < self.age_min:
+            errors["age_max"] = _("حداکثر سن باید از حداقل بیشتر باشد.")
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.access == self.Access.PRIVATE and not self.invite_token:
+            self.invite_token = new_callback_secret()
+        return super().save(*args, **kwargs)
 
 
 class MysteryStep(AbstractBaseModel):
@@ -329,6 +373,8 @@ class MysteryStep(AbstractBaseModel):
         GPS = "gps", _("موقعیت گوشی (GPS)")
         ANSWER = "answer", _("پاسخی که فقط در محل پیدا می‌شود")
         STAFF = "staff", _("کدی که کارکنان محل می‌دهند")
+        CHOICE = "choice", _("انتخاب گزینهٔ درست")
+        INFO = "info", _("فقط خواندن (دکمهٔ ادامه)")
 
     mystery = models.ForeignKey(Mystery, on_delete=models.CASCADE, related_name="steps", verbose_name=_("معما"))
     order = models.PositiveSmallIntegerField(default=1, verbose_name=_("مرحله"))
@@ -343,6 +389,22 @@ class MysteryStep(AbstractBaseModel):
         ),
     )
     points = models.PositiveIntegerField(default=10, verbose_name=_("امتیاز مرحله"))
+    options = models.JSONField(
+        default=list, blank=True, verbose_name=_("گزینه‌ها"),
+        help_text=_("برای «انتخاب گزینهٔ درست»: فهرست گزینه‌ها؛ گزینهٔ درست در «پاسخ‌های درست» نوشته می‌شود."),
+    )
+    time_limit_s = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name=_("مهلت (ثانیه)"),
+        help_text=_("خالی = بدون مهلت. اگر بعد از مهلت حل شود، مرحله رد نمی‌شود ولی امتیازی ندارد."),
+    )
+    coupon_text = models.CharField(
+        max_length=120, blank=True, verbose_name=_("کد تخفیف یا هدیه"),
+        help_text=_("بعد از حل این مرحله به بازیکن نشان داده می‌شود."),
+    )
+    is_place = models.BooleanField(
+        default=True, verbose_name=_("این مرحله یک مکان واقعی است"),
+        help_text=_("خاموش برای پرسش یا محتوایی که به جای خاصی ربط ندارد (راهنمایی «نشان دادن محل» ندارد)."),
+    )
 
     proof = models.CharField(max_length=10, choices=Proof.choices, default=Proof.QR, verbose_name=_("روش تأیید حضور"))
     class AnswerType(models.TextChoices):
@@ -448,8 +510,8 @@ class MysteryStep(AbstractBaseModel):
             errors["latitude"] = _("برای «موقعیت گوشی»، مختصات محل لازم است.")
         if self.check_location and not self.has_point:
             errors["latitude"] = _("برای سنجیدن موقعیت گوشی، مختصات محل لازم است.")
-        if self.check_location and self.proof not in (self.Proof.ANSWER, self.Proof.STAFF):
-            errors["check_location"] = _("فقط برای «پاسخ در محل» و «کد کارکنان».")
+        if self.check_location and self.proof not in (self.Proof.ANSWER, self.Proof.STAFF, self.Proof.CHOICE, self.Proof.INFO):
+            errors["check_location"] = _("فقط برای «پاسخ در محل»، «کد کارکنان»، «گزینهٔ درست» و «فقط خواندن».")
         if self.proof == self.Proof.ANSWER and not self.answer_list():
             errors["answers"] = _("پاسخ درست را بنویسید.")
         if self.proof == self.Proof.ANSWER and not self.question.strip():
@@ -458,6 +520,14 @@ class MysteryStep(AbstractBaseModel):
             errors["staff_code"] = _("کد کارکنان را بنویسید.")
         if self.qr_rotating and self.proof != self.Proof.QR:
             errors["qr_rotating"] = _("QR متغیر فقط برای «اسکن QR محل» است.")
+        if self.proof == self.Proof.CHOICE:
+            options = [str(o).strip() for o in (self.options or []) if str(o).strip()]
+            if len(options) < 2:
+                errors["options"] = _("دست‌کم دو گزینه بنویسید.")
+            elif not self.answer_list() or not set(self.answer_list()) & set(options):
+                errors["answers"] = _("گزینهٔ درست باید یکی از گزینه‌ها باشد.")
+            if not self.question.strip():
+                errors["question"] = _("پرسش را بنویسید.")
         if self.latitude is not None and not -90 <= self.latitude <= 90:
             errors["latitude"] = _("عرض جغرافیایی بین ۹۰- و ۹۰ است.")
         if self.longitude is not None and not -180 <= self.longitude <= 180:
@@ -488,6 +558,8 @@ class MysteryRun(AbstractBaseModel):
     locked_until = models.DateTimeField(null=True, blank=True)
     # Hint levels opened at the current step (they lower its points); back to 0 at the next step.
     hints_used = models.PositiveSmallIntegerField(default=0)
+    # When the current step opened (a step's time limit counts from here).
+    step_started_at = models.DateTimeField(null=True, blank=True)
     points_earned = models.PositiveIntegerField(default=0, verbose_name=_("امتیاز گرفته"))
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("زمان پایان"))
     finish_transaction = models.OneToOneField(

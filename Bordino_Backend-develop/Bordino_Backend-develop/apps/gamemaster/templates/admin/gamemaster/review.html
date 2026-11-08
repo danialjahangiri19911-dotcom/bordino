@@ -1,0 +1,84 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:gamemaster_gameversion_changelist' %}">{{ opts.verbose_name_plural }}</a>
+  &rsaquo; {{ game.title }} — نسخهٔ {{ version.number }}
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  .gm-box { border: 1px solid var(--hairline-color, #ddd); border-radius: 6px; padding: 12px 16px; margin: 0 0 14px; }
+  .gm-box h3 { margin: 0 0 8px; }
+  .gm-facts { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; list-style: none; }
+  .gm-stage { border-inline-start: 4px solid var(--primary, #79aec8); }
+  .gm-secret { background: #fff3cd; color: #333; padding: 1px 6px; border-radius: 4px; }
+  .gm-warn { background: #fde2e2; color: #611; padding: 8px 12px; border-radius: 6px; }
+  .gm-pre { white-space: pre-line; }
+</style>
+<div class="gm-box">
+  <h3>{{ d.title }}</h3>
+  <ul class="gm-facts">
+    <li>سازنده: <b>{{ game.owner }}</b> ({{ game.owner.user.phone_number }})</li>
+    <li>نوع: {{ game.get_category_display }}</li>
+    <li>وضعیت نسخه: <b>{{ version.get_status_display }}</b></li>
+    <li>دسترسی: {% if d.access == "private" %}خصوصی (فقط با لینک دعوت){% else %}عمومی{% endif %}</li>
+    <li>ارائه‌دهنده: {{ d.presenter|default:"—" }}</li>
+    <li>محدوده: {{ d.area|default:"—" }}</li>
+    <li>زمان: {{ d.starts_at|default:"از انتشار" }} تا {{ d.ends_at|default:"بدون پایان" }}</li>
+    <li>ظرفیت: {{ d.capacity|default:"بدون سقف" }}</li>
+    <li>مخاطب: سن {{ d.audience.age_min|default:"—" }} تا {{ d.audience.age_max|default:"—" }} · {% if d.audience.gender == "M" %}آقایان{% elif d.audience.gender == "F" %}خانم‌ها{% else %}همه{% endif %}</li>
+    <li>جایزهٔ پایان: {{ d.finish_points }} · بیشترین جایزهٔ یک بازیکن: <b>{{ max_run }}</b> امتیاز</li>
+    <li>بودجهٔ امتیاز سازنده: <b>{{ d.budget_points }}</b></li>
+  </ul>
+  {% if d.summary %}<p>{{ d.summary }}</p>{% endif %}
+  {% if d.story %}<p class="gm-pre">{{ d.story }}</p>{% endif %}
+  {% if d.completion_message %}<p>پیام پایان: {{ d.completion_message }}</p>{% endif %}
+  {% if problems %}<p class="gm-warn">این نسخه کامل نیست: {% for k, v in problems.items %}{{ k }}: {{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+</div>
+{% for s in stages %}
+<div class="gm-box gm-stage">
+  <h3>مرحلهٔ {{ s.number }} · {{ s.type_name }}{% if s.title %} — {{ s.title }}{% endif %}</h3>
+  {% if s.text %}<p class="gm-pre">{{ s.text }}</p>{% endif %}
+  {% if s.image %}<p><img src="/media/{{ s.image }}" alt="" style="max-width:280px;max-height:220px"></p>{% endif %}
+  <ul class="gm-facts">
+    {% if s.question %}<li>پرسش: {{ s.question }}</li>{% endif %}
+    {% if s.options %}<li>گزینه‌ها: {{ s.options|join:"، " }}</li>{% endif %}
+    {% if s.answers %}<li>پاسخ درست: <span class="gm-secret">{{ s.answers|join:" | " }}</span></li>{% endif %}
+    {% if s.staff_code %}<li>کد کارکنان: <span class="gm-secret">{{ s.staff_code }}</span></li>{% endif %}
+    {% if s.map %}<li>مکان: <a href="{{ s.map }}" target="_blank" rel="noopener">{{ s.lat }}, {{ s.lng }}</a> · شعاع {{ s.radius_m }} متر{% if s.check_location %} · موقعیت سنجیده می‌شود{% endif %}</li>{% endif %}
+    {% if s.place.name %}<li>محل: <b>{{ s.place.name }}</b> {{ s.place.address }}</li>{% endif %}
+    {% if s.place.offer %}<li>پیشنهاد: {{ s.place.offer }}</li>{% endif %}
+    {% if s.place.url %}<li>لینک: {{ s.place.url }}</li>{% endif %}
+    <li>امتیاز: {{ s.points }}</li>
+    {% if s.time_limit_s %}<li>مهلت: {{ s.time_limit_s }} ثانیه</li>{% endif %}
+    {% if s.coupon %}<li>کد هدیه: <span class="gm-secret">{{ s.coupon }}</span></li>{% endif %}
+    {% if s.hints %}<li>راهنمایی‌ها: {{ s.hints|join:" ← " }}</li>{% endif %}
+  </ul>
+</div>
+{% endfor %}
+{% if can_decide %}
+<form method="post" class="gm-box">
+  {% csrf_token %}
+  <h3>تصمیم</h3>
+  <p>محل‌ها را روی نقشه ببینید: جای عمومی و امن باشد، نه خانهٔ شخصی یا جای خطرناک. متن‌ها، تصویرها و جایزه‌ها را با قوانین بردینو بسنجید.</p>
+  <p><textarea name="note" rows="4" style="width:100%" placeholder="برای رد یا درخواست اصلاح لازم است؛ سازنده آن را می‌بیند."></textarea></p>
+  <p>
+    <button type="submit" name="decision" value="approve" class="button default">تأیید</button>
+    <button type="submit" name="decision" value="changes" class="button">درخواست اصلاح</button>
+    <button type="submit" name="decision" value="reject" class="button" style="background:#ba2121;color:#fff">رد</button>
+  </p>
+</form>
+{% elif own_game %}
+<p class="gm-warn">این بازیِ خود شماست؛ بررسی آن با بررسی‌کنندهٔ دیگری است.</p>
+{% else %}
+<p>این نسخه {{ version.get_status_display }} است{% if version.review_note %}: {{ version.review_note }}{% endif %}.</p>
+{% endif %}
+{% if reviews %}
+<div class="gm-box">
+  <h3>تاریخچهٔ بررسی این بازی</h3>
+  <ul>{% for r in reviews %}<li>نسخهٔ {{ r.version.number }} · {{ r.get_decision_display }} · {{ r.reviewer }} · {{ r.create_time }}{% if r.note %} — {{ r.note }}{% endif %}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% endblock %}

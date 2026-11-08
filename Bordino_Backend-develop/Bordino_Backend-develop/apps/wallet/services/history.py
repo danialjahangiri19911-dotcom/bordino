@@ -105,6 +105,8 @@ def points_history(user, token_account=None):
             title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
             if t.section == "mission" and t.metadata.get("title"):
                 title = f"مأموریت: {t.metadata['title']}"[:120]
+            elif t.section == "gamemaster" and t.metadata.get("title"):
+                title = str(t.metadata["title"])[:120]
             rows.append(_row(t.id, "activity_reward", title, abs(t.score_value), t.score_value > 0, t.create_time))
 
         for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):

@@ -1,0 +1,27 @@
+from django.urls import path
+
+from apps.gamemaster.views import (
+    AnalyticsView,
+    DashboardView,
+    GameActionView,
+    GamesView,
+    GameView,
+    PreviewView,
+    ProfileView,
+    QrView,
+    TemplatesView,
+    UploadView,
+)
+
+urlpatterns = [
+    path("api/v1/gm/profile/", ProfileView.as_view(), name="gm_profile"),
+    path("api/v1/gm/templates/", TemplatesView.as_view(), name="gm_templates"),
+    path("api/v1/gm/dashboard/", DashboardView.as_view(), name="gm_dashboard"),
+    path("api/v1/gm/uploads/", UploadView.as_view(), name="gm_upload"),
+    path("api/v1/gm/games/", GamesView.as_view(), name="gm_games"),
+    path("api/v1/gm/games/<uuid:game_id>/", GameView.as_view(), name="gm_game"),
+    path("api/v1/gm/games/<uuid:game_id>/preview/", PreviewView.as_view(), name="gm_preview"),
+    path("api/v1/gm/games/<uuid:game_id>/qr/", QrView.as_view(), name="gm_qr"),
+    path("api/v1/gm/games/<uuid:game_id>/analytics/", AnalyticsView.as_view(), name="gm_analytics"),
+    path("api/v1/gm/games/<uuid:game_id>/<str:action>/", GameActionView.as_view(), name="gm_action"),
+]

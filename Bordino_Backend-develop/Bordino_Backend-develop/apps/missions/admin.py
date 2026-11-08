@@ -306,16 +306,26 @@ class MysteryStepInline(admin.StackedInline):
     extra = 0
     ordering = ("order", "create_time")
     fieldsets = (
-        ("سرنخ و راهنمایی", {"fields": ("order", "clue", "clue_image", "hints", "points")}),
+        ("سرنخ و راهنمایی", {"fields": ("order", "clue", "clue_image", "hints", "points", "time_limit_s", "coupon_text")}),
         (
             "محل (بعد از رسیدن به بازیکن نشان داده می‌شود)",
             {"fields": ("place_name", "place_logo", "place_address", "place_about", "place_offer", "place_url", "point", "map_url")},
         ),
         (
             "تأیید حضور",
-            {"fields": ("proof", "question", "answer_type", "answers", "staff_code", "radius_m", "check_location", "qr_rotating", "qr_code", "venue_screen")},
+            {"fields": ("proof", "question", "answer_type", "options", "answers", "staff_code", "is_place", "radius_m", "check_location", "qr_rotating", "qr_code", "venue_screen")},
         ),
     )
+
+    # A creator's game (Game Master) is played exactly as it was approved: its steps are read-only.
+    def has_change_permission(self, request, obj=None):
+        return not (obj is not None and obj.is_creator_game) and super().has_change_permission(request, obj)
+
+    def has_add_permission(self, request, obj=None):
+        return not (obj is not None and obj.is_creator_game) and super().has_add_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return not (obj is not None and obj.is_creator_game) and super().has_delete_permission(request, obj)
 
     def get_readonly_fields(self, request, obj=None):
         return ("qr_code", "venue_screen" if self.has_change_permission(request, obj) else "venue_screen_hidden")
@@ -347,9 +357,9 @@ class MysteryStepInline(admin.StackedInline):
 
 @admin.register(Mystery)
 class MysteryAdmin(admin.ModelAdmin):
-    list_display = ("title", "area", "step_count", "finish_points", "players", "report_link", "is_active", "is_visible", "order")
+    list_display = ("title", "presenter", "area", "step_count", "finish_points", "players", "report_link", "is_active", "is_visible", "order")
+    list_filter = ("is_active", "is_visible", "access", ("owner", admin.EmptyFieldListFilter))
     list_editable = ("is_active", "is_visible", "order")
-    list_filter = ("is_active", "is_visible")
     search_fields = ("title", "area", "steps__place_name")
     inlines = (MysteryStepInline,)
     actions = ("new_season", "new_qr")
@@ -357,7 +367,26 @@ class MysteryAdmin(admin.ModelAdmin):
         (None, {"fields": ("title", "summary", "story", "cover", "area", "duration_minutes")}),
         ("جایزه، زمان و ظرفیت", {"fields": ("finish_points", "hint_penalty", "starts_at", "ends_at", "capacity")}),
         ("نمایش", {"fields": ("is_active", "is_visible", "order")}),
+        (
+            "بازی سازنده (گیم مستر)",
+            {
+                "classes": ("collapse",),
+                "fields": ("owner", "source_version", "presenter", "access", "completion_message", "age_min", "age_max", "gender", "budget_points"),
+            },
+        ),
     )
+    CREATOR_LOCKED = (
+        "title", "summary", "story", "cover", "area", "duration_minutes", "finish_points", "hint_penalty", "starts_at",
+        "ends_at", "capacity", "owner", "source_version", "presenter", "access", "completion_message", "age_min",
+        "age_max", "gender", "budget_points",
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        # A creator's game: as approved (only Bordino's pause — «فعال» — and listing stay editable;
+        # pausing is better done from «بازی‌های سازندگان»).
+        if obj is not None and obj.is_creator_game:
+            return self.CREATOR_LOCKED
+        return ("owner", "source_version")
 
     def get_queryset(self, request):
         from django.db.models import Count  # pylint: disable=import-outside-toplevel
@@ -402,6 +431,10 @@ class MysteryAdmin(admin.ModelAdmin):
     def new_season(self, request, queryset):
         made = 0
         for source in queryset:
+            if source.is_creator_game:
+                # A creator's game changes only through a new reviewed version (Game Master).
+                self.message_user(request, f"«{source.title}» بازی سازنده است و کپی نمی‌شود.", messages.WARNING)
+                continue
             with transaction.atomic():
                 steps = list(source.steps.order_by("order", "create_time"))
                 copy = Mystery.objects.get(pk=source.pk)

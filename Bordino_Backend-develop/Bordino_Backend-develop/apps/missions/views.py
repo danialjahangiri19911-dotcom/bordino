@@ -380,6 +380,9 @@ def mystery_card(view: mystery.View) -> dict:
         "ends_at": _when(m.ends_at),
         "order": m.order,
         "state": view.state,
+        # A creator's game (Game Master): who presents it.
+        "creator": m.is_creator_game,
+        "presenter": m.presenter,
     }
 
 
@@ -392,6 +395,8 @@ def _place(step: MysteryStep) -> dict:
         "offer": step.place_offer,
         "url": step.place_url,
         "map": step.map_link(),
+        "is_place": step.is_place,
+        "coupon": step.coupon_text,
     }
 
 
@@ -401,6 +406,7 @@ def mystery_detail(view: mystery.View) -> dict:
     m, run = view.mystery, view.run
     body = mystery_card(view)
     body["story"] = m.story
+    body["completion_message"] = m.completion_message if run and run.status == run.Status.COMPLETED else ""
     steps = mystery.steps_of(m)
     visits = {c.step_id: c for c in run.checkins.all()} if run else {}
     current = mystery.current_step(steps, set(visits)) if run and run.status == run.Status.ACTIVE else None
@@ -422,6 +428,9 @@ def mystery_detail(view: mystery.View) -> dict:
         if step.pk in visits:
             item.update(state="done", clue=step.clue, place=_place(step), visited_at=visits[step.pk].create_time.isoformat())
         elif current is not None and step.pk == current.pk:
+            limit_left = None
+            if step.time_limit_s and run.step_started_at:
+                limit_left = max(0, int(step.time_limit_s - (now - run.step_started_at).total_seconds()))
             item.update(
                 state="current",
                 clue=step.clue,
@@ -429,7 +438,10 @@ def mystery_detail(view: mystery.View) -> dict:
                 answer_type=step.answer_type if step.proof == MysteryStep.Proof.ANSWER else "text",
                 **mystery.hint_view(step, m, run.hints_used),
                 proof=step.proof,
-                question=step.question if step.proof == MysteryStep.Proof.ANSWER else "",
+                options=list(step.options or []) if step.proof == MysteryStep.Proof.CHOICE else [],
+                time_limit_s=step.time_limit_s,
+                time_left_s=limit_left,
+                question=step.question if step.proof in (MysteryStep.Proof.ANSWER, MysteryStep.Proof.CHOICE) else "",
                 check_location=step.proof == MysteryStep.Proof.GPS or step.check_location,
                 radius_m=step.radius_m,
             )
@@ -481,6 +493,23 @@ class MysteryHintView(APIView):
             customer = _customer(request)
             mystery.reveal_hint(customer, mystery_id, step_id)
             view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        return Response({"mystery": mystery_detail(view)})
+
+
+class MysteryInviteView(APIView):
+    """A private game's invite link: joins the game (or reopens it) and returns it."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Join a private game by its invite")
+    def post(self, request, token):
+        try:
+            customer = _customer(request)
+            run = mystery.start_by_invite(customer, token)
+            view = mystery.view_of(customer, run.mystery_id)
         except services.MissionError as exc:
             return _error(exc)
         return Response({"mystery": mystery_detail(view)})
