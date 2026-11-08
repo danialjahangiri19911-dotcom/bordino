@@ -401,7 +401,7 @@ export default function CrashGame() {
 						<div>
 							<small>بردینو / بازی‌ها</small>
 							<h2>
-								انفجار<span>.</span>
+								انفجار
 							</h2>
 						</div>
 					</div>

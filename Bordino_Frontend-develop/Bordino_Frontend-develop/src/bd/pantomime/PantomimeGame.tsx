@@ -1320,7 +1320,7 @@ export default function PantomimeGame() {
 							<div>
 								<small>بردینو / دورهمی</small>
 								<h2>
-									پانتومیم<span>.</span>
+									پانتومیم
 								</h2>
 							</div>
 						</div>

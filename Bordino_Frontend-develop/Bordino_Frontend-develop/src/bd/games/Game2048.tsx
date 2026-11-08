@@ -199,7 +199,7 @@ function View() {
 						<div>
 							<span className="g48-eyebrow">بردینو / بازی‌های فکری</span>
 							<h2 id="game-title" tabIndex={-1}>
-								۲۰۴۸<span className="g48-title-dot">.</span>
+								۲۰۴۸
 							</h2>
 						</div>
 					</div>

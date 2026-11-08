@@ -339,7 +339,7 @@ export default function SudokuGame() {
 						<div>
 							<span className="sd-eyebrow">بردینو / بازی‌های فکری</span>
 							<h2 id="game-title" tabIndex={-1}>
-								سودوکو<span>.</span>
+								سودوکو
 							</h2>
 						</div>
 					</div>
