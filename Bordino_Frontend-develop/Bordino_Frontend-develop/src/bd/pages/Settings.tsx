@@ -295,9 +295,9 @@ const THEMES: [Appearance, string, string][] = [
 
 /** The design styles: neobrutalism (the default), neon (always dark), neumorphism. */
 const STYLES: [BdStyle, string, string][] = [
-	["brutal", "نئوبروتال", "پوستر قرمز؛ خط‌های پررنگ"],
+	["brutal", "ماجراجویانه", "پوستر قرمز؛ خط‌های پررنگ"],
 	["neon", "نئونی", "نبض بنفش؛ همیشه تیره"],
-	["neu", "نرم", "نرم و روشن؛ سایه‌های ملایم"],
+	["neu", "اسمورفی", "نرم و روشن؛ سایه‌های ملایم"],
 ];
 
 export function AppearancePage() {
