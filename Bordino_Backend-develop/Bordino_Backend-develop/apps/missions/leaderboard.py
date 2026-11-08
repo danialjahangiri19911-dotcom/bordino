@@ -257,9 +257,16 @@ def forget(mystery: Mystery):
             cache.delete(_key(mystery, cfg))
 
 
-def _masked(name: str) -> str:
+FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def _anon(position: int) -> str:
+    return f"بازیکن {str(position).translate(FA_DIGITS)}"
+
+
+def _masked(name: str, position: int) -> str:
     name = (name or "").strip()
-    return (name[0] + "***") if name else "بازیکن"
+    return (name[0] + "***") if name else _anon(position)
 
 
 def _row(run, position: int, me_id, cfg: dict, request=None) -> dict:
@@ -278,7 +285,7 @@ def _row(run, position: int, me_id, cfg: dict, request=None) -> dict:
     took = run.took.total_seconds() if run.took is not None and run.status == RunStatus.COMPLETED else None
     return {
         "position": position,
-        "name": (name or "بازیکن") if public else (_masked(name) if show["name"] else f"بازیکن {position}"),
+        "name": (name or _anon(position)) if public else (_masked(name, position) if show["name"] else _anon(position)),
         "avatar": avatar,
         "is_me": mine,
         "stages": run.n_done,
@@ -398,7 +405,7 @@ def _snap_row(r: dict, me_id, cfg: dict) -> dict:
     name = r.get("name") or ""
     return {
         "position": r["position"],
-        "name": (name or "بازیکن") if public else (_masked(name) if show["name"] else f"بازیکن {r['position']}"),
+        "name": (name or _anon(r["position"])) if public else (_masked(name, r["position"]) if show["name"] else _anon(r["position"])),
         "avatar": r.get("avatar") if (public and show["avatar"]) else None,
         "is_me": mine,
         "stages": r["stages"],

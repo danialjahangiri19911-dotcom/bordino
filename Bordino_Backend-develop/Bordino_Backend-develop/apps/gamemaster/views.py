@@ -118,7 +118,8 @@ def lifetime(game: Game) -> dict:
         players=Count("customer", distinct=True),
         finished=Count("customer", distinct=True, filter=Q(status=MysteryRun.Status.COMPLETED)),
     )
-    active = (
+    over = boards.ended_at(mystery)
+    active = 0 if over is not None and over <= now else (
         runs.filter(status=MysteryRun.Status.ACTIVE)
         .annotate(last=Max("checkins__create_time"))
         .filter(Q(last__gte=now - timedelta(days=7)) | Q(last__isnull=True, create_time__gte=now - timedelta(days=7)))
@@ -386,6 +387,8 @@ def audience_numbers(mystery: Mystery) -> dict:
     enrolled = started = active = completed = 0
     progress = 0.0
     totals = dict(scope.annotate(n=Count("steps", distinct=True)).values_list("pk", "n"))
+    over = boards.ended_at(boards.current_mystery(mystery))
+    can_move = over is None or over > now
     for run in runs.only("id", "status", "mystery_id", "create_time"):
         enrolled += 1
         total = totals.get(run.mystery_id) or 0
@@ -394,8 +397,8 @@ def audience_numbers(mystery: Mystery) -> dict:
             started += 1
         if run.status == MysteryRun.Status.COMPLETED:
             completed += 1
-        elif (run.last or run.create_time) >= now - timedelta(days=7):
-            active += 1
+        elif can_move and (run.last or run.create_time) >= now - timedelta(days=7):
+            active += 1  # (after the end, and its grace, nobody is still playing)
     checkins = MysteryCheckin.objects.filter(step__mystery__in=scope)
     return {
         "enrolled": enrolled,
