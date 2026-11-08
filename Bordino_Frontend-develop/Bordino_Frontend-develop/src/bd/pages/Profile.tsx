@@ -171,7 +171,7 @@ function AvatarPicker({ image }: { image?: string | null }) {
 									<Icon name="trash-2" /> {remove.isSending ? "در حال حذف…" : "بله، حذف کن"}
 								</button>
 								<button type="button" role="menuitem" className="bd-sheet-item" autoFocus onClick={() => setConfirmRemove(false)}>
-									<Icon name="arrow-right" /> نه، برگرد
+									<Icon name="arrow-left" /> نه، برگرد
 								</button>
 							</>
 						) : (

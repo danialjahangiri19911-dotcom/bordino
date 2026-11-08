@@ -315,8 +315,9 @@ body { margin: 0; }
    and the new slide slides in from the side it came from. */
 #bordino-directions .au-swipeable { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 #bordino-directions .au-swipeable img { -webkit-user-drag: none; pointer-events: none; }
-#bordino-directions .au-enter-next { animation: au-slide-from-left .28s ease-out both; }
-#bordino-directions .au-enter-prev { animation: au-slide-from-right .28s ease-out both; }
+/* The next slide comes in from the right (the finger moved left), the previous one from the left. */
+#bordino-directions .au-enter-next { animation: au-slide-from-right .28s ease-out both; }
+#bordino-directions .au-enter-prev { animation: au-slide-from-left .28s ease-out both; }
 @keyframes au-slide-from-left { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes au-slide-from-right { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { #bordino-directions .au-enter-next, #bordino-directions .au-enter-prev { animation: none; } }
@@ -488,3 +489,4 @@ body { margin: 0; }
 #bordino-directions .my-hint-ask span { flex: 1 1 100%; }
 #bordino-directions .my-hint-ask .bd-action, #bordino-directions .my-hint-ask .bd-secondary { min-height: 36px; padding: 6px 14px; font-size: 12px; }
 #bordino-directions .my-step-points s { margin-inline-end: 4px; color: var(--bd-muted); font-weight: 400; font-size: 12px; }
+#bordino-directions .au-drag { will-change: transform; }

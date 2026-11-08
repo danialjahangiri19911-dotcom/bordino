@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import JalaliDateField from "../JalaliDateField";
-import { fa } from "../format";
 import { useArt } from "../appearance";
+import { fa } from "../format";
 import { AuthShell, LoadState, Notice, Panel, R, usePoints } from "../ui";
 import { usernameProblem } from "./Personal";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,7 +43,13 @@ const INTRO = [
 	},
 ] as const;
 
-function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void }) {
+function Intro({
+	welcome,
+	onDone,
+}: {
+	welcome: string | null;
+	onDone: () => void;
+}) {
 	const [step, setStep] = useState(0);
 	const heading = useRef<HTMLHeadingElement>(null);
 	const first = useRef(true);
@@ -57,10 +63,12 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 	const item = INTRO[step];
 	const art = useArt(item.art);
 	const last = step === INTRO.length - 1;
-	// Swipe between the slides. Right to left like the app: «ادامه» points left, so the next slide
-	// comes by swiping to the right and the previous one by swiping to the left. A swipe on the
-	// last slide stays there (leaving is the button's job, not an accidental flick).
+	// Swipe between the slides like a phone's photo gallery: the finger moving to the left brings the
+	// next slide, to the right the previous one (the player's choice, 2026-11-08). The slide follows
+	// the finger while it moves. A swipe on the last slide stays there (leaving is the button's job,
+	// not an accidental flick).
 	const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+	const [drag, setDrag] = useState(0);
 	const [enter, setEnter] = useState<"" | "next" | "prev">("");
 	const go = (to: number) => {
 		if (to < 0 || to >= INTRO.length || to === step) return;
@@ -74,18 +82,30 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 				if (e.pointerType === "mouse" && e.button !== 0) return;
 				swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
 			}}
+			onPointerMove={(e) => {
+				const start = swipe.current;
+				if (!start || start.id !== e.pointerId) return;
+				const dx = e.clientX - start.x;
+				if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - start.y))
+					return;
+				// Past either end the slide only gives a little (nothing comes from there).
+				const blocked = (dx < 0 && last) || (dx > 0 && step === 0);
+				setDrag(Math.max(-120, Math.min(120, blocked ? dx / 5 : dx / 2)));
+			}}
 			onPointerUp={(e) => {
 				const start = swipe.current;
 				swipe.current = null;
+				setDrag(0);
 				if (!start || start.id !== e.pointerId) return;
 				const dx = e.clientX - start.x;
 				const dy = e.clientY - start.y;
 				// A clear sideways move: far enough, and more sideways than up/down (a scroll).
 				if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-				go(dx > 0 ? step + 1 : step - 1);
+				go(dx < 0 ? step + 1 : step - 1);
 			}}
 			onPointerCancel={() => {
 				swipe.current = null;
+				setDrag(0);
 			}}
 		>
 			<div className="au-onboarding-top">
@@ -95,54 +115,87 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 				</button>
 			</div>
 			{welcome ? <Notice tone="ok">{welcome}</Notice> : null}
-			<div className={`au-step-layout ${enter ? `au-enter-${enter}` : ""}`} key={step}>
-				<section className="au-intro-art">
-					<div className="au-image-art" aria-hidden="true">
-						<img
-							src={art.src}
-							srcSet={art.srcSet}
-							sizes="(max-width: 540px) 80vw, 420px"
-							alt=""
-							width={1280}
-							height={1280}
-							decoding="async"
-						/>
-					</div>
-				</section>
-				<section className="au-intro-copy">
-					<span className="bd-tag">
-						{fa(step + 1)} از ۳ · {item.tag}
-					</span>
-					<h2 ref={heading} tabIndex={-1}>
-						{item.title}
-					</h2>
-					<p>{item.text}</p>
-					<div className="au-intro-detail">
-						<Icon name="check" />
-						<span>{item.detail}</span>
-					</div>
-					<div className="au-intro-footer">
-						<div className="au-step-dots" aria-label={`مرحلهٔ ${fa(step + 1)} از سه`}>
-							{INTRO.map((_, i) => (
-								<button key={i} type="button" aria-label={`رفتن به مرحلهٔ ${fa(i + 1)}`} aria-pressed={i === step} onClick={() => go(i)}>
-									<span />
-								</button>
-							))}
+			{/* The finger's drag moves this wrapper; the slide inside keeps its own entrance animation. */}
+			<div
+				className="au-drag"
+				style={
+					drag
+						? {
+								transform: `translateX(${drag}px)`,
+								opacity: 1 - Math.abs(drag) / 400,
+							}
+						: undefined
+				}
+			>
+				<div
+					className={`au-step-layout ${enter ? `au-enter-${enter}` : ""}`}
+					key={step}
+				>
+					<section className="au-intro-art">
+						<div className="au-image-art" aria-hidden="true">
+							<img
+								src={art.src}
+								srcSet={art.srcSet}
+								sizes="(max-width: 540px) 80vw, 420px"
+								alt=""
+								width={1280}
+								height={1280}
+								decoding="async"
+							/>
 						</div>
-						<div className="bd-actions">
-							<button type="button" className="bd-action" onClick={() => (last ? onDone() : go(step + 1))}>
-								{last ? "ورود به خانه" : "ادامه"}
-								<Icon name="arrow-left" />
-							</button>
-							{step > 0 ? (
-								<button type="button" className="bd-secondary" onClick={() => go(step - 1)}>
-									<Icon name="arrow-right" />
-									قبلی
-								</button>
-							) : null}
+					</section>
+					<section className="au-intro-copy">
+						<span className="bd-tag">
+							{fa(step + 1)} از ۳ · {item.tag}
+						</span>
+						<h2 ref={heading} tabIndex={-1}>
+							{item.title}
+						</h2>
+						<p>{item.text}</p>
+						<div className="au-intro-detail">
+							<Icon name="check" />
+							<span>{item.detail}</span>
 						</div>
-					</div>
-				</section>
+						<div className="au-intro-footer">
+							<div
+								className="au-step-dots"
+								aria-label={`مرحلهٔ ${fa(step + 1)} از سه`}
+							>
+								{INTRO.map((_, i) => (
+									<button
+										key={i}
+										type="button"
+										aria-label={`رفتن به مرحلهٔ ${fa(i + 1)}`}
+										aria-pressed={i === step}
+										onClick={() => go(i)}
+									>
+										<span />
+									</button>
+								))}
+							</div>
+							<div className="bd-actions">
+								<button
+									type="button"
+									className="bd-action"
+									onClick={() => (last ? onDone() : go(step + 1))}
+								>
+									{last ? "ورود به خانه" : "ادامه"}
+									<Icon name="arrow-left" />
+								</button>
+								{step > 0 ? (
+									<button
+										type="button"
+										className="bd-secondary"
+										onClick={() => go(step - 1)}
+									>
+										<Icon name="arrow-left" />
+										قبلی
+									</button>
+								) : null}
+							</div>
+						</div>
+					</section>
+				</div>
 			</div>
 		</div>
 	);
@@ -185,32 +238,61 @@ export default function Onboarding() {
 			mustCreate.current = !(profile.birthdate && profile.username);
 			setUsername(profile.username ?? "");
 			setBirthdate(profile.birthdate ?? "");
-			setGender(profile.gender === "M" || profile.gender === "F" ? profile.gender : "");
+			setGender(
+				profile.gender === "M" || profile.gender === "F" ? profile.gender : "",
+			);
 			setPhase("profile");
-		} else if (profileQuery.error && (profileQuery.error as { status?: number }).status === 404) {
+		} else if (
+			profileQuery.error &&
+			(profileQuery.error as { status?: number }).status === 404
+		) {
 			mustCreate.current = true;
 			setPhase("profile");
 		}
 	}, [phase, profile, profileQuery.error, replace]);
 
 	const onSaved = () => {
-		setUser({ username: username.trim(), gender: gender as "M" | "F", birthdate, registrationStep: "DailyUsageTime" });
+		setUser({
+			username: username.trim(),
+			gender: gender as "M" | "F",
+			birthdate,
+			registrationStep: "DailyUsageTime",
+		});
 		setWelcome(`«${username.trim()}» به بردینو خوش آمدی!`);
 		setPhase("intro");
 		queryClient.invalidateQueries();
 	};
-	const create = useMutate({ url: CUSTOMER_URLS.CUSTOMER_REGISTER, onSuccess: onSaved, onError: (e) => setServerError(gameErrorMessage(e)) });
-	const update = useMutate({ url: CUSTOMER_URLS.PROFILE_SETUP, method: "PATCH", onSuccess: onSaved, onError: (e) => setServerError(gameErrorMessage(e)) });
+	const create = useMutate({
+		url: CUSTOMER_URLS.CUSTOMER_REGISTER,
+		onSuccess: onSaved,
+		onError: (e) => setServerError(gameErrorMessage(e)),
+	});
+	const update = useMutate({
+		url: CUSTOMER_URLS.PROFILE_SETUP,
+		method: "PATCH",
+		onSuccess: onSaved,
+		onError: (e) => setServerError(gameErrorMessage(e)),
+	});
 	const sending = create.isSending || update.isSending;
 
 	const nameError = usernameProblem(username.trim());
-	const problem = nameError ?? (!birthdate ? "تاریخ تولد را کامل انتخاب کن." : !gender ? "جنسیت را انتخاب کن." : null);
+	const problem =
+		nameError ??
+		(!birthdate
+			? "تاریخ تولد را کامل انتخاب کن."
+			: !gender
+				? "جنسیت را انتخاب کن."
+				: null);
 
 	if (phase === "intro") {
 		return (
 			<AuthShell title="معرفی بردینو">
 				<Intro
-					welcome={welcome && points.points ? `${welcome} موجودی امتیاز تو: ${fa(points.points)}` : welcome}
+					welcome={
+						welcome && points.points
+							? `${welcome} موجودی امتیاز تو: ${fa(points.points)}`
+							: welcome
+					}
 					onDone={() => replace(R.home)}
 				/>
 			</AuthShell>
@@ -220,7 +302,11 @@ export default function Onboarding() {
 	return (
 		<AuthShell title="تکمیل ثبت‌نام">
 			{phase !== "profile" ? (
-				<LoadState loading={!profileQuery.error} error={profileQuery.error} onRetry={profileQuery.refetch} />
+				<LoadState
+					loading={!profileQuery.error}
+					error={profileQuery.error}
+					onRetry={profileQuery.refetch}
+				/>
 			) : (
 				<Panel title="پروفایلت را کامل کن">
 					<form
@@ -246,9 +332,18 @@ export default function Onboarding() {
 									aria-invalid={tried && !!nameError}
 									onChange={(event) => setUsername(event.target.value)}
 								/>
-								{tried && nameError ? <p className="bd-field-error">{nameError}</p> : null}
+								{tried && nameError ? (
+									<p className="bd-field-error">{nameError}</p>
+								) : null}
 							</label>
-							<JalaliDateField label="تاریخ تولد" value={birthdate} onChange={setBirthdate} error={tried && !birthdate ? "تاریخ تولد را کامل انتخاب کن." : null} />
+							<JalaliDateField
+								label="تاریخ تولد"
+								value={birthdate}
+								onChange={setBirthdate}
+								error={
+									tried && !birthdate ? "تاریخ تولد را کامل انتخاب کن." : null
+								}
+							/>
 							<fieldset className="rt-field">
 								<legend>جنسیت</legend>
 								{(
@@ -258,10 +353,18 @@ export default function Onboarding() {
 									] as const
 								).map(([value, label]) => (
 									<label key={value}>
-										<input type="radio" name="gender" checked={gender === value} onChange={() => setGender(value)} /> {label}
+										<input
+											type="radio"
+											name="gender"
+											checked={gender === value}
+											onChange={() => setGender(value)}
+										/>{" "}
+										{label}
 									</label>
 								))}
-								{tried && !gender ? <p className="bd-field-error">جنسیت را انتخاب کن.</p> : null}
+								{tried && !gender ? (
+									<p className="bd-field-error">جنسیت را انتخاب کن.</p>
+								) : null}
 							</fieldset>
 						</div>
 						{serverError ? <Notice>{serverError}</Notice> : null}
