@@ -8,10 +8,10 @@ import Icon from "../Icon";
 import { fa } from "../format";
 import MissionSheet from "../missions/MissionSheet";
 import { type Mission, type MissionState, useMissions } from "../missions/api";
-import { useQueryClient } from "@tanstack/react-query";
 import { KIND_ICON, STATE_LABEL, progressText } from "../missions/labels";
 import type { MysteryCard, MysteryState } from "../missions/mystery";
 import { AppShell, Balance, Chips, EmptyState, LoadState, R } from "../ui";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MYSTERY_LABEL: Record<MysteryState, string> = {
 	available: "شروع کن",
@@ -23,39 +23,42 @@ const MYSTERY_LABEL: Record<MysteryState, string> = {
 	inactive: "غیرفعال",
 	empty: "به‌زودی",
 };
-const MYSTERY_RANK: Record<MysteryState, number> = { in_progress: 0, available: 1, upcoming: 2, done: 3, full: 4, inactive: 4, empty: 4, expired: 5 };
+/** A mystery's state in the missions' terms (its tag colour and its place in «پیشنهادی»). */
+const MYSTERY_AS: Record<MysteryState, MissionState> = {
+	available: "available",
+	in_progress: "in_progress",
+	done: "done",
+	upcoming: "upcoming",
+	expired: "expired",
+	full: "full",
+	inactive: "inactive",
+	empty: "inactive",
+};
+/** The «معمای شهری» chip (beside the server's mission categories). */
+const MYSTERY_GROUP = "mystery";
 
-/** «معمای شهری»: hunts across real places, above the missions. */
-function Mysteries({ list }: { list: MysteryCard[] }) {
-	const shown = [...list].sort((a, b) => MYSTERY_RANK[a.state] - MYSTERY_RANK[b.state] || a.order - b.order);
-	return (
-		<section className="my-list" aria-labelledby="my-list-title">
-			<h3 id="my-list-title">
-				<Icon name="search" /> معماهای شهری
-			</h3>
-			<p className="my-list-text">سرنخ‌ها را دنبال کن، به جاهای واقعی شهر برو و در هر مقصد امتیاز بگیر.</p>
-			<div className="my-cards">
-				{shown.map((m) => (
-					<Link key={m.id} href={R.mystery(m.id)} className="bd-panel my-card" data-state={m.state}>
-						{m.cover ? <img src={m.cover} alt="" className="my-card-cover" loading="lazy" /> : <span className="my-card-cover my-card-art"><Icon name="map-pin" /></span>}
-						<span className="my-card-copy">
-							<b>{m.title}</b>
-							<small>{m.area || m.summary}</small>
-							<span className="my-card-meta">
-								<span className={`bd-tag my-tag-${m.state}`}>{MYSTERY_LABEL[m.state]}</span>
-								<span>{m.state === "in_progress" || m.state === "done" ? `${fa(m.done)} از ${fa(m.steps)} مرحله` : `${fa(m.steps)} مرحله`}</span>
-							</span>
-						</span>
-						<span className="mi-points">
-							<bdi dir="ltr">+{fa(m.points)}</bdi>
-							<small>امتیاز</small>
-						</span>
-					</Link>
-				))}
-			</div>
-		</section>
-	);
-}
+/** One row of the list: a mission (opens its sheet) or a «معمای شهری» (opens its page). */
+type Row =
+	| {
+			kind: "mission";
+			id: string;
+			state: MissionState;
+			order: number;
+			points: number;
+			created: string | null;
+			ends: string | null;
+			m: Mission;
+	  }
+	| {
+			kind: "mystery";
+			id: string;
+			state: MissionState;
+			order: number;
+			points: number;
+			created: string | null;
+			ends: string | null;
+			m: MysteryCard;
+	  };
 
 // «پیشنهادی»: what can be done now first, then what is under way, then the rest.
 const STATE_RANK: Record<MissionState, number> = {
@@ -80,13 +83,24 @@ const SORTS: [Sort, string][] = [
 	["ending", "زودتر تمام می‌شود"],
 ];
 
-function sorted(missions: Mission[], sort: Sort) {
-	const list = [...missions];
-	const time = (s: string | null) => (s ? new Date(s).getTime() : Infinity);
+function sorted(rows: Row[], sort: Sort) {
+	const list = [...rows];
+	const time = (s: string | null, none: number) =>
+		s ? new Date(s).getTime() : none;
 	if (sort === "points") list.sort((a, b) => b.points - a.points);
-	else if (sort === "newest") list.sort((a, b) => time(b.create_time) - time(a.create_time));
-	else if (sort === "ending") list.sort((a, b) => time(a.ends_at) - time(b.ends_at));
-	else list.sort((a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || a.order - b.order || b.points - a.points);
+	else if (sort === "newest")
+		list.sort(
+			(a, b) => time(b.created, -Infinity) - time(a.created, -Infinity),
+		);
+	else if (sort === "ending")
+		list.sort((a, b) => time(a.ends, Infinity) - time(b.ends, Infinity));
+	else
+		list.sort(
+			(a, b) =>
+				STATE_RANK[a.state] - STATE_RANK[b.state] ||
+				a.order - b.order ||
+				b.points - a.points,
+		);
 	return list;
 }
 
@@ -107,33 +121,92 @@ export default function Earn() {
 		const now = new Map(list.missions.map((m) => [m.id, m.completed]));
 		const before = paid.current;
 		if (before && [...now].some(([id, n]) => n > (before.get(id) ?? n))) {
-			void queryClient.invalidateQueries({ predicate: (q) => !String(q.queryKey[0]).startsWith("missions") });
+			void queryClient.invalidateQueries({
+				predicate: (q) => !String(q.queryKey[0]).startsWith("missions"),
+			});
 		}
 		paid.current = now;
 	}, [list, queryClient]);
 
+	const rows = useMemo<Row[]>(
+		() => [
+			...(list?.missions ?? []).map(
+				(m): Row => ({
+					kind: "mission",
+					id: m.id,
+					state: m.state,
+					order: m.order,
+					points: m.points,
+					created: m.create_time,
+					ends: m.ends_at,
+					m,
+				}),
+			),
+			...(list?.mysteries ?? []).map(
+				(m): Row => ({
+					kind: "mystery",
+					id: m.id,
+					state: MYSTERY_AS[m.state],
+					order: m.order,
+					points: m.points,
+					created: m.starts_at,
+					ends: m.ends_at,
+					m,
+				}),
+			),
+		],
+		[list],
+	);
 	const shown = useMemo(
-		() => sorted((list?.missions ?? []).filter((m) => group === "all" || m.category === group), sort),
-		[list, group, sort],
+		() =>
+			sorted(
+				rows.filter(
+					(r) =>
+						group === "all" ||
+						(r.kind === "mystery"
+							? group === MYSTERY_GROUP
+							: r.m.category === group),
+				),
+				sort,
+			),
+		[rows, group, sort],
 	);
 	const open = list?.missions.find((m) => m.id === openId) ?? null;
-	const doable = list?.missions.filter((m) => m.state === "available" || m.state === "in_progress" || m.state === "rejected").length ?? 0;
+	const doable = rows.filter(
+		(r) =>
+			r.state === "available" ||
+			r.state === "in_progress" ||
+			r.state === "rejected",
+	).length;
+	const groups: [string, string][] = [
+		...(list?.categories ?? []).map((c): [string, string] => [c.id, c.name]),
+		...(list?.mysteries?.length
+			? ([[MYSTERY_GROUP, "معمای شهری"]] as [string, string][])
+			: []),
+	];
 
 	return (
 		<AppShell nav="earn" title="دریافت امتیاز" headingExtra={<Balance />}>
-			{list?.mysteries?.length ? <Mysteries list={list.mysteries} /> : null}
 			<section className="ng-catalog">
 				<div className="ng-filterbar">
 					<h3>
 						<Icon name="coins" /> مأموریت‌های امتیاز
 						{/* Its room is kept while loading (invisible), so the heading never grows and moves the sort menu. */}
-						<span className="bd-tag" aria-hidden={!list} style={list ? undefined : { visibility: "hidden" }}>
+						<span
+							className="bd-tag"
+							aria-hidden={!list}
+							style={list ? undefined : { visibility: "hidden" }}
+						>
 							{fa(doable)} قابل انجام
 						</span>
 					</h3>
 					<label className="ng-sort">
 						<Icon name="arrow-down-wide-narrow" />
-						<select aria-label="مرتب‌سازی" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+						<select
+							aria-label="مرتب‌سازی"
+							value={sort}
+							onChange={(e) => setSort(e.target.value as Sort)}
+						>
 							{SORTS.map(([key, text]) => (
 								<option key={key} value={key}>
 									{text}
@@ -142,12 +215,12 @@ export default function Earn() {
 						</select>
 					</label>
 				</div>
-				{list && list.categories.length > 1 ? (
+				{list && groups.length > 1 ? (
 					<Chips
 						label="دسته‌بندی مأموریت‌ها"
 						value={group}
 						onChange={setGroup}
-						options={[["all", "همه"], ...list.categories.map((c): [string, string] => [c.id, c.name])]}
+						options={[["all", "همه"], ...groups]}
 					/>
 				) : null}
 				{/* While loading, about a list's height: the note below does not jump down when the list arrives. */}
@@ -155,37 +228,99 @@ export default function Earn() {
 					<LoadState loading={isLoading} error={error} onRetry={refetch} />
 				</div>
 				{list && !shown.length ? (
-					<EmptyState title="فعلاً مأموریتی نیست" text="مأموریت‌های تازه همین‌جا اضافه می‌شوند؛ بعداً سر بزن." />
+					<EmptyState
+						title="فعلاً مأموریتی نیست"
+						text="مأموریت‌های تازه همین‌جا اضافه می‌شوند؛ بعداً سر بزن."
+					/>
 				) : null}
 				{shown.length ? (
 					<div className="bd-panel bd-missions mi-list">
 						<div className="bd-mission-list">
-							{shown.map((m) => (
-								<button key={m.id} type="button" className="bd-mission mi-row" data-state={m.state} onClick={() => setOpenId(m.id)}>
-									<span className={`bd-mission-icon ${m.image ? "bd-mission-logo" : ""}`}>
-										{m.image ? <img src={m.image} alt="" width={36} height={36} /> : <Icon name={KIND_ICON[m.kind]} />}
-									</span>
-									<span className="bd-mission-copy">
-										<b>{m.title}</b>
-										<small>{progressText(m) ?? m.summary}</small>
-										<span className={`bd-tag mi-state mi-${m.state}`}>{STATE_LABEL[m.state]}</span>
-									</span>
-									<span className="mi-points">
-										<bdi dir="ltr">+{fa(m.points)}</bdi>
-										<small>امتیاز</small>
-									</span>
-								</button>
-							))}
+							{shown.map((row) =>
+								row.kind === "mystery" ? (
+									<Link
+										key={`my-${row.id}`}
+										href={R.mystery(row.id)}
+										className="bd-mission mi-row"
+										data-state={row.state}
+									>
+										<span
+											className={`bd-mission-icon ${row.m.cover ? "bd-mission-logo mi-cover" : ""}`}
+										>
+											{row.m.cover ? (
+												<img src={row.m.cover} alt="" width={36} height={36} />
+											) : (
+												<Icon name="map-pin" />
+											)}
+										</span>
+										<span className="bd-mission-copy">
+											<b>{row.m.title}</b>
+											<small>
+												معمای شهری ·{" "}
+												{row.m.state === "in_progress" || row.m.state === "done"
+													? `${fa(row.m.done)} از ${fa(row.m.steps)} مرحله`
+													: `${fa(row.m.steps)} مرحله`}
+												{row.m.area ? ` · ${row.m.area}` : ""}
+											</small>
+											<span className={`bd-tag mi-state mi-${row.state}`}>
+												{MYSTERY_LABEL[row.m.state]}
+											</span>
+										</span>
+										<span className="mi-points">
+											<bdi dir="ltr">+{fa(row.points)}</bdi>
+											<small>امتیاز</small>
+										</span>
+									</Link>
+								) : (
+									<button
+										key={row.id}
+										type="button"
+										className="bd-mission mi-row"
+										data-state={row.state}
+										onClick={() => setOpenId(row.id)}
+									>
+										<span
+											className={`bd-mission-icon ${row.m.image ? "bd-mission-logo" : ""}`}
+										>
+											{row.m.image ? (
+												<img src={row.m.image} alt="" width={36} height={36} />
+											) : (
+												<Icon name={KIND_ICON[row.m.kind]} />
+											)}
+										</span>
+										<span className="bd-mission-copy">
+											<b>{row.m.title}</b>
+											<small>{progressText(row.m) ?? row.m.summary}</small>
+											<span className={`bd-tag mi-state mi-${row.m.state}`}>
+												{STATE_LABEL[row.m.state]}
+											</span>
+										</span>
+										<span className="mi-points">
+											<bdi dir="ltr">+{fa(row.m.points)}</bdi>
+											<small>امتیاز</small>
+										</span>
+									</button>
+								),
+							)}
 						</div>
 					</div>
 				) : null}
 			</section>
-			{open ? <MissionSheet mission={open} onClose={() => setOpenId(null)} onChanged={() => void refetch()} /> : null}
+			{open ? (
+				<MissionSheet
+					mission={open}
+					onClose={() => setOpenId(null)}
+					onChanged={() => void refetch()}
+				/>
+			) : null}
 			<div className="ng-status">
 				<Icon name="info" />
 				<div>
 					<b>امتیاز هر مأموریت بعد از انجام یا تأیید به کیف امتیاز می‌رود.</b>
-					<small>مأموریت‌های ثبت‌نام و نصب اپ بعد از بررسی تأیید می‌شوند؛ وضعیت هر مأموریت روی همان ردیف دیده می‌شود.</small>
+					<small>
+						مأموریت‌های ثبت‌نام و نصب اپ بعد از بررسی تأیید می‌شوند؛ وضعیت هر
+						مأموریت روی همان ردیف دیده می‌شود.
+					</small>
 				</div>
 			</div>
 		</AppShell>

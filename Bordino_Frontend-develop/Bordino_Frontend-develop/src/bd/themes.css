@@ -96,11 +96,11 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 #bordino-directions .bd-night .bd-sheet { border: 1px solid var(--bd-border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px #0008; }
 #bordino-directions :is(.st-neu,.bd-night) .bd-sheet-backdrop { backdrop-filter: blur(2px); }
 /* «معمای شهری» and the missions */
-#bordino-directions .st-neu :is(.my-card-cover,.my-cover,.my-clue-image,.my-place-head img,.my-step-number) { border-color: transparent; box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); border-radius: 12px; }
+#bordino-directions .st-neu :is(.my-cover,.my-clue-image,.my-place-head img,.my-step-number) { border-color: transparent; box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); border-radius: 12px; }
 #bordino-directions .st-neu :is(.my-progress) { border: 0; border-radius: 10px; box-shadow: inset 3px 3px 6px var(--bd-lo), inset -3px -3px 6px var(--bd-hi); }
 #bordino-directions .st-neu :is(.my-problem,.my-hint-ask) { border-color: transparent; border-radius: 14px; }
 #bordino-directions .st-neu :is(.my-clue,.my-hint,.my-note,.my-offer,.my-locked) { border-radius: 14px; }
-#bordino-directions .bd-night :is(.my-card-cover,.my-cover,.my-clue-image,.my-place-head img,.my-step-number,.my-progress,.my-problem,.my-hint-ask) { border-width: 1px; border-color: var(--bd-border); border-radius: 8px; }
+#bordino-directions .bd-night :is(.my-cover,.my-clue-image,.my-place-head img,.my-step-number,.my-progress,.my-problem,.my-hint-ask) { border-width: 1px; border-color: var(--bd-border); border-radius: 8px; }
 #bordino-directions .bd-night .my-progress span { box-shadow: 0 0 12px color-mix(in srgb, var(--bd-accent) 60%, transparent); }
 #bordino-directions .bd-night :is(.my-done .my-step-number) { background: #2f8f5b; border-color: #2f8f5b; }
 #bordino-directions .bd-night .my-clue { border-inline-start-color: var(--bd-accent); background: color-mix(in srgb, var(--bd-accent) 12%, var(--bd-surface)); }

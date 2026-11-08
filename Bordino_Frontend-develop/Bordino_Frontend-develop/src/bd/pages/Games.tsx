@@ -8,8 +8,26 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import RewardOffer from "../ads/RewardOffer";
 import { usePlayableAdOffer } from "../ads/api";
+import { fa } from "../format";
 import { GAMES, type GameEntry } from "../games";
-import { AppShell, Balance, Chips } from "../ui";
+import { useMissions } from "../missions/api";
+import type { MysteryCard, MysteryState } from "../missions/mystery";
+import { AppShell, Balance, Chips, R } from "../ui";
+
+/** A «معمای شهری» card's line under its name: where it is, how far the player got, or why it is closed. */
+function mysteryTag(m: MysteryCard) {
+	const closed: Partial<Record<MysteryState, string>> = {
+		done: "حل شد",
+		upcoming: "به‌زودی",
+		expired: "پایان‌یافته",
+		full: "ظرفیت تکمیل",
+		inactive: "غیرفعال",
+		empty: "به‌زودی",
+	};
+	if (closed[m.state]) return closed[m.state];
+	if (m.state === "in_progress") return `${fa(m.done)} از ${fa(m.steps)} مرحله`;
+	return `${fa(m.steps)} مرحله · تا ${fa(m.points)} امتیاز`;
+}
 
 function Cover({ game }: { game: GameEntry }) {
 	if (game.id === "sudoku") {
@@ -33,8 +51,12 @@ function Cover({ game }: { game: GameEntry }) {
 	return <Icon name={game.icon} />;
 }
 
+type Group = "all" | GameEntry["group"] | "city";
+
 export default function Games() {
-	const [group, setGroup] = useState<"all" | GameEntry["group"]>("all");
+	const [group, setGroup] = useState<Group>("all");
+	// «معمای شهری»: hunts at real places (the mystery list comes with the missions).
+	const mysteries = useMissions().data?.result?.mysteries ?? [];
 	const router = useRouter();
 	// The rewarded-video offer (server decides if one is available today, and for how much).
 	const { offer } = usePlayableAdOffer();
@@ -57,6 +79,7 @@ export default function Games() {
 						["puzzle", "فکری"],
 						["arcade", "آرکید"],
 						["party", "دورهمی"],
+						...(mysteries.length ? ([["city", "معمای شهری"]] as [Group, string][]) : []),
 					]}
 				/>
 				<div className="ng-games">
@@ -83,6 +106,19 @@ export default function Games() {
 							</div>
 						</Link>
 					))}
+					{group === "all" || group === "city"
+						? mysteries.map((m) => (
+								<Link key={m.id} href={R.mystery(m.id)} className="ng-game" data-game="mystery" data-state={m.state} aria-label={`معمای شهری ${m.title}`}>
+									<div className="ng-cover">
+										{m.cover ? <img className="ng-mystery-cover" src={m.cover} alt="" loading="lazy" /> : <Icon name="map-pin" />}
+									</div>
+									<div className="ng-game-name">
+										<b>{m.title}</b>
+										<small>{mysteryTag(m)}</small>
+									</div>
+								</Link>
+							))
+						: null}
 				</div>
 			</section>
 			{picked && offer ? (
