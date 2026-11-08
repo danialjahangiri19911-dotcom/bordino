@@ -362,7 +362,8 @@ class Mystery(AbstractBaseModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        if self.access == self.Access.PRIVATE and not self.invite_token:
+        # (A closed creator game gives its invite to the next version: `_no_invite` keeps it empty.)
+        if self.access == self.Access.PRIVATE and not self.invite_token and not getattr(self, "_no_invite", False):
             self.invite_token = new_callback_secret()
         return super().save(*args, **kwargs)
 

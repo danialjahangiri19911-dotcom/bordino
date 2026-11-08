@@ -565,6 +565,10 @@ body { margin: 0; }
 #bordino-directions .gm-qr { margin: 0; padding: 8px; border: 1px solid var(--bd-border); border-radius: 10px; background: #fff; color: #222; text-align: center; }
 #bordino-directions .gm-qr svg { width: 100%; height: auto; }
 #bordino-directions .gm-qr figcaption { font-size: 11px; }
+#bordino-directions .gm-share { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px solid var(--bd-border); border-radius: 12px; }
+#bordino-directions .gm-share > b { display: flex; align-items: center; gap: 6px; }
+#bordino-directions .gm-share-qr { max-width: 220px; justify-self: center; width: 100%; }
+#bordino-directions .gm-share-qr a { display: inline-flex; align-items: center; gap: 4px; }
 #bordino-directions .gm-bars { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
 #bordino-directions .gm-bars li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; }
 #bordino-directions .gm-bars em { font-style: normal; color: #2f8f5b; }

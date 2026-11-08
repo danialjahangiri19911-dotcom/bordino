@@ -153,6 +153,16 @@ export const useAnalytics = (id: string) => useQuery<ResponseApiData<{ analytics
 export const useQrCodes = (id: string, enabled = true) =>
 	useQuery<ResponseApiData<{ qr: { order: number; place: string; url: string; venue_url?: string; svg: string }[] }>>({ url: `${GM}games/${id}/qr/`, headers: true, enabled });
 
+/** The game's link to share and its QR: a private game's invite (there from the first draft, it
+ * works once published) or a public game's page (once published). */
+export interface ShareInfo {
+	kind: "invite" | "public";
+	url: string;
+	active: boolean;
+	svg: string;
+}
+export const useShare = (id: string) => useQuery<ResponseApiData<ShareInfo>>({ url: `${GM}games/${id}/share/`, headers: true });
+
 export const createGame = (category: Category, template: string | null) => call<{ game: GameFull }>("post", `${GM}games/`, { category, template });
 export const saveDraft = (id: string, draft: Definition) => call<{ game: GameFull }>("patch", `${GM}games/${id}/`, { draft });
 export type GameAction = "submit" | "publish" | "pause" | "resume" | "archive" | "duplicate";

@@ -82,6 +82,9 @@ class Game(AbstractBaseModel):
         "GameVersion", on_delete=models.PROTECT, null=True, blank=True, related_name="+", verbose_name=_("نسخهٔ منتشرشده")
     )
     paused_by_admin = models.BooleanField(default=False, verbose_name=_("توقف توسط ادمین"))
+    # A private game's invite: made once (shown from the first draft), the same for every version;
+    # it opens the game once a version is published.
+    invite_token = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
 
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("بازی سازنده")

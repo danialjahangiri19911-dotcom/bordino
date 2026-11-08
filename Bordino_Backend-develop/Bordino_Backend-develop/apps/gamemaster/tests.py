@@ -568,3 +568,33 @@ class GameMasterAuditTests(TestCase):
         self.assertEqual(self.player_api.post(f"/api/v1/missions/qr/{code}/", {}, format="json").status_code, 200)
         a = body(self.api.get(f"/api/v1/gm/games/{gid}/analytics/"))["analytics"]["stages"][3]
         self.assertEqual((a["verified_visit"], a["qr_printed"]), (True, False))
+
+    def test_the_invite_link_exists_from_the_first_draft_and_lasts_across_versions(self):
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "personal"}, format="json"))["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz(access="private")}, format="json")
+        share = body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))
+        self.assertEqual((share["kind"], share["active"]), ("invite", False))
+        self.assertIn("/pwa/play/", share["url"])
+        self.assertTrue(share["svg"].startswith("<svg"))
+        token = share["url"].rsplit("/", 1)[-1]
+        self.assertEqual(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json").status_code, 404)  # not yet
+        gid, m = self.publish(quiz(access="private"), gid=gid)
+        self.assertTrue(body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))["active"])
+        self.assertEqual(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json").status_code, 200)
+        gid, m2 = self.publish(quiz(access="private", points=20), gid=gid)  # a new version: the same link
+        m.refresh_from_db()
+        self.assertEqual((m2.invite_token, m.invite_token), (token, None))
+        late = APIClient()
+        late.force_authenticate(make_player("9120009305"))
+        joined = body(late.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json"))["mystery"]
+        self.assertEqual(joined["id"], str(m2.pk))  # newcomers get the new version
+        self.api.post(f"/api/v1/gm/games/{gid}/archive/", {}, format="json")
+        self.assertFalse(body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))["active"])
+
+    def test_a_public_game_shares_its_page_once_published(self):
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro"}, format="json"))["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz()}, format="json")
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))["url"], "")
+        gid, m = self.publish(quiz(), gid=gid)
+        share = body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))
+        self.assertEqual((share["kind"], share["active"], share["url"].endswith(f"/pwa/earn/mystery/{m.pk}")), ("public", True, True))

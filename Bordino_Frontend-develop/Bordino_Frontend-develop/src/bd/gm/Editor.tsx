@@ -39,8 +39,10 @@ import {
 	saveDraft,
 	uploadImage,
 	useAnalytics,
+	type ShareInfo,
 	useGame,
 	useQrCodes,
+	useShare,
 } from "./api";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -975,6 +977,7 @@ export default function Editor({ id }: { id: string }) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const { data, isLoading, error, refetch } = useGame(id);
+	const share = useShare(id);
 	const server = data?.result?.game ?? null;
 	const points = usePoints();
 	const [draft, setDraft] = useState<Definition | null>(null);
@@ -1016,6 +1019,9 @@ export default function Editor({ id }: { id: string }) {
 		try {
 			const { game } = await saveDraft(id, d);
 			setProblems(game.problems);
+			// Switching between public and private changes what there is to share.
+			const kind = share.data?.result?.kind;
+			if (kind && kind !== (d.access === "private" ? "invite" : "public")) void share.refetch();
 			setSave({ state: "saved", at: new Date().toISOString() });
 		} catch (e) {
 			setSave({ state: "failed", error: gameErrorMessage(e) });
@@ -1687,6 +1693,7 @@ export default function Editor({ id }: { id: string }) {
 							)}
 						</div>
 					) : null}
+					<ShareBox info={share.data?.result} title={d.title} />
 					{live ? (
 						<LiveTools
 							game={server}
@@ -1748,6 +1755,62 @@ export default function Editor({ id }: { id: string }) {
 	);
 }
 
+/** The game's link and its QR, to send or print: a private game's invite link is there from the
+ * first draft (it opens the game once published); a public game's page once it is published. */
+function ShareBox({ info, title }: { info: ShareInfo | undefined; title: string }) {
+	const [shared, setShared] = useState<string | null>(null);
+	if (!info?.url) return null;
+	const invite = info.kind === "invite";
+	const name = invite ? "لینک دعوت" : "لینک بازی";
+	const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+	const send = async () => {
+		try {
+			await navigator.share({ title: title || "بازی بردینو", text: invite ? "به بازی من در بردینو دعوتی:" : title, url: info.url });
+		} catch (e) {
+			if ((e as Error)?.name !== "AbortError") setShared("فرستادن نشد؛ لینک را کپی کن.");
+		}
+	};
+	return (
+		<div className="gm-share">
+			<b>
+				<Icon name={invite ? "lock-keyhole" : "share"} /> {name} و QR آن
+			</b>
+			<small className="bd-muted">
+				{invite
+					? info.active
+						? "فقط کسانی که این لینک یا QR را دارند وارد بازی می‌شوند. با نسخه‌های بعدی هم همین می‌ماند."
+						: "این لینک ثابت است و از همین حالا می‌توانی بفرستی یا چاپ کنی؛ بعد از انتشار بازی کار می‌کند."
+					: info.active
+						? "هر کسی با این لینک یا QR مستقیم به صفحهٔ بازی می‌رسد."
+						: "بازی الان باز نیست؛ این لینک وقتی بازی باز است کار می‌کند."}
+			</small>
+			<div className="gm-invite">
+				<code dir="ltr">{info.url}</code>
+				<CopyButton text={info.url} label={`کپی ${name}`} />
+				{canShare ? (
+					<button type="button" className="bd-secondary" onClick={() => void send()}>
+						<Icon name="share-2" /> فرستادن
+					</button>
+				) : null}
+			</div>
+			{info.svg ? (
+				<figure className="gm-qr gm-share-qr">
+					<span dangerouslySetInnerHTML={{ __html: info.svg }} />
+					<figcaption>{title || "بازی بردینو"}</figcaption>
+					<a
+						className="bd-text-btn"
+						download={invite ? "invite-qr.svg" : "game-qr.svg"}
+						href={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(info.svg)}`}
+					>
+						<Icon name="download" /> دانلود QR
+					</a>
+				</figure>
+			) : null}
+			{shared ? <Notice>{shared}</Notice> : null}
+		</div>
+	);
+}
+
 /** A live game: where players see it, its invite link and QR codes, pause / resume. */
 function LiveTools({
 	game,
@@ -1800,13 +1863,6 @@ function LiveTools({
 			</div>
 			{game.paused_by_admin ? (
 				<Notice>بردینو این بازی را متوقف کرده است.</Notice>
-			) : null}
-			{game.invite_url ? (
-				<div className="gm-invite">
-					<b>لینک دعوت</b>
-					<code dir="ltr">{game.invite_url}</code>
-					<CopyButton text={game.invite_url} label="کپی لینک دعوت" />
-				</div>
 			) : null}
 			{codes.length ? (
 				<div className="gm-qr-list">

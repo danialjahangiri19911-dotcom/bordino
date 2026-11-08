@@ -90,8 +90,9 @@ def game_payload(game: Game, full: bool = False) -> dict:
         live = game.live_version
         if live is not None and getattr(live, "mystery", None) is not None:
             body["budget"] = budget.summary(live)
-            if live.mystery.access == live.mystery.Access.PRIVATE:
-                body["invite_url"] = f"{services.public_base()}/pwa/play/{live.mystery.invite_token}"
+        body["share"] = services.share(game)
+        if body["share"]["kind"] == "invite":
+            body["invite_url"] = body["share"]["url"]
     return body
 
 
@@ -245,6 +246,24 @@ class QrView(APIView):
             url = f"{base}/pwa/earn/qr/{step.qr_token}"
             items.append({"order": step.order, "place": step.place_name, "url": url, "venue_url": "", "svg": segno.make(url, error="m").svg_inline(scale=6, border=2)})
         return Response({"qr": items})
+
+
+class ShareView(APIView):
+    """The game's link to share (a private game's invite, or a public game's page) and its QR."""
+
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=TAGS, summary="The game's share link and its QR")
+    def get(self, request, game_id):
+        import segno  # pylint: disable=import-outside-toplevel
+
+        try:
+            game = services.owned(request.user, game_id)
+        except services.GameMasterError as exc:
+            return _error(exc)
+        info = services.share(game)
+        svg = segno.make(info["url"], error="m").svg_inline(scale=8, border=2) if info["url"] else ""
+        return Response({**info, "svg": svg})
 
 
 class AnalyticsView(APIView):

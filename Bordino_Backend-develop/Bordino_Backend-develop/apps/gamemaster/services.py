@@ -398,6 +398,31 @@ def confirm_payment(user, track_id: str, success: bool) -> GamePayment:
 # ── publication ──
 
 
+def invite_token(game: Game) -> str:
+    """The game's invite (made the first time it is asked for)."""
+    if not game.invite_token:
+        from apps.missions.models import new_callback_secret  # pylint: disable=import-outside-toplevel
+
+        Game.objects.filter(pk=game.pk, invite_token__isnull=True).update(invite_token=new_callback_secret())
+        game.invite_token = Game.objects.values_list("invite_token", flat=True).get(pk=game.pk)
+    return game.invite_token
+
+
+def share(game: Game) -> dict:
+    """What the creator shares: a private game's invite link (from the first draft; it works once
+    published), or a public game's page once it is published."""
+    base = public_base()
+    live = game.live_version
+    mystery = getattr(live, "mystery", None) if live else None
+    open_now = mystery is not None and game.status in (Status.PUBLISHED, Status.SCHEDULED)
+    if (game.draft or {}).get("access") == "private" or (mystery is not None and mystery.access == Mystery.Access.PRIVATE):
+        working = open_now and mystery.access == Mystery.Access.PRIVATE and mystery.invite_token == invite_token(game)
+        return {"kind": "invite", "url": f"{base}/pwa/play/{invite_token(game)}", "active": working}
+    if mystery is not None:
+        return {"kind": "public", "url": f"{base}/pwa/earn/mystery/{mystery.pk}", "active": open_now}
+    return {"kind": "public", "url": "", "active": False}
+
+
 def _compile(game: Game, version: GameVersion) -> Mystery:
     """The approved version as a Mystery and its steps (what players play)."""
     d = version.definition
@@ -419,6 +444,7 @@ def _compile(game: Game, version: GameVersion) -> Mystery:
         source_version=version,
         presenter=d.get("presenter") or game.owner.business_name,
         access=Mystery.Access.PRIVATE if d.get("access") == "private" else Mystery.Access.PUBLIC,
+        invite_token=invite_token(game) if d.get("access") == "private" else None,
         completion_message=d.get("completion_message", ""),
         age_min=audience.get("age_min"),
         age_max=audience.get("age_max"),
@@ -438,13 +464,16 @@ def _compile(game: Game, version: GameVersion) -> Mystery:
 
 
 def _close(mystery: Mystery, keep_players: bool):
-    """A replaced or archived game's Mystery: no new players; its current ones may finish (kept)."""
+    """A replaced or archived game's Mystery: no new players; its current ones may finish (kept).
+    Its invite passes to the next version (or, archived, stops working)."""
     started = mystery.runs.count()
     mystery.is_visible = False
+    mystery.invite_token = None
+    mystery._no_invite = True  # pylint: disable=protected-access
     mystery.capacity = started  # nobody new, not even by its first QR
     if not keep_players:
         mystery.is_active = False
-    mystery.save(update_fields=["is_visible", "capacity", "is_active", "update_time"])
+    mystery.save(update_fields=["is_visible", "capacity", "is_active", "invite_token", "update_time"])
 
 
 def publish(user, game_id) -> Game:
