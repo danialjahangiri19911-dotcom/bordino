@@ -232,3 +232,9 @@ export function newStage(type: StageType, n: number): Stage {
 
 /** The most one player can win: every stage's points and the finish bonus. */
 export const maxRun = (d: Definition) => d.stages.reduce((n, s) => n + (s.points || 0), 0) + (d.finish_points || 0);
+
+/** The approved version's publication fee: where to pay it (Zibal, or the sandbox page). */
+export const payFee = (id: string) => call<{ payment_url: string; track_id: string; amount_toman: number; mode: string }>("post", `${GM}games/${id}/pay/`, {});
+/** Back from the gateway: confirms the payment once. */
+export const verifyPayment = (trackId: string, success: boolean) =>
+	call<{ status: "paid" | "failed" | "pending"; game_id: string; ref_number: string; amount_toman: number; mode: string }>("post", `${GM}payments/verify/`, { trackId, success: success ? "1" : "0" });

@@ -324,3 +324,35 @@ class DashboardView(APIView):
         runs = MysteryRun.objects.filter(mystery__source_version__game__owner=p)
         totals = runs.aggregate(started=Count("id"), completed=Count("id", filter=Q(status=MysteryRun.Status.COMPLETED)))
         return Response({"by_status": by_status, "players": totals["started"], "completed": totals["completed"]})
+
+
+class PayView(APIView):
+    """The approved version's publication fee: starts a Zibal payment and says where to pay it."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (GmThrottle,)
+
+    @extend_schema(tags=TAGS, summary="Pay the publication fee (Zibal)")
+    def post(self, request, game_id):
+        try:
+            payment, url = services.start_payment(request.user, game_id)
+        except services.GameMasterError as exc:
+            return _error(exc)
+        return Response({"payment_url": url, "track_id": payment.track_id, "amount_toman": payment.amount_toman, "mode": payment.mode})
+
+
+class PayVerifyView(APIView):
+    """Back from Zibal (or the sandbox page): confirms the payment once; another user's is «not found»."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (GmThrottle,)
+
+    @extend_schema(tags=TAGS, summary="Confirm a Zibal payment")
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        success = str(data.get("success", "")).lower() in ("1", "true")
+        try:
+            payment = services.confirm_payment(request.user, str(data.get("trackId") or ""), success)
+        except services.GameMasterError as exc:
+            return _error(exc)
+        return Response({"status": payment.status, "game_id": str(payment.game_id), "ref_number": payment.ref_number, "amount_toman": payment.amount_toman, "mode": payment.mode})

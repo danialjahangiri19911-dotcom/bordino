@@ -18,6 +18,7 @@ place's QR), location (the phone at the place), staff (a code the staff give), m
 
 import json
 import math
+import re
 from datetime import datetime
 
 from django.utils.dateparse import parse_datetime
@@ -52,6 +53,21 @@ class DefinitionError(Exception):
 
 def empty() -> dict:
     return {"schema": SCHEMA, "title": "", "access": "public", "audience": {}, "finish_points": 0, "hint_penalty": 25, "budget_points": 0, "stages": []}
+
+
+# An image is one of the creator's uploads (GameAsset): "gm/<32 hex>.<ext>", nothing else.
+IMAGE = re.compile(r"^gm/[0-9a-f]{32}\.(?:jpg|jpeg|png|webp)$")
+
+
+def _image(value) -> str | None:
+    value = str(value or "").strip()
+    return value if IMAGE.match(value) else None
+
+
+def images(definition: dict) -> set[str]:
+    """Every image a definition uses (its cover and its stages')."""
+    found = {definition.get("cover")} | {s.get("image") for s in definition.get("stages") or []}
+    return {x for x in found if x}
 
 
 def _text(value, limit: int) -> str:
@@ -99,7 +115,7 @@ def clean(definition) -> dict:
         "area": _text(definition.get("area"), 120),
         "duration_minutes": _int(definition.get("duration_minutes"), 1, 1440),
         "presenter": _text(definition.get("presenter"), 120),
-        "cover": _text(definition.get("cover"), 200) or None,
+        "cover": _image(definition.get("cover")),
         "access": "private" if definition.get("access") == "private" else "public",
         "audience": {
             "age_min": _int(audience.get("age_min"), 0, 120),
@@ -127,7 +143,7 @@ def clean(definition) -> dict:
                 "type": kind,
                 "title": _text(raw.get("title"), 120),
                 "text": _text(raw.get("text"), 2000),
-                "image": _text(raw.get("image"), 200) or None,
+                "image": _image(raw.get("image")),
                 "question": _text(raw.get("question"), 200),
                 "answers": [a for a in (_text(x, 100) for x in (raw.get("answers") or [])[:10]) if a],
                 "answer_type": "number" if raw.get("answer_type") == "number" else "text",

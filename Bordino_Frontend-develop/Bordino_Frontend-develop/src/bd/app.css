@@ -581,3 +581,5 @@ body { margin: 0; }
 #bordino-directions .my-timer svg { width: 16px; height: 16px; }
 #bordino-directions .my-timer-over { color: var(--bd-muted); font-weight: 400; }
 #bordino-directions .my-coupon bdi { font-family: monospace; letter-spacing: .5px; }
+#bordino-directions .gm-sandbox p { font-size: 13px; line-height: 1.9; }
+#bordino-directions .gm-amount b { font-size: 22px; }

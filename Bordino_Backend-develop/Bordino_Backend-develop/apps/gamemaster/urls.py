@@ -6,6 +6,8 @@ from apps.gamemaster.views import (
     GameActionView,
     GamesView,
     GameView,
+    PayVerifyView,
+    PayView,
     PreviewView,
     ProfileView,
     QrView,
@@ -23,5 +25,7 @@ urlpatterns = [
     path("api/v1/gm/games/<uuid:game_id>/preview/", PreviewView.as_view(), name="gm_preview"),
     path("api/v1/gm/games/<uuid:game_id>/qr/", QrView.as_view(), name="gm_qr"),
     path("api/v1/gm/games/<uuid:game_id>/analytics/", AnalyticsView.as_view(), name="gm_analytics"),
+    path("api/v1/gm/payments/verify/", PayVerifyView.as_view(), name="gm_pay_verify"),
+    path("api/v1/gm/games/<uuid:game_id>/pay/", PayView.as_view(), name="gm_pay"),
     path("api/v1/gm/games/<uuid:game_id>/<str:action>/", GameActionView.as_view(), name="gm_action"),
 ]

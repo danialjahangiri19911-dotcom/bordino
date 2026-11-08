@@ -24,6 +24,7 @@ import {
 	fieldsOf,
 	gameAction,
 	maxRun,
+	payFee,
 	newStage,
 	previewStage,
 	saveDraft,
@@ -639,6 +640,16 @@ export default function Editor({ id }: { id: string }) {
 		}
 	};
 
+	const pay = async () => {
+		setAction({ busy: "publish", message: null });
+		try {
+			const { payment_url } = await payFee(id);
+			window.location.assign(payment_url);
+		} catch (e) {
+			setAction({ busy: null, message: gameErrorMessage(e), ok: false });
+		}
+	};
+
 	const v = server.latest_version;
 	const saveText =
 		save.state === "pending" || save.state === "saving"
@@ -876,7 +887,11 @@ export default function Editor({ id }: { id: string }) {
 								{v.fee_toman ? ` هزینهٔ انتشار: ${fa(v.fee_toman)} تومان${v.fee_paid ? " (پرداخت شد)" : ""}.` : " انتشار هزینه‌ای ندارد."}
 								{d.budget_points ? ` با انتشار، ${fa(d.budget_points)} امتیاز برای جایزه‌ها از کیف امتیازت کنار گذاشته می‌شود.` : ""}
 							</p>
-							{asking === "publish" ? (
+							{v.fee_toman && !v.fee_paid ? (
+								<button type="button" className="bd-action" disabled={!!action.busy} onClick={() => void pay()}>
+									<Icon name="banknote" /> پرداخت هزینهٔ انتشار ({fa(v.fee_toman)} تومان)
+								</button>
+							) : asking === "publish" ? (
 								<div className="my-hint-ask">
 									<span>مطمئنی؟ بازی برای بازیکنان باز می‌شود{d.budget_points ? ` و ${fa(d.budget_points)} امتیاز کنار گذاشته می‌شود` : ""}.</span>
 									<button type="button" className="bd-action" disabled={!!action.busy} onClick={() => void act("publish")}>

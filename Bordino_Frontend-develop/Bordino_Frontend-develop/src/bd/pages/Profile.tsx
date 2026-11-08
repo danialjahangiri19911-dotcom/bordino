@@ -7,6 +7,7 @@ import Link from "next/link";
 import AvatarEditor from "../AvatarEditor";
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
+import { useGmProfile } from "../gm/api";
 import { openPhoto, PhotoError } from "../photo";
 import { AppShell, LoadState, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -217,6 +218,8 @@ function AvatarPicker({ image }: { image?: string | null }) {
 }
 
 export default function Profile() {
+	// «حالت برنامه» appears once Game Master is open to this account (Bordino opens it gradually).
+	const gmOpen = !!useGmProfile().data?.result?.profile?.available;
 	const { profile, isLoading, error, refetch } = useProfileSync();
 	const [leaving, setLeaving] = useState(false);
 	return (
@@ -247,7 +250,7 @@ export default function Profile() {
 					<h3>تنظیمات برنامه</h3>
 					<ProfileRow href={R.notifications} icon="bell" title="مدیریت اعلانات" text="اعلان‌های برنامه" />
 					<ProfileRow href={R.appearance} icon="moon" title="ظاهر برنامه" text="طرح، روشن یا تیره" />
-					<ProfileRow href={R.appMode} icon="sparkles" title="حالت برنامه" text="بازیکن یا گیم مستر (ساخت بازی)" />
+					{gmOpen ? <ProfileRow href={R.appMode} icon="sparkles" title="حالت برنامه" text="بازیکن یا گیم مستر (ساخت بازی)" /> : null}
 				</section>
 				<section className="bd-panel rt-panel">
 					<h3>امتیازها و جوایز</h3>

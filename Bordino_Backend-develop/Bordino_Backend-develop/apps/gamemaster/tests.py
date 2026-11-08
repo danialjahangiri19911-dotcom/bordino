@@ -151,6 +151,20 @@ class GameMasterTests(TestCase):
         huge = {**draft, "story": "x" * 70_000}
         self.assertEqual(self.api.patch(f"/api/v1/gm/games/{game['id']}/", {"draft": huge}, format="json").status_code, 400)
 
+    def test_a_game_can_only_use_its_creators_own_uploads(self):
+        from apps.gamemaster.models import GameAsset  # pylint: disable=import-outside-toplevel
+
+        self.onboard()
+        theirs = GameAsset.objects.create(owner=services.profile(make_player("9120009005"), create=True), image="gm/" + "a" * 32 + ".png")
+        mine = GameAsset.objects.create(owner=services.profile(self.creator), image="gm/" + "b" * 32 + ".png")
+        gid = self.new_game({**quiz(), "cover": "../../mission-proofs/x.jpg"})
+        self.assertIsNone(body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["draft"]["cover"])  # not an upload: dropped
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": {**quiz(), "cover": theirs.image.name}}, format="json")
+        r = self.act(gid, "submit")
+        self.assertEqual((body(r)["code"], "images" in body(r)["fields"]), ("incomplete", True))
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": {**quiz(), "cover": mine.image.name}}, format="json")
+        self.assertEqual(self.act(gid, "submit").status_code, 200)
+
     def test_preview_checks_stages_and_records_nothing(self):
         self.onboard()
         gid = self.new_game(quiz())
@@ -350,3 +364,98 @@ class GameMasterTests(TestCase):
         r = body(self.player_api.post(f"{url}/steps/{engine.steps_of(m)[0].pk}/checkin/", {"answer": "a"}, format="json"))
         self.assertEqual((r["points"], r["finished"]), (0, True))
         self.assertEqual(MysteryCheckin.objects.get().points, 0)
+
+
+@override_settings(CACHES=LOCMEM)
+class GameMasterPaymentTests(TestCase):
+    """Publication fees through Zibal (sandbox first), packages, SMS, the budget-low notice."""
+
+    def setUp(self):
+        cache.clear()
+        self.flags = mock.patch.dict(services.DEFAULTS, {"GM_ACCESS": "all", "GM_FEE_BUSINESS_TOMAN": 50_000, "GM_INCLUDED_STAGES": 2, "GM_EXTRA_STAGE_TOMAN": 10_000})
+        self.flags.start()
+        self.addCleanup(self.flags.stop)
+        self.creator = make_player("9120009101", points=5000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.creator)
+        self.reviewer = get_user_model().objects.create_superuser(phone_number="9120009199", password="x-Pass-123")
+        self.api.patch("/api/v1/gm/profile/", {"preferred_mode": "creator", "intent": "business", "accept_terms": True, "business_name": "ک"}, format="json")
+        r = self.api.post("/api/v1/gm/games/", {"category": "business"}, format="json")
+        self.gid = body(r)["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{self.gid}/", {"draft": quiz()}, format="json")
+        self.api.post(f"/api/v1/gm/games/{self.gid}/submit/", {}, format="json")
+        self.version = GameVersion.objects.get(game_id=self.gid)
+        services.review(self.reviewer, self.version.pk, "approve")
+
+    def test_the_fee_is_set_at_approval_from_the_package_prices(self):
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.fee_toman, 50_000 + 2 * 10_000)  # 4 stages, 2 included
+
+    def test_publication_waits_for_payment_and_a_payment_counts_once(self):
+        r = self.api.post(f"/api/v1/gm/games/{self.gid}/publish/", {}, format="json")
+        self.assertEqual((r.status_code, body(r)["code"]), (402, "payment_required"))
+        start = body(self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json"))
+        self.assertEqual((start["mode"], start["amount_toman"]), ("sandbox", 70_000))
+        self.assertIn("/pwa/gm/pay/sandbox?trackId=sbx-", start["payment_url"])
+        again = body(self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json"))
+        self.assertEqual(again["track_id"], start["track_id"])  # an open payment is reused
+        # Someone else cannot confirm (or see) it.
+        other = APIClient()
+        other.force_authenticate(make_player("9120009102"))
+        self.assertEqual(other.post("/api/v1/gm/payments/verify/", {"trackId": start["track_id"], "success": "1"}, format="json").status_code, 404)
+        cancelled = body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": start["track_id"], "success": "0"}, format="json"))
+        self.assertEqual(cancelled["status"], "failed")
+        self.assertFalse(GameVersion.objects.get(pk=self.version.pk).fee_paid)
+        start = body(self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json"))
+        paid = body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": start["track_id"], "success": "1"}, format="json"))
+        twice = body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": start["track_id"], "success": "1"}, format="json"))
+        self.assertEqual((paid["status"], twice["status"]), ("paid", "paid"))
+        from apps.gamemaster.models import GamePayment  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(GamePayment.objects.filter(status="paid").count(), 1)
+        self.assertTrue(GameVersion.objects.get(pk=self.version.pk).fee_paid)
+        self.assertEqual(body(self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json"))["code"], "nothing_to_pay")
+        self.assertEqual(self.api.post(f"/api/v1/gm/games/{self.gid}/publish/", {}, format="json").status_code, 200)
+
+    def test_a_live_payment_is_checked_with_zibal_and_its_amount(self):
+        from apps.gamemaster import zibal  # pylint: disable=import-outside-toplevel
+
+        with mock.patch.dict(services.DEFAULTS, {"GM_ZIBAL_MODE": "live", "GM_ZIBAL_MERCHANT": "m-123"}), mock.patch.object(zibal, "_post") as post:
+            post.return_value = {"result": 100, "trackId": 777}
+            start = body(self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json"))
+            self.assertEqual(start["payment_url"], "https://gateway.zibal.ir/start/777")
+            sent = post.call_args.args[1]
+            self.assertEqual((sent["merchant"], sent["amount"]), ("m-123", 700_000))  # rial
+            post.return_value = {"result": 100, "amount": 1000, "refNumber": "R1"}  # a different amount
+            self.assertEqual(body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": "777", "success": "1"}, format="json"))["status"], "failed")
+            post.return_value = {"result": 100, "trackId": 778}
+            self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json")
+            post.return_value = {"result": 100, "amount": 700_000, "refNumber": "R2", "cardNumber": "6037****1234"}
+            paid = body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": "778", "success": "1"}, format="json"))
+            self.assertEqual((paid["status"], paid["ref_number"]), ("paid", "R2"))
+
+    def test_sms_goes_out_only_when_switched_on(self):
+        with mock.patch.object(services, "send_sms") as sms:
+            services._notify(Game.objects.get(pk=self.gid), "t", "b", "GM_SMS_TEMPLATE_APPROVED")
+            sms.assert_not_called()
+            with mock.patch.dict(services.DEFAULTS, {"GM_SMS_ENABLED": True}):
+                services._notify(Game.objects.get(pk=self.gid), "t", "b", "GM_SMS_TEMPLATE_APPROVED")
+            sms.assert_called_once()
+            self.assertEqual(sms.call_args.args[1], "gmApproved")
+
+    def test_the_creator_is_told_once_when_the_budget_runs_low(self):
+        with mock.patch.dict(services.DEFAULTS, {"GM_FEE_BUSINESS_TOMAN": 0}):
+            r = self.api.post(f"/api/v1/gm/games/{self.gid}/pay/", {}, format="json")
+            GameVersion.objects.filter(pk=self.version.pk).update(fee_paid=True)
+            self.assertEqual(self.api.post(f"/api/v1/gm/games/{self.gid}/publish/", {}, format="json").status_code, 200)
+        m = Mystery.objects.get()  # budget 1000 / 35 per player = 28 players
+        for n in range(27):
+            p = make_player(f"91200092{n:02d}")
+            MysteryRun.objects.create(customer=p.customer, mystery=m, step_started_at=timezone.now())
+        player = make_player("9120009299")
+        api = APIClient()
+        api.force_authenticate(player)
+        api.post(f"/api/v1/missions/mysteries/{m.pk}/start/", {}, format="json")
+        api.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{engine.steps_of(m)[0].pk}/checkin/", {"answer": "1404"}, format="json")
+        api.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{engine.steps_of(m)[1].pk}/checkin/", {"answer": "ب"}, format="json")
+        self.assertEqual(GameAuditLog.objects.filter(game_id=self.gid, action="budget_low").count(), 1)

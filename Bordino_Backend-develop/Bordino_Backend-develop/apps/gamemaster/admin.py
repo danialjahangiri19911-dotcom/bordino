@@ -6,7 +6,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from apps.gamemaster import budget, schema, services
-from apps.gamemaster.models import CreatorProfile, Game, GameAuditLog, GameBudgetLedger, GameReview, GameVersion
+from apps.gamemaster.models import CreatorProfile, Game, GameAuditLog, GameBudgetLedger, GamePayment, GameReview, GameVersion
 
 STAGE_NAMES = {
     "question": "پرسش",
@@ -187,3 +187,11 @@ class GameBudgetLedgerAdmin(ReadOnlyAdmin):
     list_filter = ("kind",)
     search_fields = ("game__title", "key")
     list_select_related = ("game", "version")
+
+
+@admin.register(GamePayment)
+class GamePaymentAdmin(ReadOnlyAdmin):
+    list_display = ("create_time", "game", "creator", "amount_toman", "mode", "status", "ref_number", "verified_at")
+    list_filter = ("status", "mode")
+    search_fields = ("game__title", "track_id", "ref_number", "creator__user__phone_number")
+    list_select_related = ("game", "creator__user")

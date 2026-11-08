@@ -62,6 +62,26 @@ def on_payout(run: MysteryRun, step, points: int, bonus: int):
         key=f"spend:{run.pk}:{step.pk}",
         defaults={"game": version.game, "version": version, "kind": Kind.SPEND, "points": points + bonus},
     )
+    _warn_if_low(version, mystery)
+
+
+# When only this many more players can still start, the creator is told (once per version).
+LOW_PLAYERS = 2
+
+
+def _warn_if_low(version: GameVersion, mystery):
+    from apps.gamemaster.models import GameAuditLog  # pylint: disable=import-outside-toplevel
+    from apps.missions.mystery import funded_runs  # pylint: disable=import-outside-toplevel
+
+    funded = funded_runs(mystery)
+    if funded is None or funded - mystery.runs.count() > LOW_PLAYERS:
+        return
+    if GameAuditLog.objects.filter(game=version.game, action="budget_low", data__version=version.number).exists():
+        return
+    GameAuditLog.objects.create(game=version.game, action="budget_low", data={"version": version.number})
+    from apps.gamemaster.services import _notify  # pylint: disable=import-outside-toplevel
+
+    _notify(version.game, "بودجهٔ بازی تو رو به پایان است", f"«{version.game.title}»: بودجه فقط برای چند بازیکن دیگر کافی است.")
 
 
 def summary(version: GameVersion) -> dict:

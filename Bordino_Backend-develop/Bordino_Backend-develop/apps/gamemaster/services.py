@@ -8,6 +8,7 @@ Rules kept here (the API and the admin only call these):
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -15,8 +16,8 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from apps.configuration.models.system_configuration import SystemConfiguration
-from apps.gamemaster import budget, schema, starters
-from apps.gamemaster.models import CreatorProfile, Game, GameAuditLog, GameReview, GameVersion
+from apps.gamemaster import budget, schema, starters, zibal
+from apps.gamemaster.models import CreatorProfile, Game, GameAuditLog, GamePayment, GameReview, GameVersion
 from apps.missions import mystery as engine
 from apps.missions.models import Mystery, MysteryStep
 
@@ -33,6 +34,16 @@ DEFAULTS = {
     "GM_FEE_BUSINESS_TOMAN": 0,
     "GM_FEE_PERSONAL_TOMAN": 0,
     "GM_FEE_PRO_TOMAN": 0,
+    # Packages: a fee covers this many stages; each stage beyond them adds this much (toman).
+    "GM_INCLUDED_STAGES": 5,
+    "GM_EXTRA_STAGE_TOMAN": 0,
+    # Zibal: "sandbox" (the first step: no money moves), "test" (Zibal's test merchant), "live".
+    "GM_ZIBAL_MODE": "sandbox",
+    "GM_ZIBAL_MERCHANT": "",
+    # SMS (Kavenegar templates, approved in Kavenegar's panel; %token10% = the game's title).
+    "GM_SMS_TEMPLATE_APPROVED": "gmApproved",
+    "GM_SMS_TEMPLATE_CHANGES": "gmChanges",
+    "GM_SMS_TEMPLATE_PUBLISHED": "gmPublished",
     # How many games a creator may have open (not archived) at once.
     "GM_MAX_OPEN_GAMES": 10,
     # Future phases, off until approved.
@@ -79,13 +90,34 @@ def audit(game, actor, action: str, **data):
     GameAuditLog.objects.create(game=game, actor=actor, action=action, data=data)
 
 
-def _notify(game: Game, title: str, body: str):
+def _notify(game: Game, title: str, body: str, sms: str | None = None):
+    """The creator's in-app/push notice; and an SMS (a Kavenegar template) when SMS is switched on."""
     from apps.notifications import services as notifications  # pylint: disable=import-outside-toplevel
 
     try:
         notifications.queue(game.owner.user.customer, "account", title, body, url=f"/pwa/gm/games/{game.pk}")
     except Exception:  # pylint: disable=broad-except
         pass  # a notice is a courtesy, never the reason an action fails
+    if sms and setting("GM_SMS_ENABLED"):
+        send_sms(game.owner.user.phone_number, str(setting(sms) or ""), game.title)
+
+
+def send_sms(phone: str, template: str, title: str) -> bool:
+    """One Game Master SMS through Bordino's Kavenegar account (verify lookup, like the login code)."""
+    if not template or not phone:
+        return False
+    try:
+        from kavenegar import KavenegarAPI  # pylint: disable=import-outside-toplevel
+
+        from apps.user_management.services.utils import normalize_phone_number  # pylint: disable=import-outside-toplevel
+
+        words = " ".join(str(title).split()[:5])[:60] or "بردینو"
+        KavenegarAPI(settings.KAVENEGAR_API_KEY).verify_lookup(
+            {"receptor": normalize_phone_number(phone), "template": template, "token": "بردینو", "token10": words, "type": "sms"}
+        )
+        return True
+    except Exception:  # pylint: disable=broad-except
+        return False  # never the reason a review or a publication fails
 
 
 # ── the creator ──
@@ -219,6 +251,13 @@ def submit(user, game_id) -> GameVersion:
             raise GameMasterError("یک نسخه از این بازی همین حالا در بررسی است.", "locked")
         definition = schema.clean(game.draft)
         errors = schema.check(definition)
+        used = schema.images(definition)
+        if used:
+            from apps.gamemaster.models import GameAsset  # pylint: disable=import-outside-toplevel
+
+            mine = set(GameAsset.objects.filter(owner=game.owner, image__in=used).values_list("image", flat=True))
+            if used - mine:
+                errors["images"] = "یکی از تصویرها مال این حساب نیست؛ دوباره بارگذاری‌اش کن."
         if errors:
             raise GameMasterError("چند چیز هنوز کامل نیست.", "incomplete", errors)
         number = (game.versions.order_by("-number").values_list("number", flat=True).first() or 0) + 1
@@ -257,7 +296,7 @@ def review(reviewer, version_id, decision: str, note: str = "") -> GameVersion:
         live = game.status in LIVE
         if decision == GameReview.Decision.APPROVE:
             version.status = VStatus.APPROVED
-            version.fee_toman = int(setting(f"GM_FEE_{game.category.upper()}_TOMAN") or 0)
+            version.fee_toman = fee_for(game.category, version.definition)
             if not live:
                 game.status = Status.APPROVED
         elif decision == GameReview.Decision.REJECT:
@@ -276,12 +315,81 @@ def review(reviewer, version_id, decision: str, note: str = "") -> GameVersion:
         GameReview.objects.create(version=version, reviewer=reviewer, decision=decision, note=note[:2000])
         audit(game, reviewer, f"review_{decision}", version=version.number, note=note[:300])
     texts = {
-        "approve": ("بازی تو تأیید شد", f"«{game.title}» تأیید شد؛ حالا می‌توانی منتشرش کنی."),
-        "reject": ("بازی تو رد شد", f"«{game.title}»: {note}"),
-        "changes": ("بازی تو اصلاح لازم دارد", f"«{game.title}»: {note}"),
+        "approve": ("بازی تو تأیید شد", f"«{game.title}» تأیید شد؛ حالا می‌توانی منتشرش کنی.", "GM_SMS_TEMPLATE_APPROVED"),
+        "reject": ("بازی تو رد شد", f"«{game.title}»: {note}", "GM_SMS_TEMPLATE_CHANGES"),
+        "changes": ("بازی تو اصلاح لازم دارد", f"«{game.title}»: {note}", "GM_SMS_TEMPLATE_CHANGES"),
     }
     _notify(game, *texts[decision])
     return version
+
+
+# ── fees (Zibal) ──
+
+
+def fee_for(category: str, definition: dict) -> int:
+    """The publication fee (toman) from today's prices: the category's base, plus each stage beyond
+    the ones it includes (a bigger personal game is a bigger package)."""
+    base = int(setting(f"GM_FEE_{category.upper()}_TOMAN") or 0)
+    if not base:
+        return 0
+    extra = max(0, len(definition.get("stages") or []) - int(setting("GM_INCLUDED_STAGES") or 0))
+    return base + extra * int(setting("GM_EXTRA_STAGE_TOMAN") or 0)
+
+
+def start_payment(user, game_id) -> tuple[GamePayment, str]:
+    """The approved version's fee: a Zibal transaction (an open one is reused) and where to pay it."""
+    with transaction.atomic():
+        game = owned(user, game_id, lock=True)
+        version = game.versions.select_for_update().filter(status=VStatus.APPROVED).order_by("-number").first()
+        if version is None:
+            raise GameMasterError("نسخهٔ تأییدشده‌ای برای پرداخت نیست.", "not_approved")
+        if not version.fee_toman or version.fee_paid:
+            raise GameMasterError("این نسخه پرداختی لازم ندارد.", "nothing_to_pay")
+        mode = zibal.mode()
+        open_one = version.payments.filter(status=GamePayment.Status.PENDING, mode=mode, create_time__gte=timezone.now() - timedelta(minutes=20)).first()
+        base = public_base()
+        callback = f"{base}/pwa/gm/pay/callback"
+        if open_one is None:
+            try:
+                track = zibal.request(version.fee_toman, f"انتشار بازی «{game.title}» در بردینو", callback, str(version.pk), user.phone_number or "")
+            except zibal.ZibalError as exc:
+                raise GameMasterError(str(exc), "gateway") from exc
+            open_one = GamePayment.objects.create(
+                creator=game.owner, game=game, version=version, amount_toman=version.fee_toman, track_id=track, mode=mode
+            )
+            audit(game, user, "payment_start", track=track, amount=version.fee_toman, mode=mode)
+    sandbox = f"{base}/pwa/gm/pay/sandbox?trackId={open_one.track_id}&amount={open_one.amount_toman}"
+    return open_one, zibal.pay_url(open_one.track_id, sandbox)
+
+
+def confirm_payment(user, track_id: str, success: bool) -> GamePayment:
+    """The payer is back from Zibal (or the sandbox page): asks Zibal, marks it paid once."""
+    with transaction.atomic():
+        payment = GamePayment.objects.select_for_update().select_related("version", "game", "creator").filter(track_id=str(track_id or "")).first()
+        if payment is None or payment.creator.user_id != user.pk:
+            raise _not_found()
+        if payment.status == GamePayment.Status.PAID:
+            return payment  # again (a reload): already done
+        if payment.mode != zibal.mode():
+            raise GameMasterError("حالت درگاه عوض شده؛ دوباره پرداخت کن.", "gateway")
+        if not success and payment.mode == "sandbox":
+            payment.status = GamePayment.Status.FAILED
+            payment.save(update_fields=["status", "update_time"])
+            return payment
+        try:
+            result = zibal.verify(payment.track_id, sandbox_success=success)
+        except zibal.ZibalError as exc:
+            raise GameMasterError(str(exc), "gateway") from exc
+        if result.ok and result.amount_rial is not None and result.amount_rial != payment.amount_toman * 10:
+            result.ok = False  # paid a different amount: not this fee
+        payment.status = GamePayment.Status.PAID if result.ok else GamePayment.Status.FAILED
+        payment.ref_number, payment.card = result.ref_number[:64], result.card[:32]
+        payment.verified_at = timezone.now()
+        payment.save(update_fields=["status", "ref_number", "card", "verified_at", "update_time"])
+        if result.ok:
+            GameVersion.objects.filter(pk=payment.version_id).update(fee_paid=True)
+        audit(payment.game, user, "payment_" + payment.status, track=payment.track_id, ref=payment.ref_number, mode=payment.mode)
+    return payment
 
 
 # ── publication ──
@@ -369,7 +477,7 @@ def publish(user, game_id) -> Game:
         audit(game, user, "publish", version=version.number, mystery=str(mystery.pk))
     if previous is not None:
         budget.release(previous, "replaced")  # (its own transaction; once per version)
-    _notify(game, "بازی تو منتشر شد", f"«{game.title}» حالا برای بازیکنان باز است.")
+    _notify(game, "بازی تو منتشر شد", f"«{game.title}» حالا برای بازیکنان باز است.", "GM_SMS_TEMPLATE_PUBLISHED")
     return game
 
 

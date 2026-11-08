@@ -211,3 +211,34 @@ class GameAsset(AbstractBaseModel):
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("تصویر سازنده")
         verbose_name_plural = _("تصاویر سازندگان")
+
+
+class GamePayment(AbstractBaseModel):
+    """A creator's payment through Zibal (a publication fee): one per trackId, confirmed once."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("در انتظار پرداخت")
+        PAID = "paid", _("پرداخت شد")
+        FAILED = "failed", _("ناموفق")
+
+    class Purpose(models.TextChoices):
+        FEE = "fee", _("هزینهٔ انتشار")
+
+    creator = models.ForeignKey(CreatorProfile, on_delete=models.PROTECT, related_name="payments", verbose_name=_("سازنده"))
+    game = models.ForeignKey(Game, on_delete=models.PROTECT, related_name="payments", verbose_name=_("بازی"))
+    version = models.ForeignKey(GameVersion, on_delete=models.PROTECT, related_name="payments", verbose_name=_("نسخه"))
+    purpose = models.CharField(max_length=10, choices=Purpose.choices, default=Purpose.FEE, verbose_name=_("برای"))
+    amount_toman = models.PositiveIntegerField(verbose_name=_("مبلغ (تومان)"))
+    track_id = models.CharField(max_length=64, unique=True, verbose_name=_("شناسهٔ زیبال"))
+    mode = models.CharField(max_length=10, verbose_name=_("حالت درگاه"), help_text=_("sandbox = آزمایشی، بدون جابه‌جایی پول."))
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, verbose_name=_("وضعیت"))
+    ref_number = models.CharField(max_length=64, blank=True, verbose_name=_("شمارهٔ پیگیری"))
+    card = models.CharField(max_length=32, blank=True, verbose_name=_("کارت"))
+    verified_at = models.DateTimeField(null=True, blank=True, verbose_name=_("زمان تأیید"))
+
+    class Meta(AbstractBaseModel.Meta):
+        verbose_name = _("پرداخت سازنده")
+        verbose_name_plural = _("پرداخت‌های سازندگان")
+
+    def __str__(self):
+        return f"{self.game} — {self.amount_toman} تومان ({self.get_status_display()})"
