@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -59,6 +60,9 @@ const STAGE_HELP: Record<StageType, string> = {
 	reward: "یک کد تخفیف یا پیام هدیه نشان داده می‌شود.",
 };
 
+// The map (Leaflet) only in the browser, and only once a stage's place is edited.
+const MapPicker = dynamic(() => import("./MapPicker"), { ssr: false, loading: () => <div className="gm-map gm-map-loading">در حال باز کردن نقشه…</div> });
+
 const DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String(DIGITS.indexOf(d))).replace(/٫/g, ".").replace(/،/g, ",");
 
@@ -111,6 +115,7 @@ function ImagePick({ value, onChange, disabled }: { value: string | null; onChan
 					</button>
 				) : null}
 			</div>
+			<small className="bd-muted gm-copyright">فقط تصویری که خودت گرفته‌ای یا اجازهٔ استفاده‌اش را داری؛ حق نشر دیگران را رعایت کن.</small>
 			{problem ? <Notice>{problem}</Notice> : null}
 		</div>
 	);
@@ -134,7 +139,21 @@ function PointField({ stage, set, disabled }: { stage: Stage; set: (patch: Parti
 	};
 	return (
 		<div className="gm-point">
-			<Field label="مختصات محل" hint="در گوگل‌مپ یا نشان روی محل نگه دار و عددها را اینجا بچسبان، یا وقتی آنجایی «موقعیت فعلی من» را بزن.">
+			<div className="gm-field">
+				<span>محل روی نقشه</span>
+				<MapPicker
+					lat={stage.lat}
+					lng={stage.lng}
+					radius={stage.radius_m}
+					disabled={disabled}
+					onPick={(lat, lng) => {
+						setText(`${lat}, ${lng}`);
+						set({ lat, lng });
+					}}
+				/>
+				<small className="bd-muted">روی نقشه بزن تا نشانگر آنجا برود، یا نشانگر را بکش. دایره، شعاعی است که بازیکن باید در آن باشد.</small>
+			</div>
+			<Field label="مختصات محل" hint="یا عددها را از گوگل‌مپ یا نشان اینجا بچسبان، یا وقتی آنجایی «موقعیت فعلی من» را بزن.">
 				<input
 					dir="ltr"
 					value={text}
@@ -458,7 +477,7 @@ function PreviewRunner({ game }: { game: GameFull }) {
 			) : null}
 			{result?.ok ? (
 				<button type="button" className="bd-action" onClick={() => setI(i + 1)}>
-					مرحلهٔ بعد <Icon name="arrow-right" />
+					مرحلهٔ بعد <Icon name="arrow-left" />
 				</button>
 			) : null}
 		</div>
@@ -712,7 +731,7 @@ export default function Editor({ id }: { id: string }) {
 						<ImagePick value={d.cover} disabled={locked} onChange={(cover) => set({ cover })} />
 					</Field>
 					<button type="button" className="bd-action" onClick={() => setTab("stages")}>
-						بعدی: مرحله‌ها <Icon name="arrow-right" />
+						بعدی: مرحله‌ها <Icon name="arrow-left" />
 					</button>
 				</Panel>
 			) : null}
@@ -772,7 +791,7 @@ export default function Editor({ id }: { id: string }) {
 						</Panel>
 					) : null}
 					<button type="button" className="bd-action" onClick={() => setTab("audience")}>
-						بعدی: مخاطب و زمان <Icon name="arrow-right" />
+						بعدی: مخاطب و زمان <Icon name="arrow-left" />
 					</button>
 				</>
 			) : null}
@@ -812,7 +831,7 @@ export default function Editor({ id }: { id: string }) {
 						<input type="number" inputMode="numeric" dir="ltr" min={1} value={d.capacity ?? ""} disabled={locked} onChange={(e) => set({ capacity: e.target.value ? Number(e.target.value) : null })} />
 					</Field>
 					<button type="button" className="bd-action" onClick={() => setTab("rewards")}>
-						بعدی: جایزه و بودجه <Icon name="arrow-right" />
+						بعدی: جایزه و بودجه <Icon name="arrow-left" />
 					</button>
 				</Panel>
 			) : null}
@@ -844,7 +863,7 @@ export default function Editor({ id }: { id: string }) {
 					</ul>
 					{run > 0 && (d.budget_points || 0) < run ? <Notice>بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({fa(run)}) باشد.</Notice> : null}
 					<button type="button" className="bd-action" onClick={() => setTab("preview")}>
-						بعدی: امتحان بازی <Icon name="arrow-right" />
+						بعدی: امتحان بازی <Icon name="arrow-left" />
 					</button>
 				</Panel>
 			) : null}

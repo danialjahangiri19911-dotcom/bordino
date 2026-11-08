@@ -115,7 +115,7 @@ export function Dashboard() {
 					text="یک قالب انتخاب کن: تولد معمایی، چالش QR فروشگاه، گنج‌یابی شهری یا مسابقه."
 					action={
 						<Link href={GM.create} className="bd-action">
-							ساخت اولین بازی <Icon name="arrow-right" />
+							ساخت اولین بازی <Icon name="arrow-left" />
 						</Link>
 					}
 				/>
