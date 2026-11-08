@@ -110,6 +110,12 @@ def unavailable(
     return None
 
 
+def in_grace(mystery: Mystery, now=None) -> bool:
+    """Ended for newcomers, but those already playing may still finish."""
+    now = now or timezone.now()
+    return bool(mystery.ends_at and now >= mystery.ends_at and mystery.grace_ends_at and now < mystery.grace_ends_at)
+
+
 def steps_of(mystery: Mystery) -> list[MysteryStep]:
     return list(mystery.steps.order_by("order", "create_time"))
 
@@ -134,14 +140,18 @@ class View:
 def listing(customer: Customer) -> list[View]:
     """The mysteries in «دریافت امتیاز», each with this player's progress."""
     now = timezone.now()
+    # A creator game's older version the player is still in (hidden since a new version replaced
+    # it) stays in their list; the newer one of the same edition does not (one game per edition).
+    mine = MysteryRun.objects.filter(customer=customer, mystery__series__isnull=False).values_list("mystery_id", flat=True)
     mysteries = list(
-        Mystery.objects.filter(is_visible=True)
+        Mystery.objects.filter(Q(is_visible=True) | Q(pk__in=mine))
         .exclude(access=Mystery.Access.PRIVATE)
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now - SHOW_ENDED_FOR))
     )
     if not mysteries:
         return []
     ids = [m.pk for m in mysteries]
+    playing = {(s, e) for s, e in Mystery.objects.filter(pk__in=list(mine)).values_list("series", "edition")}
 
     def per_mystery(qs, field, value):
         return dict(qs.values_list(field).annotate(n=value).values_list(field, "n"))
@@ -154,12 +164,16 @@ def listing(customer: Customer) -> list[View]:
     views = []
     for m in mysteries:
         run = runs.get(m.pk)
-        # A creator's game is listed only to its audience, and not while paused (its players still
-        # see theirs).
-        if run is None and m.is_creator_game and (not m.is_active or outside_audience(customer, m)):
+        # A creator's game is listed only to its audience, and not while paused or once ended (its
+        # players still see theirs); nor a version of an edition the player is already in.
+        if run is None and m.is_creator_game and (
+            not m.is_active or outside_audience(customer, m) or (m.ends_at and now >= m.ends_at) or (m.series, m.edition) in playing
+        ):
             continue
         max_run = (step_points.get(m.pk) or 0) + m.finish_points
         reason = unavailable(m, now, n_runs.get(m.pk, 0), n_steps.get(m.pk, 0), max_run)
+        if run and reason == "expired" and in_grace(m, now):
+            reason = None  # ended for newcomers; its players may still finish
         if run and run.status == RunStatus.COMPLETED:
             state = "done"
         elif run and reason not in (None, "full"):
@@ -179,9 +193,16 @@ def view_of(customer: Customer, mystery_id) -> View:
     # Hidden from the list but being played (or finished): still shown to its player.
     mystery = Mystery.objects.filter(pk=mystery_id).annotate(n_steps=Count("steps", distinct=True)).first()
     run = MysteryRun.objects.filter(customer=customer, mystery=mystery).first() if mystery else None
+    if run is None and mystery is not None and mystery.series:
+        # Another version of the same edition is the one this player plays.
+        run = edition_run(customer, mystery)
+        if run is not None:
+            mystery = Mystery.objects.filter(pk=run.mystery_id).annotate(n_steps=Count("steps", distinct=True)).first()
     if run is None:
         raise not_found()
     reason = unavailable(mystery, steps=mystery.n_steps, started=0)
+    if reason == "expired" and in_grace(mystery):
+        reason = None
     state = "done" if run.status == RunStatus.COMPLETED else (reason or "in_progress")
     total = sum(s.points for s in mystery.steps.all()) + mystery.finish_points
     return View(mystery, state, mystery.n_steps, run.checkins.count(), total, run)
@@ -190,8 +211,22 @@ def view_of(customer: Customer, mystery_id) -> View:
 # ── playing ──
 
 
+def edition_run(customer: Customer, mystery: Mystery) -> MysteryRun | None:
+    """The player's game in this creator game's edition (whichever version they started), if any."""
+    if not mystery.series:
+        return None
+    return (
+        MysteryRun.objects.filter(customer=customer, mystery__series=mystery.series, mystery__edition=mystery.edition)
+        .order_by("create_time")
+        .first()
+    )
+
+
 def _new_run(customer: Customer, mystery: Mystery) -> MysteryRun:
-    """A new game, checked: open, not full (nor past its budget), and for this audience."""
+    """A new game, checked: open, not full (nor past its budget), for this audience, and not an
+    edition this player already plays (a new version of a game is not a second chance at its points)."""
+    if edition_run(customer, mystery) is not None:
+        raise MissionError("این بازی را قبلاً شروع کرده‌ای؛ از «دریافت امتیاز» همان را ادامه بده.", "played")
     reason = unavailable(mystery)
     if reason:
         raise MissionError(UNAVAILABLE[reason], reason)
@@ -209,7 +244,7 @@ def start(customer: Customer, mystery_id, invite: str | None = None) -> MysteryR
         mystery = Mystery.objects.select_for_update().filter(pk=mystery_id).first()
         if mystery is None:
             raise not_found()
-        run = MysteryRun.objects.filter(customer=customer, mystery=mystery).first()
+        run = MysteryRun.objects.filter(customer=customer, mystery=mystery).first() or edition_run(customer, mystery)
         if run:
             return run
         if mystery.access == Mystery.Access.PRIVATE:
@@ -243,11 +278,12 @@ class Result:
 
 
 def _check_open(mystery: Mystery):
-    """A running game can go on unless the mystery was switched off or has ended."""
+    """A running game can go on unless the mystery was switched off or has ended (and the time its
+    players were given to finish, if any, is over too). Checked on every move: no timer needed."""
     now = timezone.now()
     if not mystery.is_active:
         raise MissionError(UNAVAILABLE["inactive"], "inactive")
-    if mystery.ends_at and now >= mystery.ends_at:
+    if mystery.ends_at and now >= mystery.ends_at and not (mystery.grace_ends_at and now < mystery.grace_ends_at):
         raise MissionError(UNAVAILABLE["expired"], "expired")
     if mystery.starts_at and now < mystery.starts_at:
         raise MissionError(UNAVAILABLE["upcoming"], "upcoming")

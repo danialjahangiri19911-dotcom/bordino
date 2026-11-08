@@ -1,6 +1,9 @@
 """Game Master API (/api/v1/gm/…): the creator's own games only (another creator's is «not found»)."""
 
-from django.db.models import Count, Q
+from datetime import timedelta
+
+from django.db.models import Count, Max, Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -12,8 +15,10 @@ from drf_spectacular.utils import extend_schema
 
 from apps.gamemaster import budget, schema, services, starters
 from apps.gamemaster.models import CreatorProfile, Game, GameAsset, GameVersion
+from apps.missions import leaderboard as boards
 from apps.missions import mystery as engine
 from apps.missions import services as mission_services
+from apps.missions.models import Mystery, MysteryCheckin, MysteryRun
 
 TAGS = ["gamemaster"]
 
@@ -81,11 +86,15 @@ def game_payload(game: Game, full: bool = False) -> dict:
         "latest_version": version_payload(latest),
         "live_version": version_payload(game.live_version),
         "mystery_id": str(game.live_version.mystery.pk) if game.live_version and getattr(game.live_version, "mystery", None) else None,
+        "edition": game.edition,
+        "leaderboard": (game.draft or {}).get("leaderboard", {}).get("preset", "none"),
+        **lifetime(game),
     }
     if full:
         draft = schema.clean(game.draft or {})
         body["draft"] = draft
-        body["problems"] = schema.check(draft)
+        body["problems"] = services.problems(game, draft)
+        body["next_publish"] = next_publish(game)
         body["max_run_points"] = schema.max_run_points(draft)
         live = game.live_version
         if live is not None and getattr(live, "mystery", None) is not None:
@@ -94,6 +103,107 @@ def game_payload(game: Game, full: bool = False) -> dict:
         if body["share"]["kind"] == "invite":
             body["invite_url"] = body["share"]["url"]
     return body
+
+
+def lifetime(game: Game) -> dict:
+    """The live edition's dates and players (for the dashboard): when it ends, how long is left,
+    and how many enrolled, are playing, finished."""
+    live = game.live_version
+    mystery = getattr(live, "mystery", None) if live else None
+    if mystery is None:
+        return {"expires_at": None, "grace_ends_at": None, "days_left": None, "players": 0, "active": 0, "finished": 0, "board_final": False}
+    now = timezone.now()
+    runs = MysteryRun.objects.filter(mystery__in=boards.scope_mysteries(mystery))
+    counts = runs.aggregate(
+        players=Count("customer", distinct=True),
+        finished=Count("customer", distinct=True, filter=Q(status=MysteryRun.Status.COMPLETED)),
+    )
+    active = (
+        runs.filter(status=MysteryRun.Status.ACTIVE)
+        .annotate(last=Max("checkins__create_time"))
+        .filter(Q(last__gte=now - timedelta(days=7)) | Q(last__isnull=True, create_time__gte=now - timedelta(days=7)))
+        .count()
+    )
+    left = (mystery.ends_at - now).total_seconds() / 86400 if mystery.ends_at else None
+    return {
+        "expires_at": mystery.ends_at.isoformat() if mystery.ends_at else None,
+        "grace_ends_at": mystery.grace_ends_at.isoformat() if mystery.grace_ends_at else None,
+        "days_left": max(0, int(left + 0.999)) if left is not None else None,
+        "players": counts["players"],
+        "active": active,
+        "finished": counts["finished"],
+        "board_final": boards.snapshot_of(mystery) is not None,
+    }
+
+
+def next_publish(game: Game) -> str:
+    """What publishing the approved version would do: "first" (the first edition), "continue" (the
+    same edition, its players and board go on; or "new" if chosen), or "new_only" (the edition is over
+    for good: a new edition)."""
+    live = game.live_version
+    mystery = getattr(live, "mystery", None) if live else None
+    if mystery is None:
+        return "first"
+    if game.status == Game.Status.EXPIRED:
+        end = boards.ended_at(mystery)
+        if boards.snapshot_of(mystery) is not None or (end and end <= timezone.now()):
+            return "new_only"
+    return "continue"
+
+
+class OptionsView(APIView):
+    """What the editor offers: the leaderboard presets (with their defaults), metrics and limits."""
+
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=TAGS, summary="Leaderboard presets and availability limits")
+    def get(self, request):
+        categories = {c: services.leaderboard_allowed(c) for c in Game.Category.values}
+        return Response(
+            {
+                "leaderboard": {
+                    "presets": {k: {**boards.preset_config(k), "name": v["name"]} for k, v in boards.PRESETS.items()},
+                    "metrics": boards.METRICS,
+                    "unsupported_metrics": boards.UNSUPPORTED_METRICS,
+                    "periods": list(boards.PERIODS),
+                    "future_periods": list(boards.FUTURE_PERIODS),
+                    "tops": list(boards.TOPS),
+                    "teams": False,
+                    "categories": categories,
+                },
+                "availability": {
+                    "max_days": {c: int(services.setting(f"GM_MAX_DAYS_{c.upper()}") or 0) for c in Game.Category.values},
+                    "max_grace_hours": int(services.setting("GM_MAX_GRACE_HOURS") or 0),
+                    "zone": "Asia/Tehran",
+                },
+            }
+        )
+
+
+class GameBoardView(APIView):
+    """My game's leaderboard as I (its creator) see it: every row, names masked unless a player
+    chose to show theirs."""
+
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(tags=TAGS, summary="Leaderboard of my game")
+    def get(self, request, game_id):
+        try:
+            game = services.owned(request.user, game_id)
+        except services.GameMasterError as exc:
+            return _error(exc)
+        live = game.live_version
+        mystery = getattr(live, "mystery", None) if live else None
+        if mystery is None:
+            return Response({"board": None})
+        return Response({"board": boards.board(mystery, None, _int(request.query_params.get("offset")), 50, staff=True, request=request)})
+
+
+def _int(value) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 class ProfileView(APIView):
@@ -133,7 +243,7 @@ class GamesView(APIView):
             p = services.creator(request.user)
         except services.GameMasterError as exc:
             return _error(exc)
-        for game in Game.objects.filter(owner=p, status__in=services.LIVE):
+        for game in Game.objects.filter(owner=p, status__in=services.PLAYED):
             services.settle(game)
         games = Game.objects.filter(owner=p).select_related("live_version").order_by("-update_time")
         counts = dict(Game.objects.filter(owner=p).values_list("status").annotate(n=Count("id")).values_list("status", "n"))
@@ -173,7 +283,7 @@ class GameView(APIView):
 
 ACTIONS = {
     "submit": lambda user, gid, data: services.submit(user, gid),
-    "publish": lambda user, gid, data: services.publish(user, gid),
+    "publish": lambda user, gid, data: services.publish(user, gid, new_edition=data.get("new_edition") is True),
     "pause": lambda user, gid, data: services.set_paused(user, gid, True),
     "resume": lambda user, gid, data: services.set_paused(user, gid, False),
     "archive": lambda user, gid, data: services.archive(user, gid),
@@ -266,6 +376,41 @@ class ShareView(APIView):
         return Response({**info, "svg": svg})
 
 
+def audience_numbers(mystery: Mystery) -> dict:
+    """This edition's players, counted separately (never one for another): enrolled (joined), started
+    (solved at least one stage), active (moved in the last 7 days and not done), completed; and
+    the stage proofs, verified visits and rewards claimed. Aggregates only: no player is named."""
+    now = timezone.now()
+    scope = boards.scope_mysteries(mystery)
+    runs = MysteryRun.objects.filter(mystery__in=scope).annotate(done=Count("checkins", distinct=True), last=Max("checkins__create_time"))
+    enrolled = started = active = completed = 0
+    progress = 0.0
+    totals = dict(scope.annotate(n=Count("steps", distinct=True)).values_list("pk", "n"))
+    for run in runs.only("id", "status", "mystery_id", "create_time"):
+        enrolled += 1
+        total = totals.get(run.mystery_id) or 0
+        progress += (run.done / total) if total else 0
+        if run.done:
+            started += 1
+        if run.status == MysteryRun.Status.COMPLETED:
+            completed += 1
+        elif (run.last or run.create_time) >= now - timedelta(days=7):
+            active += 1
+    checkins = MysteryCheckin.objects.filter(step__mystery__in=scope)
+    return {
+        "enrolled": enrolled,
+        "started_playing": started,
+        "active": active,
+        "completed_players": completed,
+        "completion_rate": round(100 * completed / enrolled) if enrolled else 0,
+        "average_progress": round(100 * progress / enrolled) if enrolled else 0,
+        "stage_completions": checkins.count(),
+        "verified_visits": checkins.filter(step__proof="qr", step__qr_rotating=True).count(),
+        "reward_claims": checkins.exclude(step__coupon_text="").count(),
+        "edition": mystery.edition,
+    }
+
+
 class AnalyticsView(APIView):
     """My game's numbers: players, finishes, visits per stage, budget (aggregated; no player data)."""
 
@@ -282,11 +427,20 @@ class AnalyticsView(APIView):
         if mystery is None:
             return Response({"analytics": None})
         r = engine.report(mystery)
+        people = audience_numbers(mystery)
+        reached = [row["total"] for row in r["steps"]]
         return Response(
             {
                 "analytics": {
+                    **people,
+                    # (kept for the older app: this version's own numbers)
                     "started": r["started"],
                     "completed": r["completed"],
+                    "drop_off": [
+                        round(100 * (1 - n / prev)) if prev else 0
+                        for prev, n in zip([people["enrolled"]] + reached[:-1], reached)
+                    ],
+                    "leaderboard": (mystery.leaderboard or {}).get("preset", "none"),
                     "days": [d.isoformat() for d in r["days"]],
                     "stages": [
                         {

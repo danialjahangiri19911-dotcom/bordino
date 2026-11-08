@@ -26,7 +26,10 @@
     <li>دسترسی: {% if d.access == "private" %}خصوصی (فقط با لینک دعوت){% else %}عمومی{% endif %}</li>
     <li>ارائه‌دهنده: {{ d.presenter|default:"—" }}</li>
     <li>محدوده: {{ d.area|default:"—" }}</li>
-    <li>زمان: {{ d.starts_at|default:"از انتشار" }} تا {{ d.ends_at|default:"بدون پایان" }}</li>
+    <li>شروع: {{ d.starts_at|default:"از انتشار" }}</li>
+    <li>پایان و بعد از آن: <b>{{ availability_text }}</b></li>
+    <li>جدول رده‌بندی: <b>{{ board_text }}</b></li>
+    {% if extension %}<li class="gm-secret">این بازی قبلاً منتشر شده؛ این نسخه تمدید یا اصلاح آن است.</li>{% endif %}
     <li>ظرفیت: {{ d.capacity|default:"بدون سقف" }}</li>
     <li>مخاطب: سن {{ d.audience.age_min|default:"—" }} تا {{ d.audience.age_max|default:"—" }} · {% if d.audience.gender == "M" %}آقایان{% elif d.audience.gender == "F" %}خانم‌ها{% else %}همه{% endif %}</li>
     <li>جایزهٔ پایان: {{ d.finish_points }} · بیشترین جایزهٔ یک بازیکن: <b>{{ max_run }}</b> امتیاز</li>

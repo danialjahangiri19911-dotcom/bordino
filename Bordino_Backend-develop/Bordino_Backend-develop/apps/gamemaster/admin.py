@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -7,6 +8,8 @@ from django.utils.html import format_html
 
 from apps.gamemaster import budget, schema, services
 from apps.gamemaster.models import CreatorProfile, Game, GameAuditLog, GameBudgetLedger, GamePayment, GameReview, GameVersion
+from apps.missions import leaderboard as boards
+from apps.missions.models import LeaderboardSnapshot, MysteryRun
 
 STAGE_NAMES = {
     "question": "پرسش",
@@ -18,6 +21,36 @@ STAGE_NAMES = {
     "media": "محتوا (ادامه)",
     "reward": "جایزه / کد تخفیف",
 }
+
+
+def availability_text(d: dict) -> str:
+    """The version's end and after-end rules, in words, for the review."""
+    a = d.get("availability") or schema.availability(None, d.get("ends_at"))
+    if a["expiry"] == "date":
+        when = f"پایان در تاریخ ثابت {d.get('ends_at') or '—'}"
+    elif a["expiry"] == "duration":
+        unit = "ماه تقویمی" if a["duration_unit"] == "months" else "روز"
+        when = f"پایان {a['duration_value']} {unit} بعد از انتشار (به وقت تهران)"
+    else:
+        when = "بدون پایان خودکار"
+    if a["after"] == "finish" and a["grace_hours"]:
+        after = f"بعد از پایان، کسانی که شروع کرده‌اند {a['grace_hours']} ساعت برای تمام کردن وقت دارند"
+    else:
+        after = "بعد از پایان، بازی برای همه بسته می‌شود (کامل)"
+    return f"{when} · {after} · بعد از پایان از فهرست بازی‌ها پنهان می‌شود و سابقه می‌ماند"
+
+
+AFTER_NAMES = {"keep": "همان‌طور بماند", "top10": "فقط ۱۰ نفر اول", "hide": "پنهان", "participants": "فقط شرکت‌کنندگان", "creator": "فقط سازنده و بردینو"}
+VIS_NAMES = {"players": "شرکت‌کنندگان بازی", "finishers": "فقط بعد از تمام کردن", "creator": "فقط سازنده و بردینو"}
+
+
+def board_text(d: dict) -> str:
+    cfg = boards.clean(d.get("leaderboard"))
+    if not boards.enabled(cfg):
+        return "بدون جدول رده‌بندی" if cfg.get("preset") != boards.TEAM_PRESET else "رقابت تیمی (فعال نیست)"
+    name = boards.PRESETS[cfg["preset"]]["name"] + (" (سفارشی)" if cfg.get("customized") else "")
+    return (f"{name} · {boards.describe(cfg)} · دیده می‌شود برای: {VIS_NAMES[cfg['visibility']]}"
+            f" · بعد از پایان: {AFTER_NAMES[cfg['after']]} · {cfg['top']} نفر اول{' (و همهٔ جدول)' if cfg['full'] else ''}")
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -67,7 +100,7 @@ class GameAdmin(admin.ModelAdmin):
     readonly_fields = ("owner", "category", "template", "title", "status", "live_version", "paused_by_admin", "draft_saved_at", "budget")
     fields = readonly_fields
     inlines = (VersionInline,)
-    actions = ("admin_pause", "admin_resume", "admin_archive")
+    actions = ("admin_pause", "admin_resume", "admin_expire", "admin_archive")
 
     def has_add_permission(self, request):
         return False
@@ -100,6 +133,10 @@ class GameAdmin(admin.ModelAdmin):
     @admin.action(description="ادامهٔ بازی متوقف‌شده")
     def admin_resume(self, request, queryset):
         self._run(request, queryset, lambda u, g: services.set_paused(u, g, False, by_admin=True), "دوباره باز شد")
+
+    @admin.action(description="پایان فوری بازی (منقضی، بدون مهلت؛ سابقه می‌ماند)")
+    def admin_expire(self, request, queryset):
+        self._run(request, queryset, lambda u, g: services.expire_now(u, g, "از پنل ادمین"), "به پایان رسید")
 
     @admin.action(description="بایگانی (پایان بازی و برگشت بودجهٔ مانده)")
     def admin_archive(self, request, queryset):
@@ -164,7 +201,10 @@ class GameVersionAdmin(ReadOnlyAdmin):
             "d": d,
             "stages": stages,
             "max_run": schema.max_run_points(d),
-            "problems": schema.check(d),
+            "problems": services.problems(version.game, d),
+            "availability_text": availability_text(schema.clean(d)),
+            "board_text": board_text(d),
+            "extension": version.game.versions.filter(mystery__isnull=False).exclude(pk=version.pk).exists(),
             "reviews": GameReview.objects.filter(version__game=version.game).select_related("reviewer", "version").order_by("-create_time"),
             "own_game": version.game.owner.user_id == request.user.pk,
             "can_decide": version.status == GameVersion.Status.SUBMITTED and version.game.owner.user_id != request.user.pk,
@@ -195,3 +235,52 @@ class GamePaymentAdmin(ReadOnlyAdmin):
     list_filter = ("status", "mode")
     search_fields = ("game__title", "track_id", "ref_number", "creator__user__phone_number")
     list_select_related = ("game", "creator__user")
+
+
+class ExcludeForm(forms.Form):
+    note = forms.CharField(label="دلیل (در سابقهٔ بازی ثبت می‌شود)", widget=forms.Textarea(attrs={"rows": 3}), max_length=300)
+
+
+@admin.register(MysteryRun)
+class LeaderboardRunAdmin(ReadOnlyAdmin):
+    """Players of creator games, for leaderboard disputes: «حذف از جدول» is audited and corrects a
+    frozen result with a new snapshot (the old one is kept)."""
+
+    list_display = ("create_time", "mystery", "customer", "status", "points_earned", "completed_at", "show_identity", "leaderboard_excluded")
+    list_filter = ("status", "leaderboard_excluded", "mystery")
+    search_fields = ("customer__user__phone_number", "mystery__title")
+    list_select_related = ("mystery", "customer__user")
+    actions = ("exclude_from_board",)
+
+    @admin.action(description="حذف از جدول رده‌بندی (تقلب یا اعتراض)")
+    def exclude_from_board(self, request, queryset):
+        if not services.is_reviewer(request.user):
+            self.message_user(request, "فقط بررسی‌کنندهٔ بردینو این کار را می‌کند.", messages.ERROR)
+            return None
+        if "apply" in request.POST:
+            form = ExcludeForm(request.POST)
+            if form.is_valid():
+                for run in queryset:
+                    services.exclude_run(request.user, run.pk, form.cleaned_data["note"])
+                self.message_user(request, f"{queryset.count()} بازیکن از جدول حذف شد (ثبت در سابقه).", messages.SUCCESS)
+                return None
+        else:
+            form = ExcludeForm()
+        return TemplateResponse(
+            request,
+            "admin/gamemaster/exclude_run.html",
+            {**self.admin_site.each_context(request), "title": "حذف از جدول رده‌بندی", "runs": queryset, "form": form,
+             "action": "exclude_from_board", "opts": self.model._meta},
+        )
+
+
+@admin.register(LeaderboardSnapshot)
+class LeaderboardSnapshotAdmin(ReadOnlyAdmin):
+    list_display = ("create_time", "mystery", "scope", "reason", "rows_count", "created_by", "note")
+    list_filter = ("reason",)
+    search_fields = ("mystery__title", "scope")
+    readonly_fields = ("scope", "mystery", "reason", "note", "replaces", "created_by", "totals", "rows")
+
+    @admin.display(description="ردیف‌ها")
+    def rows_count(self, obj):
+        return len(obj.rows or [])

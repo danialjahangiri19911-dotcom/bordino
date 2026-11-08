@@ -7,6 +7,7 @@ player who started (mystery.funded_runs), so a payout is always covered; each pa
 """
 
 from django.db import transaction
+from django.utils import timezone
 from django.db.models import Sum
 
 from apps.gamemaster.models import Game, GameBudgetLedger, GameVersion
@@ -94,6 +95,10 @@ def outstanding(version: GameVersion) -> int:
     """What the players still playing can still win (kept back from a release)."""
     mystery = getattr(version, "mystery", None)
     if mystery is None or not mystery.is_active:
+        return 0
+    # Ended for good (its end, and the end of its grace, passed): nobody can win anything more.
+    last = max(mystery.ends_at, mystery.grace_ends_at or mystery.ends_at) if mystery.ends_at else None
+    if last is not None and last <= timezone.now():
         return 0
     from apps.missions.mystery import max_run_points  # pylint: disable=import-outside-toplevel
 

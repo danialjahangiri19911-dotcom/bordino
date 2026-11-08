@@ -6,6 +6,9 @@ fixed set of types the mission engine already checks on the server.
      "access": "public"|"private", "audience": {"age_min", "age_max", "gender"},
      "starts_at", "ends_at", "capacity", "finish_points", "hint_penalty", "budget_points",
      "completion_message",
+     "availability": {"expiry": "none"|"date"|"duration", "duration_value", "duration_unit": "days"|"months",
+                      "after": "strict"|"finish", "grace_hours"},   (a "date" expiry is `ends_at`)
+     "leaderboard": {...}   (apps.missions.leaderboard; preset "none" = no leaderboard),
      "stages": [{"id", "type", "title", "text", "image", "question", "answers", "answer_type",
                  "options", "lat", "lng", "radius_m", "check_location", "staff_code",
                  "place": {"name", "address", "about", "offer", "url"},
@@ -19,9 +22,15 @@ place's QR), location (the phone at the place), staff (a code the staff give), m
 import json
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
+from dateutil.relativedelta import relativedelta
+
+from apps.missions import leaderboard as boards
 
 SCHEMA = 1
 STAGE_TYPES = ("question", "puzzle", "choice", "qr", "location", "staff", "media", "reward")
@@ -41,6 +50,12 @@ MAX_BYTES = 64 * 1024
 MAX_STAGE_POINTS = 500
 # A mission location must be in Iran (a rough box: the review checks the exact place).
 IRAN = (24.0, 40.5, 43.5, 64.0)
+EXPIRY = ("none", "date", "duration")
+# Dates and durations are on Tehran's clock: «one month» from 10 Nov 18:00 is 10 Dec 18:00 there
+# (a calendar month, not 30 days; the 31st becomes the month's last day).
+ZONE = ZoneInfo("Asia/Tehran")
+MAX_DURATION = {"days": 3650, "months": 120}
+MAX_GRACE_HOURS = 24 * 30
 
 
 class DefinitionError(Exception):
@@ -53,6 +68,43 @@ class DefinitionError(Exception):
 
 def empty() -> dict:
     return {"schema": SCHEMA, "title": "", "access": "public", "audience": {}, "finish_points": 0, "hint_penalty": 25, "budget_points": 0, "stages": []}
+
+
+def availability(raw, ends_at) -> dict:
+    """When the game stops taking players, and what those already playing may still do."""
+    a = raw if isinstance(raw, dict) else {}
+    # (A draft from before this setting: its end date, or no end.)
+    expiry = a.get("expiry") if a.get("expiry") in EXPIRY else ("date" if ends_at else "none")
+    unit = "months" if a.get("duration_unit") == "months" else "days"
+    after = "finish" if a.get("after") == "finish" else "strict"
+    return {
+        "expiry": expiry,
+        "duration_value": _int(a.get("duration_value"), 1, MAX_DURATION[unit]),
+        "duration_unit": unit,
+        "after": after,
+        "grace_hours": (_int(a.get("grace_hours"), 0, MAX_GRACE_HOURS) or 0) if after == "finish" else 0,
+    }
+
+
+def end_times(definition: dict, published_at: datetime) -> tuple[datetime | None, datetime | None]:
+    """(ends_at, grace_ends_at) of a version published at `published_at`: a duration counts from the
+    actual publication, on Tehran's clock."""
+    a = definition.get("availability") or availability(None, definition.get("ends_at"))
+    end = None
+    if a["expiry"] == "date" and definition.get("ends_at"):
+        end = parse_datetime(definition["ends_at"])
+    elif a["expiry"] == "duration" and a.get("duration_value"):
+        local = timezone.localtime(published_at, ZONE)
+        step = relativedelta(months=a["duration_value"]) if a["duration_unit"] == "months" else timedelta(days=a["duration_value"])
+        end = local + step
+    grace = end + timedelta(hours=a["grace_hours"]) if end and a["after"] == "finish" and a["grace_hours"] else None
+    return end, grace
+
+
+def length_days(definition: dict, now: datetime) -> float | None:
+    """How long the game would run if published now (None = no end)."""
+    end, _ = end_times(definition, now)
+    return None if end is None else (end - now).total_seconds() / 86400
 
 
 # An image is one of the creator's uploads (GameAsset): "gm/<32 hex>.<ext>", nothing else.
@@ -129,8 +181,12 @@ def clean(definition) -> dict:
         "hint_penalty": _int(definition.get("hint_penalty"), 0, 100) if definition.get("hint_penalty") not in (None, "") else 25,
         "budget_points": _int(definition.get("budget_points"), 0, 10_000_000) or 0,
         "completion_message": _text(definition.get("completion_message"), 1000),
+        "availability": availability(definition.get("availability"), definition.get("ends_at")),
+        "leaderboard": boards.clean(definition.get("leaderboard")),
         "stages": [],
     }
+    if out["availability"]["expiry"] != "date":
+        out["ends_at"] = None  # (the end is then a duration, or none)
     stages = definition.get("stages") if isinstance(definition.get("stages"), list) else []
     for raw in stages[:MAX_STAGES]:
         if not isinstance(raw, dict):
@@ -227,6 +283,12 @@ def check(definition: dict) -> dict:
                 errors[f"{p}.lat"] = "محل باید داخل ایران باشد."
         if t in ("qr", "location", "staff") and not s["place"]["name"]:
             errors[f"{p}.place.name"] = "نام محل را بنویسید (بعد از رسیدن نشان داده می‌شود)."
+    a = d["availability"]
+    if a["expiry"] == "date" and not d["ends_at"]:
+        errors["ends_at"] = "تاریخ و ساعت پایان را انتخاب کن."
+    if a["expiry"] == "duration" and not a["duration_value"]:
+        errors["availability.duration_value"] = "مدت بازی را بنویس."
+    errors.update(boards.problems(d["leaderboard"]))
     need = max_run_points(d)
     if need and d["budget_points"] < need:
         errors["budget_points"] = f"بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({need} امتیاز) باشد."

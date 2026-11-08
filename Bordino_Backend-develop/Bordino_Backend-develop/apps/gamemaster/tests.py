@@ -521,7 +521,7 @@ class GameMasterAuditTests(TestCase):
         gid, m = self.publish(quiz())
         Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(minutes=1))
         listed = body(self.api.get("/api/v1/gm/games/"))["games"][0]
-        self.assertEqual(listed["status"], "archived")
+        self.assertEqual(listed["status"], "expired")  # ended: not archived, its history kept
         self.assertEqual(self.points(self.creator), start)
 
     def test_a_scheduled_game_shows_published_once_it_starts(self):
@@ -598,3 +598,312 @@ class GameMasterAuditTests(TestCase):
         gid, m = self.publish(quiz(), gid=gid)
         share = body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))
         self.assertEqual((share["kind"], share["active"], share["url"].endswith(f"/pwa/earn/mystery/{m.pk}")), ("public", True, True))
+
+
+@override_settings(CACHES=LOCMEM)
+class GameMasterLeaderboardTests(TestCase):
+    """Leaderboards, presets and expiry (the 2026-11-08 leaderboard spec)."""
+
+    def setUp(self):
+        cache.clear()
+        OPEN.start()
+        self.addCleanup(OPEN.stop)
+        self.creator = make_player("9120009401", points=20000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.creator)
+        self.reviewer = get_user_model().objects.create_superuser(phone_number="9120009499", password="x-Pass-123")
+        self.api.patch("/api/v1/gm/profile/", {"preferred_mode": "creator", "intent": "pro", "accept_terms": True, "business_name": "ک"}, format="json")
+        self.n = 0
+
+    def player(self, name=None):
+        self.n += 1
+        user = make_player(f"91200094{self.n:02d}" if self.n > 1 else "9120009451")
+        if name:
+            get_user_model().objects.filter(pk=user.pk).update(username=name)
+        api = APIClient()
+        api.force_authenticate(user)
+        return api
+
+    def publish(self, definition, gid=None, new_edition=False, category="pro"):
+        if gid is None:
+            gid = body(self.api.post("/api/v1/gm/games/", {"category": category}, format="json"))["game"]["id"]
+        r = self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": definition}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        r = self.api.post(f"/api/v1/gm/games/{gid}/submit/", {}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        services.review(self.reviewer, GameVersion.objects.filter(game_id=gid).order_by("-number").first().pk, "approve")
+        r = self.api.post(f"/api/v1/gm/games/{gid}/publish/", {"new_edition": new_edition}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        return gid, Game.objects.get(pk=gid).live_version.mystery
+
+    def play(self, api, m, upto=4, wait=None):
+        url = f"/api/v1/missions/mysteries/{m.pk}"
+        r = api.post(f"{url}/start/", {}, format="json")
+        steps = engine.steps_of(m)
+        moves = [{"answer": "1404"}, {"answer": "ب"}, {}]
+        for i, step in enumerate(steps[:upto]):
+            if wait:
+                wait()
+            if i < 3:
+                api.post(f"{url}/steps/{step.pk}/checkin/", moves[i], format="json")
+            else:
+                api.post(f"/api/v1/missions/qr/{step.qr_token}/", {}, format="json")
+        return r
+
+    def board(self, api, m, **params):
+        cache.clear()
+        q = "&".join(f"{k}={v}" for k, v in params.items())
+        return body(api.get(f"/api/v1/missions/mysteries/{m.pk}/leaderboard/?{q}"))["board"]
+
+    # 1, 2: no leaderboard is a full option, progress is tracked all the same
+    def test_a_game_without_a_leaderboard_publishes_and_still_tracks_progress(self):
+        gid, m = self.publish(quiz())
+        p = self.player()
+        self.play(p, m, upto=2)
+        b = self.board(p, m)
+        self.assertEqual((b["enabled"], b["visible"]), (False, False))
+        self.assertNotIn("rows", b)
+        self.assertFalse(body(p.get(f"/api/v1/missions/mysteries/{m.pk}/"))["mystery"]["leaderboard"]["enabled"])
+        a = body(self.api.get(f"/api/v1/gm/games/{gid}/analytics/"))["analytics"]
+        self.assertEqual((a["enrolled"], a["started_playing"], a["completed_players"], a["stage_completions"]), (1, 1, 0, 2))
+        self.assertEqual(a["average_progress"], 50)
+        self.assertEqual(a["drop_off"][:2], [0, 0])
+
+    # 3-6: presets, their defaults, customizing, restoring
+    def test_presets_apply_their_defaults_and_can_be_customized_and_restored(self):
+        from apps.missions import leaderboard as boards  # pylint: disable=import-outside-toplevel
+
+        speed = boards.clean({"preset": "speed"})
+        self.assertEqual((speed["rank_by"], speed["only_finishers"], speed["show"]["time"]), (["duration", "score"], True, True))
+        self.assertEqual(boards.clean({"preset": "score"})["rank_by"], ["score", "stages", "duration"])
+        custom = boards.clean({"preset": "progress", "customized": True, "rank_by": ["score"], "top": 3, "visibility": "finishers"})
+        self.assertEqual((custom["preset"], custom["rank_by"], custom["top"], custom["visibility"]), ("progress", ["score"], 3, "finishers"))
+        # «Restore defaults» = not customized: whatever else was sent, the preset's own rules.
+        restored = boards.clean({**custom, "customized": False})
+        self.assertEqual(restored, boards.preset_config("progress"))
+        self.assertEqual(boards.clean({"preset": "none"}), {"preset": "none"})
+        # Contradictions and what is not offered yet are refused.
+        self.assertIn("leaderboard.only_finishers", boards.problems(boards.clean({"preset": "speed", "customized": True, "rank_by": ["duration"], "only_finishers": False})))
+        self.assertIn("leaderboard.rank_by", boards.problems(boards.clean({"preset": "progress", "customized": True, "rank_by": ["stages", "progress"]})))
+        self.assertIn("leaderboard.period", boards.problems(boards.clean({"preset": "score", "customized": True, "period": "weekly"})))
+        self.assertIn("leaderboard.preset", boards.problems(boards.clean({"preset": "team"})))
+        # The quiz template suggests a board; a business game starts without one, 30 days long.
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro", "template": "quiz"}, format="json"))["game"]["id"]
+        draft = body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["draft"]
+        self.assertEqual((draft["leaderboard"]["preset"], draft["availability"]["duration_value"]), ("score", 7))
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "business"}, format="json"))["game"]["id"]
+        draft = body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["draft"]
+        self.assertEqual((draft["leaderboard"]["preset"], draft["availability"]["expiry"], draft["availability"]["duration_value"]), ("none", "duration", 30))
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro", "template": "city_hunt"}, format="json"))["game"]["id"]
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["draft"]["availability"]["expiry"], "none")
+
+    # 8, 10, 11: server-side counts, my row, deterministic order
+    def test_the_board_ranks_on_the_server_deterministically_and_shows_my_row(self):
+        gid, m = self.publish(quiz(leaderboard={"preset": "progress", "customized": True, "rank_by": ["stages", "score"], "top": 3, "full": False}))
+        players = [self.player(f"p{i}") for i in range(5)]
+        for i, (api, upto) in enumerate(zip(players, (4, 2, 2, 1, 0))):
+            self.play(api, m, upto=upto)
+        b = self.board(players[3], m)
+        self.assertEqual([r["position"] for r in b["rows"]], [1, 2, 3])
+        self.assertEqual((b["rows"][0]["stages"], b["rows"][0]["completed"], b["count"], b["more"]), (4, True, 3, False))
+        # Two players on 2 stages with the same points: the one who got there first is ahead.
+        self.assertEqual([r["stages"] for r in b["rows"]][1:], [2, 2])
+        self.assertEqual((b["me"]["position"], b["me"]["stages"], b["me"]["is_me"]), (4, 1, True))  # outside the top 3, still shown
+        self.assertEqual(b["totals"], {"players": 5, "finishers": 1, "stages": 4})
+        self.assertEqual(self.board(players[3], m), b)  # the same order every time
+        # A stage proved again counts once.
+        step = engine.steps_of(m)[0]
+        players[3].post(f"/api/v1/missions/mysteries/{m.pk}/steps/{step.pk}/checkin/", {"answer": "1404"}, format="json")
+        self.assertEqual(self.board(players[3], m)["me"]["stages"], 1)
+        # A player who has not proved a stage is not ranked, but sees their progress.
+        self.assertIsNone(self.board(players[4], m)["me"])
+        self.assertEqual(self.board(players[4], m)["my_progress"], {"stages": 0, "completed": False})
+        # Someone not playing does not see it; the creator sees every row.
+        self.assertEqual(self.board(self.player(), m)["reason"], "not_playing")
+        self.assertEqual(len(body(self.api.get(f"/api/v1/gm/games/{gid}/leaderboard/"))["board"]["rows"]), 4)
+
+    # 9: privacy
+    def test_names_and_pictures_follow_the_players_own_choice(self):
+        gid, m = self.publish(quiz(leaderboard={"preset": "score"}))
+        ali, sara = self.player("ali"), self.player("sara")
+        self.play(ali, m, upto=2)
+        self.play(sara, m, upto=1)
+        row = self.board(sara, m)["rows"][0]
+        self.assertEqual((row["name"], row["avatar"], row["is_me"]), ("a***", None, False))
+        self.assertEqual(self.board(ali, m)["rows"][0]["name"], "ali")  # their own row: their name
+        ali.post(f"/api/v1/missions/mysteries/{m.pk}/leaderboard/identity/", {"show": True}, format="json")
+        self.assertEqual(self.board(sara, m)["rows"][0]["name"], "ali")
+        # The creator cannot turn it on for a player (no such setting on the creator side).
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/leaderboard/"))["board"]["rows"][1]["name"], "s***")
+
+    def test_who_may_see_the_board(self):
+        gid, m = self.publish(quiz(leaderboard={"preset": "score", "customized": True, "visibility": "finishers", "after": "hide"}))
+        done, halfway = self.player("a"), self.player("b")
+        self.play(done, m)
+        self.play(halfway, m, upto=1)
+        self.assertTrue(self.board(done, m)["visible"])
+        self.assertEqual(self.board(halfway, m)["reason"], "finish_first")
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self.board(done, m)["reason"], "hidden")  # after the end: hidden from players
+        self.assertTrue(body(self.api.get(f"/api/v1/gm/games/{gid}/leaderboard/"))["board"]["visible"])  # not from the creator
+
+    # 7, 20: editions
+    def test_each_edition_has_its_own_players_and_board_and_versions_share_one(self):
+        gid, m1 = self.publish(quiz(leaderboard={"preset": "progress"}))
+        a = self.player("a")
+        self.play(a, m1, upto=2)
+        # A new version of the same edition: the player keeps their game (no second run, no
+        # second reward); the board carries on.
+        gid, m2 = self.publish(quiz(points=20, leaderboard={"preset": "progress"}), gid=gid)
+        started = body(a.post(f"/api/v1/missions/mysteries/{m2.pk}/start/", {}, format="json"))["mystery"]
+        self.assertEqual(started["id"], str(m1.pk))
+        self.assertEqual(MysteryRun.objects.filter(customer__user__username="a").count(), 1)
+        listed = [x["id"] for x in body(a.get("/api/v1/missions/"))["mysteries"]] if "mysteries" in body(a.get("/api/v1/missions/")) else None
+        if listed is not None:
+            self.assertIn(str(m1.pk), listed)
+            self.assertNotIn(str(m2.pk), listed)
+        b = self.player("b")
+        self.play(b, m2, upto=1)
+        self.assertEqual([r["stages"] for r in self.board(a, m2)["rows"]], [2, 1])
+        # A new edition: a fresh board and everyone may play again.
+        gid, m3 = self.publish(quiz(leaderboard={"preset": "progress"}), gid=gid, new_edition=True)
+        self.assertEqual((m3.edition, Game.objects.get(pk=gid).edition), (2, 2))
+        self.assertEqual(self.board(self.player(), m3)["totals"]["players"], 0)
+        self.play(a, m3, upto=1)
+        self.assertEqual([r["stages"] for r in self.board(a, m3)["rows"]], [1])
+        self.assertEqual([r["stages"] for r in self.board(a, m1)["rows"]], [2, 1])  # the old edition as it was
+
+    # 12, 13, 15: expiry on the server, timer or not
+    def test_an_expired_game_takes_nobody_new_and_strict_expiry_stops_progress(self):
+        gid, m = self.publish(quiz())
+        a = self.player()
+        self.play(a, m, upto=1)
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(seconds=1))  # no timer ran
+        late = self.player()
+        self.assertEqual(body(late.post(f"/api/v1/missions/mysteries/{m.pk}/start/", {}, format="json"))["code"], "expired")
+        step = engine.steps_of(m)[1]
+        self.assertEqual(body(a.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{step.pk}/checkin/", {"answer": "ب"}, format="json"))["code"], "expired")
+        self.assertEqual(Game.objects.get(pk=gid).status, "published")  # (the stored status is the timer's job)
+        services.tick()
+        self.assertEqual(Game.objects.get(pk=gid).status, "expired")
+        # Hidden from discovery, still the player's own.
+        self.assertEqual(late.get(f"/api/v1/missions/mysteries/{m.pk}/").status_code, 404)
+        self.assertEqual(body(a.get(f"/api/v1/missions/mysteries/{m.pk}/"))["mystery"]["done"], 1)
+
+    # 14: the grace to finish
+    def test_players_who_started_may_finish_within_the_grace(self):
+        gid, m = self.publish(quiz(availability={"expiry": "duration", "duration_value": 1, "duration_unit": "days", "after": "finish", "grace_hours": 24}))
+        self.assertEqual(m.grace_ends_at - m.ends_at, timedelta(hours=24))
+        a = self.player()
+        self.play(a, m, upto=1)
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(minutes=1), grace_ends_at=timezone.now() + timedelta(hours=1))
+        self.assertEqual(body(self.player().post(f"/api/v1/missions/mysteries/{m.pk}/start/", {}, format="json"))["code"], "expired")
+        step = engine.steps_of(m)[1]
+        self.assertEqual(a.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{step.pk}/checkin/", {"answer": "ب"}, format="json").status_code, 200)
+        self.assertEqual(body(a.get(f"/api/v1/missions/mysteries/{m.pk}/"))["mystery"]["in_grace"], True)
+        services.tick()
+        self.assertEqual(Game.objects.get(pk=gid).status, "expired")
+        from apps.missions.models import LeaderboardSnapshot  # pylint: disable=import-outside-toplevel
+
+        self.assertFalse(LeaderboardSnapshot.objects.exists())  # not final while players may still finish
+        self.assertEqual(GameBudgetLedger.objects.filter(kind="release").count(), 0)  # nor the budget back
+        Mystery.objects.filter(pk=m.pk).update(grace_ends_at=timezone.now() - timedelta(seconds=1))
+        step = engine.steps_of(m)[2]
+        self.assertEqual(body(a.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{step.pk}/checkin/", {}, format="json"))["code"], "expired")
+
+    # 16, 17: durations count from the publication, months are calendar months on Tehran's clock
+    def test_durations_count_from_publication_in_calendar_months(self):
+        zone = schema.ZONE
+        d = schema.clean(quiz(availability={"expiry": "duration", "duration_value": 1, "duration_unit": "months"}))
+        for start, end in (((2026, 11, 10), (2026, 12, 10)), ((2027, 1, 31), (2027, 2, 28)), ((2028, 1, 31), (2028, 2, 29))):
+            published = timezone.datetime(*start, 18, 30, tzinfo=zone)
+            got, grace = schema.end_times(d, published)
+            self.assertEqual((got.astimezone(zone).date(), got.astimezone(zone).hour, got.astimezone(zone).minute, grace), (date(*end), 18, 30, None))
+        from datetime import timezone as dt_timezone  # pylint: disable=import-outside-toplevel
+
+        published = timezone.datetime(2026, 11, 10, 23, 0, tzinfo=dt_timezone.utc)  # 02:30 on the 11th in Tehran
+        got, _ = schema.end_times(d, published)
+        self.assertEqual(got.astimezone(zone).date(), date(2026, 12, 11))
+        before = timezone.now()
+        gid, m = self.publish(quiz(availability={"expiry": "duration", "duration_value": 3, "duration_unit": "days"}))
+        self.assertTrue(before + timedelta(days=3) <= m.ends_at <= timezone.now() + timedelta(days=3))
+
+    # 18, 19: history and the final result stay
+    def test_history_money_and_the_final_result_are_kept_and_corrections_are_audited(self):
+        from apps.missions.models import LeaderboardSnapshot  # pylint: disable=import-outside-toplevel
+
+        start = self.points(self.creator)
+        gid, m = self.publish(quiz(leaderboard={"preset": "score"}))
+        a, b = self.player("a"), self.player("b")
+        self.play(a, m)
+        self.play(b, m, upto=1)
+        paid = set(ActivityTransaction.objects.values_list("pk", flat=True))
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(seconds=1))
+        services.tick()
+        services.tick()  # (again: nothing happens twice)
+        self.assertEqual((MysteryRun.objects.count(), MysteryCheckin.objects.count()), (2, 5))
+        after = set(ActivityTransaction.objects.values_list("pk", flat=True))
+        self.assertTrue(paid < after and len(after - paid) == 1)  # every payment kept; one refund of the rest
+        self.assertEqual(LeaderboardSnapshot.objects.count(), 1)
+        first = LeaderboardSnapshot.objects.get()
+        self.assertEqual([r["name"] for r in first.rows], ["a", "b"])
+        spent = budget.summary(m.source_version)["spent"]
+        self.assertEqual(self.points(self.creator), start - spent)  # the rest came back, once
+        with self.assertRaises(ValueError):
+            first.save()
+        # Bordino takes a run off: a new snapshot, the old one kept, the action in the audit log.
+        services.exclude_run(self.reviewer, MysteryRun.objects.get(customer__user__username="a").pk, "تقلب")
+        self.assertEqual(LeaderboardSnapshot.objects.count(), 2)
+        newest = LeaderboardSnapshot.objects.order_by("-create_time").first()
+        self.assertEqual(([r["name"] for r in newest.rows], newest.replaces_id), (["b"], first.pk))
+        self.assertTrue(GameAuditLog.objects.filter(game_id=gid, action="leaderboard_exclude").exists())
+        b_board = self.board(b, m)
+        self.assertEqual((b_board["final"], b_board["rows"][0]["position"]), (True, 1))
+        with self.assertRaises(services.GameMasterError):
+            services.exclude_run(self.creator, MysteryRun.objects.first().pk, "x")  # creators cannot
+
+    # 21: material settings change only through review
+    def test_changing_the_rules_of_a_live_game_needs_a_new_review(self):
+        gid, m = self.publish(quiz(leaderboard={"preset": "score"}))
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz(leaderboard={"preset": "speed"}, availability={"expiry": "duration", "duration_value": 2})}, format="json")
+        m.refresh_from_db()
+        self.assertEqual((m.leaderboard["preset"], m.ends_at), ("score", None))
+        self.assertEqual(self.api.post(f"/api/v1/gm/games/{gid}/publish/", {}, format="json").status_code, 409)  # nothing approved
+        from apps.missions.admin import MysteryAdmin  # pylint: disable=import-outside-toplevel
+
+        self.assertTrue({"leaderboard", "ends_at", "grace_ends_at", "edition"} <= set(MysteryAdmin.CREATOR_LOCKED))
+
+    def test_bordinos_limits_apply_and_an_extension_is_reviewed(self):
+        with mock.patch.dict(services.DEFAULTS, {"GM_MAX_DAYS_PRO": 14}):
+            gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro"}, format="json"))["game"]["id"]
+            self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz()}, format="json")
+            problems = body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["problems"]
+            self.assertIn("availability.expiry", problems)  # «no end» is not allowed under a limit
+            self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz(availability={"expiry": "duration", "duration_value": 1, "duration_unit": "months"})}, format="json")
+            self.assertIn("availability.expiry", body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["problems"])
+            gid, m = self.publish(quiz(availability={"expiry": "duration", "duration_value": 7}), gid=gid)
+        # Extending: a new version (reviewed) with a later end; the edition goes on.
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(seconds=1))
+        a = self.player()
+        services.settle(Game.objects.get(pk=gid))
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["next_publish"], "new_only")
+        gid, m2 = self.publish(quiz(availability={"expiry": "duration", "duration_value": 7}), gid=gid)
+        self.assertEqual((Game.objects.get(pk=gid).status, m2.edition), ("published", 2))  # the ended edition stays closed
+        self.assertEqual(a.post(f"/api/v1/missions/mysteries/{m2.pk}/start/", {}, format="json").status_code, 201)
+
+    def test_ending_soon_is_told_once(self):
+        gid, m = self.publish(quiz(availability={"expiry": "duration", "duration_value": 10}))
+        with mock.patch.object(services, "_notify") as told:
+            later = m.ends_at - timedelta(days=6)
+            services.tick(later)
+            services.tick(later + timedelta(minutes=10))
+            self.assertEqual(told.call_count, 1)
+            services.tick(m.ends_at - timedelta(hours=20))
+            self.assertEqual(told.call_count, 2)
+            services.tick(m.ends_at + timedelta(minutes=1))
+            self.assertEqual(told.call_count, 3)  # «ended» (and wrapped up: no board, no more notices)
+            services.tick(m.ends_at + timedelta(minutes=20))
+            self.assertEqual(told.call_count, 3)
+
+    def points(self, user):
+        return TokenWalletAccount.objects.get(wallet__owner=user).amount

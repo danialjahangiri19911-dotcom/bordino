@@ -67,6 +67,9 @@ class Game(AbstractBaseModel):
         SCHEDULED = "scheduled", _("زمان‌بندی‌شده")
         PUBLISHED = "published", _("منتشرشده")
         PAUSED = "paused", _("متوقف")
+        # Its end came: nobody new joins (players may finish within its grace); history is kept and
+        # a new version (an extension) or a new edition can open it again after review.
+        EXPIRED = "expired", _("به پایان رسیده")
         ARCHIVED = "archived", _("بایگانی")
 
     owner = models.ForeignKey(CreatorProfile, on_delete=models.PROTECT, related_name="games", verbose_name=_("سازنده"))
@@ -85,6 +88,8 @@ class Game(AbstractBaseModel):
     # A private game's invite: made once (shown from the first draft), the same for every version;
     # it opens the game once a version is published.
     invite_token = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
+    # The edition being played: a new edition has its own players and leaderboard.
+    edition = models.PositiveSmallIntegerField(default=1, verbose_name=_("دوره"))
 
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("بازی سازنده")
@@ -245,3 +250,15 @@ class GamePayment(AbstractBaseModel):
 
     def __str__(self):
         return f"{self.game} — {self.amount_toman} تومان ({self.get_status_display()})"
+
+
+class GameNotice(AbstractBaseModel):
+    """A one-time event of a game (a notice sent, a result frozen): its key is used once, so a
+    timer that runs again (or twice at once) never repeats it."""
+
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="notices")
+    key = models.CharField(max_length=120, unique=True)
+
+    class Meta(AbstractBaseModel.Meta):
+        verbose_name = _("رویداد بازی")
+        verbose_name_plural = _("رویدادهای بازی‌ها")

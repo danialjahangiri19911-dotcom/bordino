@@ -9,8 +9,9 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
+from apps.missions import leaderboard as boards
 from apps.missions import mystery, services
-from apps.missions.models import Mission, MissionAttempt, MissionCategory, MysteryStep
+from apps.missions.models import Mission, MissionAttempt, MissionCategory, MysteryRun, MysteryStep
 from apps.wallet.services import ad_reward
 from apps.wallet.services.balance import points_account
 
@@ -383,6 +384,7 @@ def mystery_card(view: mystery.View) -> dict:
         # A creator's game (Game Master): who presents it.
         "creator": m.is_creator_game,
         "presenter": m.presenter,
+        "leaderboard": boards.enabled(m.leaderboard),
     }
 
 
@@ -452,6 +454,18 @@ def mystery_detail(view: mystery.View) -> dict:
             item.update(state="locked")
         shown.append(item)
     body["step_list"] = shown
+    # The leaderboard's rules are shown before joining; the board itself to whom its rules allow.
+    cfg = boards.clean(boards.current_mystery(m).leaderboard)
+    if boards.enabled(cfg):
+        ok, _cap, why = boards.access(m, run.customer if run else None)
+        body["leaderboard"] = {
+            "enabled": True, "visible": ok, "reason": why, "name": boards.PRESETS[cfg["preset"]]["name"],
+            "rules": boards.describe(cfg), "show_identity": bool(run and run.show_identity),
+        }
+    else:
+        body["leaderboard"] = {"enabled": False}
+    body["grace_ends_at"] = _when(m.grace_ends_at)
+    body["in_grace"] = mystery.in_grace(m)
     return body
 
 
@@ -516,6 +530,50 @@ class MysteryInviteView(APIView):
         except services.MissionError as exc:
             return _error(exc)
         return Response({"mystery": mystery_detail(view)})
+
+
+class MysteryBoardView(APIView):
+    """A game's leaderboard as this player may see it (a page of it, and their own row)."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Leaderboard of a city mystery / creator game")
+    def get(self, request, mystery_id):
+        try:
+            customer = _customer(request)
+            view = mystery.view_of(customer, mystery_id)  # (a game this player cannot see: not found)
+        except services.MissionError as exc:
+            return _error(exc)
+        try:
+            offset = max(0, int(request.query_params.get("offset") or 0))
+            limit = max(1, min(50, int(request.query_params.get("limit") or 0) or 20))
+        except ValueError:
+            offset, limit = 0, 20
+        owner = view.mystery.owner_id is not None and view.mystery.owner_id == customer.pk
+        result = boards.board(view.mystery, customer, offset, limit, staff=owner, request=request)
+        result["title"] = view.mystery.title
+        return Response({"board": result})
+
+
+class MysteryIdentityView(APIView):
+    """The player shows (or hides) their name and picture on this game's leaderboard."""
+
+    permission_classes = (IsAuthenticated,)
+    throttle_classes = (MissionThrottle,)
+
+    @extend_schema(tags=["missions"], summary="Show my name on this game's leaderboard")
+    def post(self, request, mystery_id):
+        try:
+            customer = _customer(request)
+            view = mystery.view_of(customer, mystery_id)
+        except services.MissionError as exc:
+            return _error(exc)
+        if view.run is None:
+            return _error(services.MissionError("اول بازی را شروع کن.", "not_started"))
+        show = request.data.get("show") is True if isinstance(request.data, dict) else False
+        MysteryRun.objects.filter(pk=view.run.pk, customer=customer).update(show_identity=show, update_time=timezone.now())
+        return Response({"show_identity": show})
 
 
 class CheckinSerializer(serializers.Serializer):

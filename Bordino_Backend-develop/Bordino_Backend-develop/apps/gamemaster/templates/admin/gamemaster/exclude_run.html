@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>این بازیکن‌ها از جدول رده‌بندی بازی‌شان حذف می‌شوند. امتیازهایی که گرفته‌اند سر جایش می‌ماند؛ اگر نتیجهٔ نهایی ثبت شده باشد، یک نتیجهٔ اصلاح‌شدهٔ تازه ساخته می‌شود و نتیجهٔ قبلی هم نگه داشته می‌شود.</p>
+<ul>{% for run in runs %}<li>{{ run.mystery }} — {{ run.customer }} ({{ run.get_status_display }}، {{ run.points_earned }} امتیاز)</li>{% endfor %}</ul>
+<form method="post">{% csrf_token %}
+  {{ form.as_p }}
+  {% for run in runs %}<input type="hidden" name="_selected_action" value="{{ run.pk }}">{% endfor %}
+  <input type="hidden" name="action" value="{{ action }}">
+  <input type="hidden" name="apply" value="1">
+  <input type="submit" value="حذف از جدول">
+</form>
+{% endblock %}

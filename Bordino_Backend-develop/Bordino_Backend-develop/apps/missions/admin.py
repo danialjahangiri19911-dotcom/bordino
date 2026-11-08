@@ -365,20 +365,20 @@ class MysteryAdmin(admin.ModelAdmin):
     actions = ("new_season", "new_qr")
     fieldsets = (
         (None, {"fields": ("title", "summary", "story", "cover", "area", "duration_minutes")}),
-        ("جایزه، زمان و ظرفیت", {"fields": ("finish_points", "hint_penalty", "starts_at", "ends_at", "capacity")}),
+        ("جایزه، زمان و ظرفیت", {"fields": ("finish_points", "hint_penalty", "starts_at", "ends_at", "grace_ends_at", "capacity")}),
         ("نمایش", {"fields": ("is_active", "is_visible", "order")}),
         (
             "بازی سازنده (گیم مستر)",
             {
                 "classes": ("collapse",),
-                "fields": ("owner", "source_version", "presenter", "access", "completion_message", "age_min", "age_max", "gender", "budget_points"),
+                "fields": ("owner", "source_version", "presenter", "access", "completion_message", "age_min", "age_max", "gender", "budget_points", "edition", "leaderboard"),
             },
         ),
     )
     CREATOR_LOCKED = (
         "title", "summary", "story", "cover", "area", "duration_minutes", "finish_points", "hint_penalty", "starts_at",
         "ends_at", "capacity", "owner", "source_version", "presenter", "access", "completion_message", "age_min",
-        "age_max", "gender", "budget_points",
+        "age_max", "gender", "budget_points", "grace_ends_at", "edition", "leaderboard",
     )
 
     def get_readonly_fields(self, request, obj=None):
@@ -466,23 +466,7 @@ class MysteryAdmin(admin.ModelAdmin):
         self.message_user(request, f"برای {done} مرحله QR تازه ساخته شد؛ دوباره چاپ کنید.", messages.SUCCESS)
 
 
-@admin.register(MysteryRun)
-class MysteryRunAdmin(admin.ModelAdmin):
-    list_display = ("create_time", "mystery", "customer", "status", "points_earned", "completed_at")
-    list_filter = ("status", "mystery")
-    search_fields = ("customer__user__phone_number", "mystery__title")
-    list_select_related = ("mystery", "customer__user")
-    readonly_fields = ("mystery", "customer", "status", "points_earned", "wrong_tries", "locked_until", "completed_at", "finish_transaction")
-    exclude = ()
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
+# MysteryRun's admin (with «حذف از جدول») is in apps.gamemaster.admin.
 
 
 @admin.register(MysteryCheckin)

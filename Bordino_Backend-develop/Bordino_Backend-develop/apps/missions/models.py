@@ -338,6 +338,18 @@ class Mystery(AbstractBaseModel):
         null=True, blank=True, verbose_name=_("بودجهٔ امتیاز سازنده"),
         help_text=_("امتیازهایی که سازنده برای جایزهٔ بازیکنان کنار گذاشته؛ هر بازیکن فقط وقتی شروع می‌کند که جایزهٔ کامل او تأمین باشد."),
     )
+    # A creator's game: every version of one edition shares players and a leaderboard (`series` is
+    # the Game; a new edition starts both afresh). A player plays an edition once, whatever version.
+    series = models.UUIDField(null=True, blank=True, db_index=True, editable=False)
+    edition = models.PositiveSmallIntegerField(default=1, verbose_name=_("دوره"))
+    # After `ends_at` nobody new joins; those already playing may finish until `grace_ends_at`
+    # (empty = they stop at `ends_at` too). Both are kept: the end and the end of the grace.
+    grace_ends_at = models.DateTimeField(
+        null=True, blank=True, verbose_name=_("مهلت تمام کردن"),
+        help_text=_("بعد از پایان، فقط کسانی که بازی را شروع کرده‌اند تا این زمان می‌توانند تمامش کنند."),
+    )
+    # The leaderboard's rules (apps.missions.leaderboard; empty = no leaderboard).
+    leaderboard = models.JSONField(default=dict, blank=True, verbose_name=_("جدول رده‌بندی"))
 
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("معمای شهری")
@@ -566,6 +578,11 @@ class MysteryRun(AbstractBaseModel):
     finish_transaction = models.OneToOneField(
         "wallet.ActivityTransaction", on_delete=models.PROTECT, null=True, blank=True, related_name="mystery_run"
     )
+    # The player agreed to show their name and picture on this game's leaderboard (otherwise others
+    # see a masked name and no picture). Only the player sets it.
+    show_identity = models.BooleanField(default=False, verbose_name=_("نمایش نام در جدول"))
+    # Taken off the leaderboard by Bordino (cheating, a dispute); recorded in the game's audit log.
+    leaderboard_excluded = models.BooleanField(default=False, verbose_name=_("حذف از جدول رده‌بندی"))
 
     class Meta(AbstractBaseModel.Meta):
         verbose_name = _("بازی معما")
@@ -600,3 +617,26 @@ class MysteryCheckin(AbstractBaseModel):
 
     def __str__(self):
         return f"{self.step.place_name} — {self.customer}"
+
+
+class LeaderboardSnapshot(AbstractBaseModel):
+    """A leaderboard's final result, frozen when its game ended (and its grace with it). Never
+    changed: a correction (a run taken off the board) is a new snapshot that points at the old."""
+
+    scope = models.CharField(max_length=80, db_index=True)
+    mystery = models.ForeignKey(Mystery, on_delete=models.PROTECT, related_name="leaderboard_snapshots")
+    rows = models.JSONField(default=list)
+    totals = models.JSONField(default=dict)
+    reason = models.CharField(max_length=20, default="final")
+    note = models.TextField(blank=True)
+    replaces = models.OneToOneField("self", on_delete=models.PROTECT, null=True, blank=True, related_name="replaced_by")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+
+    class Meta(AbstractBaseModel.Meta):
+        verbose_name = _("نتیجهٔ نهایی جدول")
+        verbose_name_plural = _("نتیجه‌های نهایی جدول‌ها")
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("A final leaderboard never changes; a correction is a new snapshot.")
+        return super().save(*args, **kwargs)

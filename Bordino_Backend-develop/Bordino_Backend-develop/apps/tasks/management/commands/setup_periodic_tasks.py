@@ -7,6 +7,7 @@ from django.db import transaction
 from django_celery_beat.models import CrontabSchedule, IntervalSchedule, PeriodicTask
 
 from apps.crash.tasks import settle_expired_crash_rounds
+from apps.gamemaster.tasks import gamemaster_tick
 from apps.lottery.tasks import process_lottery_winners
 
 
@@ -65,6 +66,19 @@ class Command(BaseCommand):
                 "name": "settle_expired_crash_rounds",
                 "cron": {
                     "minute": "*",
+                    "hour": "*",
+                    "day_of_week": "*",
+                    "day_of_month": "*",
+                    "month_of_year": "*",
+                },
+                "enabled": True,
+            },
+            {
+                # Creator games: expiry, wrap-up and «ending soon» notices.
+                "task": gamemaster_tick,
+                "name": "gamemaster_tick",
+                "cron": {
+                    "minute": "*/10",
                     "hour": "*",
                     "day_of_week": "*",
                     "day_of_month": "*",
