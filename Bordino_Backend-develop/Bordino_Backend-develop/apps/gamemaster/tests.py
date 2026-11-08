@@ -266,7 +266,8 @@ class GameMasterTests(TestCase):
         self.assertEqual((done["completion_message"], done["step_list"][3]["place"]["coupon"]), ("تمام!", "OFF10"))
         self.assertEqual(budget.summary(m.source_version)["spent"], 35)
         analytics = body(self.api.get(f"/api/v1/gm/games/{gid}/analytics/"))["analytics"]
-        self.assertEqual((analytics["started"], analytics["completed"], analytics["stages"][3]["verified_visit"]), (1, 1, True))
+        # A printed QR is counted as a scan, not a verified visit (a photo of it works anywhere).
+        self.assertEqual((analytics["started"], analytics["completed"], analytics["stages"][3]["verified_visit"], analytics["stages"][3]["qr_printed"]), (1, 1, False, True))
 
     def test_publication_needs_enough_points_and_the_budget_caps_players(self):
         self.onboard()
@@ -459,3 +460,111 @@ class GameMasterPaymentTests(TestCase):
         api.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{engine.steps_of(m)[0].pk}/checkin/", {"answer": "1404"}, format="json")
         api.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{engine.steps_of(m)[1].pk}/checkin/", {"answer": "ب"}, format="json")
         self.assertEqual(GameAuditLog.objects.filter(game_id=self.gid, action="budget_low").count(), 1)
+
+
+
+@override_settings(CACHES=LOCMEM)
+class GameMasterAuditTests(TestCase):
+    """The 2026-11-08 audit: choice guessing, budget left behind, ended games, uploads, QR proof."""
+
+    def setUp(self):
+        cache.clear()
+        OPEN.start()
+        self.addCleanup(OPEN.stop)
+        self.creator = make_player("9120009301", points=5000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.creator)
+        self.player = make_player("9120009302")
+        self.player_api = APIClient()
+        self.player_api.force_authenticate(self.player)
+        self.reviewer = get_user_model().objects.create_superuser(phone_number="9120009399", password="x-Pass-123")
+        self.api.patch("/api/v1/gm/profile/", {"preferred_mode": "creator", "intent": "pro", "accept_terms": True, "business_name": "ک"}, format="json")
+
+    def points(self, user):
+        return TokenWalletAccount.objects.get(wallet__owner=user).amount
+
+    def publish(self, definition, gid=None):
+        if gid is None:
+            gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro"}, format="json"))["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": definition}, format="json")
+        self.assertEqual(self.api.post(f"/api/v1/gm/games/{gid}/submit/", {}, format="json").status_code, 200)
+        services.review(self.reviewer, GameVersion.objects.filter(game_id=gid).order_by("-number").first().pk, "approve")
+        self.assertEqual(self.api.post(f"/api/v1/gm/games/{gid}/publish/", {}, format="json").status_code, 200)
+        return gid, Game.objects.get(pk=gid).live_version.mystery
+
+    def test_guessing_every_option_of_a_choice_pays_nothing(self):
+        gid, m = self.publish(quiz())
+        url = f"/api/v1/missions/mysteries/{m.pk}"
+        self.player_api.post(f"{url}/start/", {}, format="json")
+        steps = engine.steps_of(m)
+        self.player_api.post(f"{url}/steps/{steps[0].pk}/checkin/", {"answer": "1404"}, format="json")
+        wrong = body(self.player_api.post(f"{url}/steps/{steps[1].pk}/checkin/", {"answer": "الف"}, format="json"))
+        self.assertIn("امتیاز این مرحله از دست رفت", wrong["error"])
+        current = body(self.player_api.get(f"{url}/"))["mystery"]["step_list"][1]
+        self.assertEqual(current["points_now"], 0)
+        r = body(self.player_api.post(f"{url}/steps/{steps[1].pk}/checkin/", {"answer": "ب"}, format="json"))
+        self.assertEqual(r["points"], 0)  # solved, the next stage opens, no points
+        self.assertEqual(body(self.player_api.get(f"{url}/"))["mystery"]["step_list"][2]["state"], "current")
+
+    def test_points_held_for_players_of_a_replaced_version_come_back_at_the_end(self):
+        start = self.points(self.creator)
+        gid, old = self.publish(quiz())
+        self.player_api.post(f"/api/v1/missions/mysteries/{old.pk}/start/", {}, format="json")  # starts, then stops playing
+        self.publish(quiz(points=20), gid=gid)  # v2 replaces v1: v1's free budget back, the player's 35 held
+        self.assertEqual(self.points(self.creator), start - 1000 - 1000 + 965)
+        self.api.post(f"/api/v1/gm/games/{gid}/archive/", {}, format="json")
+        self.assertEqual(self.points(self.creator), start)  # everything back: the held 35 too
+        self.assertEqual(GameBudgetLedger.objects.filter(kind="release").count(), 3)
+
+    def test_an_ended_game_is_settled_when_its_creator_looks(self):
+        start = self.points(self.creator)
+        gid, m = self.publish(quiz())
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(minutes=1))
+        listed = body(self.api.get("/api/v1/gm/games/"))["games"][0]
+        self.assertEqual(listed["status"], "archived")
+        self.assertEqual(self.points(self.creator), start)
+
+    def test_a_scheduled_game_shows_published_once_it_starts(self):
+        later = (timezone.now() + timedelta(hours=1)).isoformat()
+        gid, m = self.publish(quiz(starts_at=later))
+        self.assertEqual(Game.objects.get(pk=gid).status, "scheduled")
+        Mystery.objects.filter(pk=m.pk).update(starts_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]["status"], "published")
+
+    def test_uploads_are_capped(self):
+        from apps.gamemaster.models import GameAsset  # pylint: disable=import-outside-toplevel
+        from apps.missions.tests import png  # pylint: disable=import-outside-toplevel
+
+        GameAsset.objects.create(owner=services.profile(self.creator), image="gm/" + "c" * 32 + ".png")  # today's one
+        with mock.patch.dict(services.DEFAULTS, {"GM_MAX_UPLOADS_PER_DAY": 1}):
+            r = self.api.post("/api/v1/gm/uploads/", {"image": png()}, format="multipart")
+            self.assertEqual(body(r)["code"], "limit")  # refused before anything is stored
+        self.assertEqual(GameAsset.objects.count(), 1)
+
+    def test_choice_options_must_differ(self):
+        d = quiz()
+        d["stages"][1]["options"] = ["ب", "ب"]
+        self.assertIn("stages.1.options", schema.check(d))
+
+    def test_a_venue_screen_qr_is_the_verified_visit(self):
+        d = quiz()
+        d["stages"][3]["qr_rotating"] = True
+        gid, m = self.publish(d)
+        step = engine.steps_of(m)[3]
+        self.assertTrue(step.qr_rotating and step.qr_display_key)
+        qr = body(self.api.get(f"/api/v1/gm/games/{gid}/qr/"))["qr"][0]
+        self.assertEqual((qr["svg"], qr["venue_url"].endswith(step.qr_display_key)), ("", True))
+        # The printed token does not work for a venue-screen stage.
+        url = f"/api/v1/missions/mysteries/{m.pk}"
+        self.player_api.post(f"{url}/start/", {}, format="json")
+        steps = engine.steps_of(m)
+        self.player_api.post(f"{url}/steps/{steps[0].pk}/checkin/", {"answer": "1404"}, format="json")
+        self.player_api.post(f"{url}/steps/{steps[1].pk}/checkin/", {"answer": "ب"}, format="json")
+        self.player_api.post(f"{url}/steps/{steps[2].pk}/checkin/", {}, format="json")
+        self.assertEqual(body(self.player_api.post(f"/api/v1/missions/qr/{step.qr_token}/", {}, format="json"))["code"], "qr_expired")
+        from apps.missions import services as mission_services  # pylint: disable=import-outside-toplevel
+
+        code, _ = mission_services.display_code(step)
+        self.assertEqual(self.player_api.post(f"/api/v1/missions/qr/{code}/", {}, format="json").status_code, 200)
+        a = body(self.api.get(f"/api/v1/gm/games/{gid}/analytics/"))["analytics"]["stages"][3]
+        self.assertEqual((a["verified_visit"], a["qr_printed"]), (True, False))

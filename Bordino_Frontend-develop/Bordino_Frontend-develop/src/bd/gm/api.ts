@@ -56,6 +56,8 @@ export interface Stage {
 	lng: number | null;
 	radius_m: number;
 	check_location: boolean;
+	/** A QR stage shown on a screen at the place, changing every 30 s (a photo of it stops working). */
+	qr_rotating?: boolean;
 	staff_code: string;
 	place: Place;
 	hints: string[];
@@ -135,7 +137,7 @@ export interface Analytics {
 	started: number;
 	completed: number;
 	days: string[];
-	stages: { order: number; place: string; proof: string; verified_visit: boolean; total: number; week: number; hints: number; daily: number[] }[];
+	stages: { order: number; place: string; proof: string; verified_visit: boolean; qr_printed?: boolean; total: number; week: number; hints: number; daily: number[] }[];
 	budget: { reserved: number; spent: number; released: number; left: number };
 }
 
@@ -149,7 +151,7 @@ export const useDashboard = () =>
 export const useGame = (id: string) => useQuery<ResponseApiData<{ game: GameFull }>>({ url: `${GM}games/${id}/`, headers: true });
 export const useAnalytics = (id: string) => useQuery<ResponseApiData<{ analytics: Analytics | null }>>({ url: `${GM}games/${id}/analytics/`, headers: true });
 export const useQrCodes = (id: string, enabled = true) =>
-	useQuery<ResponseApiData<{ qr: { order: number; place: string; url: string; svg: string }[] }>>({ url: `${GM}games/${id}/qr/`, headers: true, enabled });
+	useQuery<ResponseApiData<{ qr: { order: number; place: string; url: string; venue_url?: string; svg: string }[] }>>({ url: `${GM}games/${id}/qr/`, headers: true, enabled });
 
 export const createGame = (category: Category, template: string | null) => call<{ game: GameFull }>("post", `${GM}games/`, { category, template });
 export const saveDraft = (id: string, draft: Definition) => call<{ game: GameFull }>("patch", `${GM}games/${id}/`, { draft });

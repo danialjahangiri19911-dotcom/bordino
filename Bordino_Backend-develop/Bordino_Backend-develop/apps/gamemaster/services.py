@@ -46,6 +46,9 @@ DEFAULTS = {
     "GM_SMS_TEMPLATE_PUBLISHED": "gmPublished",
     # How many games a creator may have open (not archived) at once.
     "GM_MAX_OPEN_GAMES": 10,
+    # Image uploads per creator: per day and in all (each ≤5 MB).
+    "GM_MAX_UPLOADS_PER_DAY": 60,
+    "GM_MAX_UPLOADS_TOTAL": 500,
     # Future phases, off until approved.
     "GM_MARKETPLACE_ENABLED": False,
     "GM_USAGE_BILLING_ENABLED": False,
@@ -524,15 +527,45 @@ def archive(actor, game_id, by_admin: bool = False) -> Game:
             return game
         if game.versions.filter(status=VStatus.SUBMITTED).exists() and not by_admin:
             raise GameMasterError("این بازی در بررسی است؛ بعد از بررسی بایگانی کن.", "locked")
-        live = game.live_version
-        if live is not None and getattr(live, "mystery", None) is not None:
-            _close(live.mystery, keep_players=False)
+        # Every version players got (the live one and any it replaced): closed to everyone.
+        played = list(game.versions.filter(mystery__isnull=False).select_related("mystery"))
+        for v in played:
+            _close(v.mystery, keep_players=False)
         game.status = Status.ARCHIVED
         game.save(update_fields=["status", "update_time"])
         audit(game, actor, "admin_archive" if by_admin else "archive")
-    if live is not None:
-        budget.release(live, "archived")  # (its own transaction; once per version)
+    for v in played:
+        budget.release(v, "archived")  # (its own transaction; only what is still left)
     return game
+
+
+def settle(game: Game) -> Game:
+    """Keeps a creator's game in step with time: a scheduled game whose start came is published;
+    a live game whose end passed is archived (its budget goes back). Called when the creator looks."""
+    live = game.live_version
+    mystery = getattr(live, "mystery", None) if live else None
+    if mystery is None or game.status not in LIVE:
+        return game
+    now = timezone.now()
+    if mystery.ends_at and mystery.ends_at <= now:
+        try:
+            return archive(game.owner.user, game.pk)
+        except GameMasterError:
+            return game  # (a version in review: settled after the review)
+    if game.status == Status.SCHEDULED and (not mystery.starts_at or mystery.starts_at <= now):
+        Game.objects.filter(pk=game.pk, status=Status.SCHEDULED).update(status=Status.PUBLISHED)
+        game.status = Status.PUBLISHED
+    return game
+
+
+def check_upload_quota(p: CreatorProfile):
+    from apps.gamemaster.models import GameAsset  # pylint: disable=import-outside-toplevel
+
+    mine = GameAsset.objects.filter(owner=p)
+    if mine.count() >= int(setting("GM_MAX_UPLOADS_TOTAL") or 500):
+        raise GameMasterError("سقف تعداد تصویرهای تو پر شده است.", "limit")
+    if mine.filter(create_time__gte=timezone.now() - timedelta(days=1)).count() >= int(setting("GM_MAX_UPLOADS_PER_DAY") or 60):
+        raise GameMasterError("امروز تصویر زیادی بارگذاری کرده‌ای؛ فردا دوباره امتحان کن.", "limit")
 
 
 # ── preview (nothing is recorded, nothing is paid) ──

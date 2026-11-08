@@ -428,6 +428,9 @@ def mystery_detail(view: mystery.View) -> dict:
         if step.pk in visits:
             item.update(state="done", clue=step.clue, place=_place(step), visited_at=visits[step.pk].create_time.isoformat())
         elif current is not None and step.pk == current.pk:
+            help_now = mystery.hint_view(step, m, run.hints_used)
+            if step.proof == MysteryStep.Proof.CHOICE and (run.wrong_tries or run.locked_until):
+                help_now.update(points_now=0, next_hint_cost=0)  # a wrong pick: nothing left to win here
             limit_left = None
             if step.time_limit_s and run.step_started_at:
                 limit_left = max(0, int(step.time_limit_s - (now - run.step_started_at).total_seconds()))
@@ -436,7 +439,7 @@ def mystery_detail(view: mystery.View) -> dict:
                 clue=step.clue,
                 clue_image=_media(step.clue_image),
                 answer_type=step.answer_type if step.proof == MysteryStep.Proof.ANSWER else "text",
-                **mystery.hint_view(step, m, run.hints_used),
+                **help_now,
                 proof=step.proof,
                 options=list(step.options or []) if step.proof == MysteryStep.Proof.CHOICE else [],
                 time_limit_s=step.time_limit_s,

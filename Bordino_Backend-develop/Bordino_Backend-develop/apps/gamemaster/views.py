@@ -132,6 +132,8 @@ class GamesView(APIView):
             p = services.creator(request.user)
         except services.GameMasterError as exc:
             return _error(exc)
+        for game in Game.objects.filter(owner=p, status__in=services.LIVE):
+            services.settle(game)
         games = Game.objects.filter(owner=p).select_related("live_version").order_by("-update_time")
         counts = dict(Game.objects.filter(owner=p).values_list("status").annotate(n=Count("id")).values_list("status", "n"))
         return Response({"games": [game_payload(g) for g in games], "counts": counts})
@@ -153,7 +155,7 @@ class GameView(APIView):
     @extend_schema(tags=TAGS, summary="One of my games, with its draft")
     def get(self, request, game_id):
         try:
-            game = services.owned(request.user, game_id)
+            game = services.settle(services.owned(request.user, game_id))
         except services.GameMasterError as exc:
             return _error(exc)
         return Response({"game": game_payload(game, full=True)})
@@ -236,8 +238,12 @@ class QrView(APIView):
         for step in engine.steps_of(mystery):
             if step.proof != step.Proof.QR or not step.qr_token:
                 continue
+            if step.qr_rotating:
+                # A screen at the place shows a new code every 30 s (a photo of it stops working).
+                items.append({"order": step.order, "place": step.place_name, "venue_url": f"{base}/venue/{step.qr_display_key}", "url": "", "svg": ""})
+                continue
             url = f"{base}/pwa/earn/qr/{step.qr_token}"
-            items.append({"order": step.order, "place": step.place_name, "url": url, "svg": segno.make(url, error="m").svg_inline(scale=6, border=2)})
+            items.append({"order": step.order, "place": step.place_name, "url": url, "venue_url": "", "svg": segno.make(url, error="m").svg_inline(scale=6, border=2)})
         return Response({"qr": items})
 
 
@@ -268,8 +274,10 @@ class AnalyticsView(APIView):
                             "order": row["step"].order,
                             "place": row["step"].place_name,
                             "proof": row["step"].proof,
-                            # A QR scanned at the place is a verified visit; a location or an answer is not proof of one.
-                            "verified_visit": row["step"].proof == row["step"].Proof.QR,
+                            # Only the venue screen's changing QR proves the player was there; a printed QR
+                            # can be photographed and shared, a location or an answer proves nothing.
+                            "verified_visit": row["step"].proof == row["step"].Proof.QR and row["step"].qr_rotating,
+                            "qr_printed": row["step"].proof == row["step"].Proof.QR and not row["step"].qr_rotating,
                             "total": row["total"],
                             "week": row["week"],
                             "hints": row["hints"],
@@ -297,6 +305,7 @@ class UploadView(APIView):
             p = services.creator(request.user)
             if not image:
                 raise services.GameMasterError("تصویری فرستاده نشد.")
+            services.check_upload_quota(p)
             mission_services._check_image(image)  # pylint: disable=protected-access
         except services.GameMasterError as exc:
             return _error(exc)

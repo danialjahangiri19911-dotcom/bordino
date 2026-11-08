@@ -385,6 +385,8 @@ def _pay(run: MysteryRun, step: MysteryStep, method: str, distance=None, accurac
     points = step_points(step, mystery, run.hints_used)
     if step.time_limit_s and run.step_started_at and (now - run.step_started_at).total_seconds() > step.time_limit_s:
         points = 0  # solved, but after its time: no points
+    if step.proof == Proof.CHOICE and (run.wrong_tries or run.locked_until):
+        points = 0  # a choice is one guess: trying every option must not pay (the stage still opens the next)
     checkin = MysteryCheckin.objects.create(
         run=run, step=step, customer=run.customer, method=method, points=points, hints_used=run.hints_used,
         distance_m=distance, accuracy_m=accuracy,
@@ -499,7 +501,10 @@ def checkin(customer: Customer, mystery_id, step_id, data: dict) -> Result:
             refusal = MissionError(f"{noun} درست نیست. چند بار اشتباه شد؛ {minutes} دقیقهٔ دیگر دوباره امتحان کن.", "locked")
         else:
             left = WRONG_LIMIT - run.wrong_tries
-            refusal = MissionError(f"{noun} درست نیست؛ {left} بار دیگر می‌توانی امتحان کنی.", "wrong")
+            if step.proof == Proof.CHOICE:
+                refusal = MissionError("این گزینه درست نیست؛ امتیاز این مرحله از دست رفت، ولی می‌توانی ادامه بدهی.", "wrong")
+            else:
+                refusal = MissionError(f"{noun} درست نیست؛ {left} بار دیگر می‌توانی امتحان کنی.", "wrong")
         run.save(update_fields=["wrong_tries", "locked_until", "update_time"])
     raise refusal
 

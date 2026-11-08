@@ -152,6 +152,7 @@ def clean(definition) -> dict:
                 "lng": _float(raw.get("lng")),
                 "radius_m": _int(raw.get("radius_m"), 20, 2000) or 100,
                 "check_location": bool(raw.get("check_location")),
+                "qr_rotating": bool(raw.get("qr_rotating")) and kind == "qr",
                 "staff_code": _text(raw.get("staff_code"), 40),
                 "place": {
                     "name": _text(place.get("name"), 120),
@@ -211,6 +212,8 @@ def check(definition: dict) -> dict:
                 errors[f"{p}.question"] = "پرسش را بنویسید."
             if len(s["options"]) < 2:
                 errors[f"{p}.options"] = "دست‌کم دو گزینه بنویسید."
+            elif len(set(s["options"])) != len(s["options"]):
+                errors[f"{p}.options"] = "گزینه‌ها نباید تکراری باشند."
             elif not s["answers"] or s["answers"][0] not in s["options"]:
                 errors[f"{p}.answers"] = "گزینهٔ درست را انتخاب کنید."
         if t == "staff" and not s["staff_code"]:
@@ -254,6 +257,7 @@ def compile_steps(definition: dict) -> list[dict]:
                 "longitude": f"{s['lng']:.6f}" if has_point(s) else None,
                 "radius_m": s["radius_m"],
                 "check_location": bool(s["check_location"] and proof in ("answer", "staff", "choice", "info")),
+                "qr_rotating": bool(s.get("qr_rotating")) and proof == "qr",
                 "time_limit_s": s["time_limit_s"],
                 "coupon_text": s["coupon"],
                 "is_place": is_place,

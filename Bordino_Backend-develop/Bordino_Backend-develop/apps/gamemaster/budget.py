@@ -103,20 +103,21 @@ def outstanding(version: GameVersion) -> int:
 
 
 def release(version: GameVersion, reason: str = "end"):
-    """Gives the creator back what is left (the game ended, was archived or replaced). Once per version."""
+    """Gives the creator back what no player can still win (the game ended, was archived or
+    replaced). May run again later: each time only what became free since (players who were still
+    playing a replaced version and finished or stopped), under the version's lock."""
     with transaction.atomic():
         GameVersion.objects.select_for_update().filter(pk=version.pk).first()
-        key = f"release:{version.pk}"
-        if GameBudgetLedger.objects.filter(key=key).exists():
-            return None
         left = summary(version)["left"] - outstanding(version)
         if left <= 0:
             return None
+        n = GameBudgetLedger.objects.filter(version=version, kind=Kind.RELEASE).count() + 1
+        key = f"release:{version.pk}:{n}"
         user = version.game.owner.user
         tx = ActivityTransaction.objects.create(
             customer=user.customer,
             section=SECTION,
-            action_type=f"gm-release:{version.pk}",
+            action_type=f"gm-release:{version.pk}:{n}",
             score_value=left,
             reward_data={"score": left},
             metadata={"game": str(version.game_id), "reason": reason, "title": f"برگشت بودجهٔ بازی «{version.game.title}»"},
