@@ -1,3 +1,4 @@
+import type { Board } from "../gm/api";
 import { MISSIONS, type MissionReward } from "./api";
 import { call } from "@/api/games/request";
 import type { ResponseApiData } from "@/libs/http/interfaces";
@@ -27,6 +28,8 @@ export interface MysteryCard {
 	/** A creator's game (Game Master), and who presents it (servers before 2026-11-08: absent). */
 	creator?: boolean;
 	presenter?: string;
+	/** It has a leaderboard (servers before the leaderboards: absent). */
+	has_leaderboard?: boolean;
 }
 
 /** The place of a solved step: what the mystery introduces. */
@@ -95,6 +98,11 @@ export interface MysteryDetail extends MysteryCard {
 		locked_in: number;
 	} | null;
 	step_list: MysteryStep[];
+	/** The leaderboard: its rules (shown before joining) and whether this player may see it now. */
+	leaderboard?: { enabled: false } | { enabled: true; visible: boolean; reason: string; name: string; rules: string; show_identity: boolean };
+	/** Ended for newcomers, those playing may finish until then. */
+	grace_ends_at?: string | null;
+	in_grace?: boolean;
 }
 
 export interface CheckinReward {
@@ -118,6 +126,12 @@ export function useMystery(id: string) {
 
 /** A private game's invite: joins it (or reopens it). */
 export const joinByInvite = (token: string) => call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}invite/${encodeURIComponent(token)}/`, {});
+
+export function useMysteryBoard(id: string, limit = 20) {
+	return useQuery<ResponseApiData<{ board: Board }>>({ url: `${MYSTERIES}${id}/leaderboard/?limit=${limit}`, headers: true });
+}
+export const moreOfBoard = (id: string, offset: number, limit = 20) => call<{ board: Board }>("get", `${MYSTERIES}${id}/leaderboard/?offset=${offset}&limit=${limit}`);
+export const showMyName = (id: string, show: boolean) => call<{ show_identity: boolean }>("post", `${MYSTERIES}${id}/leaderboard/identity/`, { show });
 
 export const startMystery = (id: string) => call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}${id}/start/`, {});
 

@@ -41,7 +41,23 @@ function nextStep(g: GameSummary): string {
 	if (g.status === "paused") return g.paused_by_admin ? "بردینو متوقفش کرده است." : "متوقف است.";
 	if (g.status === "scheduled") return "منتشر شده؛ از زمان شروع باز می‌شود.";
 	if (g.status === "published") return "برای بازیکنان باز است.";
+	if (g.status === "expired") return "به پایان رسیده؛ برای تمدید یا دورهٔ تازه، نسخهٔ تازه بفرست.";
 	return "";
+}
+
+const BOARD_NAME: Record<string, string> = { progress: "بیشترین مرحله", score: "بیشترین امتیاز", speed: "سریع‌ترین پایان", participation: "فعالیت", team: "تیمی" };
+
+/** A published game's life at a glance: days left / end date, players, the leaderboard. */
+function lifeLine(g: GameSummary): string {
+	if (!g.live_version) return g.leaderboard && g.leaderboard !== "none" ? `جدول: ${BOARD_NAME[g.leaderboard] ?? ""}` : "";
+	const parts: string[] = [];
+	if (g.status === "expired") parts.push(g.expires_at ? `پایان: ${dateText(g.expires_at)}` : "به پایان رسیده");
+	else if (g.days_left != null) parts.push(g.days_left === 0 ? "امروز تمام می‌شود" : `${fa(g.days_left)} روز مانده (تا ${dateText(g.expires_at)})`);
+	else parts.push("بدون پایان خودکار");
+	parts.push(`${fa(g.active ?? 0)} فعال`, `${fa(g.finished ?? 0)} تمام کرده`);
+	parts.push(g.leaderboard && g.leaderboard !== "none" ? `جدول: ${BOARD_NAME[g.leaderboard] ?? ""}${g.board_final ? " (نهایی)" : ""}` : "بدون جدول");
+	if ((g.edition ?? 1) > 1) parts.push(`دورهٔ ${fa(g.edition)}`);
+	return parts.join(" · ");
 }
 
 export function GameRow({ g }: { g: GameSummary }) {
@@ -55,6 +71,7 @@ export function GameRow({ g }: { g: GameSummary }) {
 				<small>
 					{CATEGORY_LABEL[g.category]} · {fa(g.stages)} مرحله · {nextStep(g)}
 				</small>
+				{lifeLine(g) ? <small className="gm-row-meta">{lifeLine(g)}</small> : null}
 				<span className={`bd-tag mi-state gm-st-${g.status}`}>{STATUS_LABEL[g.status]}</span>
 			</span>
 			<Icon name="chevron-right" />
@@ -69,7 +86,12 @@ export function Dashboard() {
 	const list = games.data?.result?.games ?? [];
 	const by = dash.data?.result?.by_status ?? {};
 	const sum = (...keys: GameStatus[]) => keys.reduce((n, k) => n + (by[k] ?? 0), 0);
-	const needsMe = list.filter((g) => ["changes_requested", "rejected", "approved"].includes(g.status) || g.latest_version?.status === "approved");
+	const needsMe = list.filter(
+		(g) =>
+			["changes_requested", "rejected", "approved"].includes(g.status) ||
+			g.latest_version?.status === "approved" ||
+			(["published", "scheduled", "paused"].includes(g.status) && g.days_left != null && g.days_left <= 7),
+	);
 	return (
 		<CreatorShell
 			nav="home"
@@ -139,13 +161,13 @@ const FILTERS: [Filter, string][] = [
 	["draft", "پیش‌نویس"],
 	["review", "بررسی"],
 	["live", "منتشرشده"],
-	["archived", "بایگانی"],
+	["archived", "تمام‌شده"],
 ];
 const IN: Record<Exclude<Filter, "all">, GameStatus[]> = {
 	draft: ["draft", "changes_requested", "rejected"],
 	review: ["submitted", "approved"],
 	live: ["published", "scheduled", "paused"],
-	archived: ["archived"],
+	archived: ["expired", "archived"],
 };
 
 export function GamesList() {

@@ -25,6 +25,7 @@ export const R = {
 	earn: "/pwa/earn",
 	earnQr: (token: string) => `/pwa/earn/qr/${token}`,
 	mystery: (id: string) => `/pwa/earn/mystery/${id}`,
+	mysteryBoard: (id: string) => `/pwa/earn/mystery/${id}/leaderboard`,
 	play: (token: string) => `/pwa/play/${token}`,
 	appMode: "/pwa/profile/mode",
 	gm: "/pwa/gm",

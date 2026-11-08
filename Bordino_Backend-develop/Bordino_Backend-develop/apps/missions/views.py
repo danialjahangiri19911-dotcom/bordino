@@ -384,7 +384,7 @@ def mystery_card(view: mystery.View) -> dict:
         # A creator's game (Game Master): who presents it.
         "creator": m.is_creator_game,
         "presenter": m.presenter,
-        "leaderboard": boards.enabled(m.leaderboard),
+        "has_leaderboard": boards.enabled(m.leaderboard),
     }
 
 

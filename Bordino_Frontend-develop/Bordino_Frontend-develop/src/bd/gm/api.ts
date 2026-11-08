@@ -18,6 +18,7 @@ export type GameStatus =
 	| "scheduled"
 	| "published"
 	| "paused"
+	| "expired"
 	| "archived";
 export type StageType = "question" | "puzzle" | "choice" | "qr" | "location" | "staff" | "media" | "reward";
 
@@ -84,7 +85,81 @@ export interface Definition {
 	hint_penalty: number;
 	budget_points: number;
 	completion_message: string;
+	availability: Availability;
+	leaderboard: BoardConfig;
 	stages: Stage[];
+}
+
+/** When the game stops taking players, and what those already playing may still do. */
+export interface Availability {
+	expiry: "none" | "date" | "duration";
+	duration_value: number | null;
+	duration_unit: "days" | "months";
+	after: "strict" | "finish";
+	grace_hours: number;
+}
+
+export type BoardPreset = "none" | "progress" | "score" | "speed" | "participation" | "team";
+export type BoardMetric = "stages" | "progress" | "score" | "duration" | "team";
+export type BoardShow = "rank" | "name" | "avatar" | "stages" | "percent" | "bar" | "score" | "time" | "participants" | "finishers";
+export interface BoardConfig {
+	preset: BoardPreset;
+	customized?: boolean;
+	rank_by?: BoardMetric[];
+	only_finishers?: boolean;
+	visibility?: "players" | "finishers" | "creator";
+	after?: "keep" | "top10" | "hide" | "participants" | "creator";
+	period?: "lifetime" | "daily" | "weekly" | "monthly" | "range";
+	attempts?: "first";
+	top?: 3 | 10 | 20 | 50;
+	full?: boolean;
+	highlight_me?: boolean;
+	show?: Record<BoardShow, boolean>;
+}
+
+export interface GmOptions {
+	leaderboard: {
+		presets: Record<Exclude<BoardPreset, "none" | "team">, BoardConfig & { name: string }>;
+		metrics: Record<string, string>;
+		unsupported_metrics: Record<string, string>;
+		periods: string[];
+		future_periods: string[];
+		tops: number[];
+		teams: boolean;
+		categories: Record<Category, boolean>;
+	};
+	availability: { max_days: Record<Category, number>; max_grace_hours: number; zone: string };
+}
+
+export interface BoardRow {
+	position: number;
+	name: string;
+	avatar: string | null;
+	is_me: boolean;
+	stages: number;
+	total: number;
+	percent: number;
+	score: number;
+	seconds: number | null;
+	completed: boolean;
+}
+
+export interface Board {
+	enabled: boolean;
+	visible: boolean;
+	reason: string;
+	title?: string;
+	totals: { players: number; finishers: number; stages: number };
+	config: { preset: BoardPreset; name?: string; rules?: string; show?: Record<BoardShow, boolean>; highlight_me?: boolean; top?: number; full?: boolean; only_finishers?: boolean };
+	rows?: BoardRow[];
+	me?: BoardRow | null;
+	my_progress?: { stages: number; completed: boolean } | null;
+	show_identity?: boolean;
+	count?: number;
+	offset?: number;
+	more?: boolean;
+	final?: boolean;
+	finalized_at?: string;
 }
 
 export interface VersionInfo {
@@ -113,6 +188,15 @@ export interface GameSummary {
 	live_version: VersionInfo | null;
 	/** The live game's player page (/pwa/earn/mystery/<id>). */
 	mystery_id: string | null;
+	edition: number;
+	leaderboard: BoardPreset;
+	expires_at: string | null;
+	grace_ends_at: string | null;
+	days_left: number | null;
+	players: number;
+	active: number;
+	finished: number;
+	board_final: boolean;
 }
 
 export interface GameFull extends GameSummary {
@@ -122,6 +206,9 @@ export interface GameFull extends GameSummary {
 	max_run_points: number;
 	budget?: { reserved: number; spent: number; released: number; left: number };
 	invite_url?: string;
+	/** What publishing the approved version does: the first edition, the same edition goes on (or a
+	 * new one if chosen), or only a new edition (the last one is over for good). */
+	next_publish: "first" | "continue" | "new_only";
 }
 
 export interface Template {
@@ -134,6 +221,19 @@ export interface Template {
 }
 
 export interface Analytics {
+	/** Joined, solved at least one stage, moved in the last 7 days, finished: never one for another. */
+	enrolled: number;
+	started_playing: number;
+	active: number;
+	completed_players: number;
+	completion_rate: number;
+	average_progress: number;
+	stage_completions: number;
+	verified_visits: number;
+	reward_claims: number;
+	edition: number;
+	drop_off: number[];
+	leaderboard: BoardPreset;
 	started: number;
 	completed: number;
 	days: string[];
@@ -150,6 +250,8 @@ export const useDashboard = () =>
 	useQuery<ResponseApiData<{ by_status: Record<string, number>; players: number; completed: number }>>({ url: `${GM}dashboard/`, headers: true });
 export const useGame = (id: string) => useQuery<ResponseApiData<{ game: GameFull }>>({ url: `${GM}games/${id}/`, headers: true });
 export const useAnalytics = (id: string) => useQuery<ResponseApiData<{ analytics: Analytics | null }>>({ url: `${GM}games/${id}/analytics/`, headers: true });
+export const useGmOptions = () => useQuery<ResponseApiData<GmOptions>>({ url: `${GM}options/`, headers: true });
+export const useGameBoard = (id: string, enabled = true) => useQuery<ResponseApiData<{ board: Board | null }>>({ url: `${GM}games/${id}/leaderboard/`, headers: true, enabled });
 export const useQrCodes = (id: string, enabled = true) =>
 	useQuery<ResponseApiData<{ qr: { order: number; place: string; url: string; venue_url?: string; svg: string }[] }>>({ url: `${GM}games/${id}/qr/`, headers: true, enabled });
 
@@ -166,7 +268,8 @@ export const useShare = (id: string) => useQuery<ResponseApiData<ShareInfo>>({ u
 export const createGame = (category: Category, template: string | null) => call<{ game: GameFull }>("post", `${GM}games/`, { category, template });
 export const saveDraft = (id: string, draft: Definition) => call<{ game: GameFull }>("patch", `${GM}games/${id}/`, { draft });
 export type GameAction = "submit" | "publish" | "pause" | "resume" | "archive" | "duplicate";
-export const gameAction = (id: string, action: GameAction) => call<{ game: GameFull | null }>("post", `${GM}games/${id}/${action}/`, {});
+export const gameAction = (id: string, action: GameAction, data: { new_edition?: boolean } = {}) =>
+	call<{ game: GameFull | null }>("post", `${GM}games/${id}/${action}/`, data);
 export const previewStage = (id: string, data: { stage: string; answer?: string; code?: string; lat?: number; lng?: number; accuracy?: number; simulate_location?: boolean }) =>
 	call<{ ok: boolean; message: string; points: number; coupon: string }>("post", `${GM}games/${id}/preview/`, data);
 
@@ -191,6 +294,7 @@ export const STATUS_LABEL: Record<GameStatus, string> = {
 	scheduled: "زمان‌بندی‌شده",
 	published: "منتشرشده",
 	paused: "متوقف",
+	expired: "به پایان رسیده",
 	archived: "بایگانی",
 };
 

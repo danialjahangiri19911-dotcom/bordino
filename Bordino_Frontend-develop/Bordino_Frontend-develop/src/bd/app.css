@@ -596,3 +596,42 @@ body { margin: 0; }
 #bordino-directions .gm-venue { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px dashed var(--bd-border); border-radius: 10px; }
 #bordino-directions .gm-venue code { overflow-wrap: anywhere; font-size: 11px; }
 #bordino-directions .gm-bars em.gm-printed { color: var(--bd-muted); }
+/* Leaderboards (player + creator preview) and the editor's competition / availability steps */
+#bordino-directions .lb-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+#bordino-directions .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--bd-border); border-radius: 12px; background: var(--bd-surface); }
+#bordino-directions .lb-row[data-me=true] { border-color: var(--bd-accent); box-shadow: 0 0 0 2px var(--bd-accent); background: var(--bd-tint); }
+#bordino-directions .lb-rank { flex: none; min-width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%; font-weight: 800; background: var(--bd-tint); }
+#bordino-directions .lb-top-1 { background: #f6c945; color: #2a2100; }
+#bordino-directions .lb-top-2 { background: #cfd6de; color: #1d232a; }
+#bordino-directions .lb-top-3 { background: #e0a26b; color: #2b1606; }
+#bordino-directions .lb-avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center; background: var(--bd-tint); color: var(--bd-muted); }
+#bordino-directions .lb-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#bordino-directions .lb-avatar svg { width: 18px; height: 18px; }
+#bordino-directions .lb-who { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+#bordino-directions .lb-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bordino-directions .lb-who small { color: var(--bd-muted); font-size: 11px; }
+#bordino-directions .lb-bar { display: block; height: 6px; border-radius: 4px; background: var(--bd-tint); overflow: hidden; }
+#bordino-directions .lb-bar > span { display: block; height: 100%; background: var(--bd-accent); }
+#bordino-directions .lb-metric { flex: none; display: grid; justify-items: end; gap: 2px; font-size: 13px; }
+#bordino-directions .lb-metric small { color: var(--bd-muted); font-size: 11px; }
+#bordino-directions .lb-summary h2 { margin: 0 0 6px; font-size: 18px; }
+#bordino-directions .lb-mine { display: grid; gap: 4px; margin: 10px 0; }
+#bordino-directions .lb-more { width: 100%; justify-content: center; }
+#bordino-directions .lb-identity { margin-top: 14px; }
+#bordino-directions .my-board { display: grid; gap: 6px; margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--bd-border); border-radius: 12px; }
+#bordino-directions .my-board b { display: flex; align-items: center; gap: 6px; }
+#bordino-directions .my-board small { font-size: 12px; line-height: 1.8; }
+#bordino-directions .gm-q { font-weight: 700; margin: 0 0 6px; }
+#bordino-directions .gm-preset small b { color: var(--bd-fg); }
+#bordino-directions .gm-preset[aria-disabled=true] { opacity: .6; cursor: default; }
+#bordino-directions .gm-advanced { display: grid; gap: 12px; margin: 10px 0; }
+#bordino-directions .gm-advanced fieldset, #bordino-directions .gm-availability { border: 1px solid var(--bd-border); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; }
+#bordino-directions .gm-advanced legend, #bordino-directions .gm-availability legend { font-weight: 700; padding: 0 6px; }
+#bordino-directions .gm-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 12px; }
+#bordino-directions .gm-check-grid .gm-check { margin: 4px 0; }
+#bordino-directions .gm-more summary { cursor: pointer; font-weight: 700; }
+#bordino-directions .gm-rules { margin: 8px 0; padding-inline-start: 18px; font-size: 12px; line-height: 1.9; }
+#bordino-directions .gm-board-preview { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: var(--bd-tint); }
+#bordino-directions .gm-duration { display: grid; gap: 8px; margin: 6px 0 10px; }
+#bordino-directions .gm-drop { color: var(--bd-muted); font-size: 11px; }
+#bordino-directions .gm-row-meta { display: block; color: var(--bd-muted); font-size: 11px; }

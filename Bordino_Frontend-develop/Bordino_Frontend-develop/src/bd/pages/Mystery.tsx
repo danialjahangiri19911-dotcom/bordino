@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { APK_URL } from "../BackButton";
 import Icon from "../Icon";
@@ -436,6 +437,7 @@ function CurrentStep({
 export default function Mystery({ id }: { id: string }) {
 	const { data, isLoading, error, refetch } = useMystery(id);
 	const queryClient = useQueryClient();
+	const router = useRouter();
 	const [live, setLive] = useState<MysteryDetail | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [problem, setProblem] = useState<string | null>(null);
@@ -445,6 +447,10 @@ export default function Mystery({ id }: { id: string }) {
 	const [now, setNow] = useState(() => Date.now());
 	useEffect(() => setLive(null), [data]);
 	const m = live ?? data?.result?.mystery ?? null;
+	// A newer version of a game this player already plays: their own (earlier) version opens.
+	useEffect(() => {
+		if (m && m.id !== id) router.replace(R.mystery(m.id));
+	}, [m, id, router]);
 	const lockedIn = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
 
 	useEffect(() => {
@@ -609,6 +615,32 @@ export default function Mystery({ id }: { id: string }) {
 					) : null}
 				</ul>
 				{m.story ? <p className="my-story">{m.story}</p> : null}
+				{m.in_grace && m.grace_ends_at && m.run && m.run.status !== "completed" ? (
+					<p className="my-note">
+						<Icon name="hourglass" /> زمان این بازی تمام شده؛ چون شروعش کرده‌ای تا {dateText(m.grace_ends_at)} وقت داری تمامش کنی.
+					</p>
+				) : null}
+				{m.leaderboard?.enabled ? (
+					<div className="my-board">
+						<b>
+							<Icon name="trophy" /> جدول رده‌بندی: {m.leaderboard.name}
+						</b>
+						<small>{m.leaderboard.rules}</small>
+						{m.leaderboard.visible ? (
+							<Link className="bd-secondary" href={R.mysteryBoard(m.id)}>
+								<Icon name="medal" /> دیدن جدول
+							</Link>
+						) : (
+							<small className="bd-muted">
+								{m.leaderboard.reason === "finish_first"
+									? "جدول بعد از تمام کردن بازی باز می‌شود."
+									: m.leaderboard.reason === "not_playing"
+										? "بعد از شروع بازی، جدول را می‌بینی."
+										: ""}
+							</small>
+						)}
+					</div>
+				) : null}
 				{m.run ? (
 					<div
 						className="my-progress"

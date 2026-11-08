@@ -41,9 +41,14 @@ import {
 	useAnalytics,
 	type ShareInfo,
 	useGame,
+	useGameBoard,
+	useGmOptions,
 	useQrCodes,
 	useShare,
 } from "./api";
+import AvailabilitySetup from "./AvailabilitySetup";
+import BoardSetup from "./BoardSetup";
+import { LeaderList } from "../board";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -51,6 +56,7 @@ import { gameErrorMessage } from "@/api/games/request";
 type Tab =
 	| "info"
 	| "stages"
+	| "board"
 	| "audience"
 	| "rewards"
 	| "preview"
@@ -59,10 +65,11 @@ type Tab =
 const TABS: [Tab, string][] = [
 	["info", "۱. اطلاعات"],
 	["stages", "۲. مرحله‌ها"],
-	["audience", "۳. مخاطب و زمان"],
-	["rewards", "۴. جایزه و بودجه"],
-	["preview", "۵. امتحان"],
-	["publish", "۶. ارسال و انتشار"],
+	["board", "۳. رقابت و جدول"],
+	["audience", "۴. مخاطب و زمان"],
+	["rewards", "۵. جایزه و بودجه"],
+	["preview", "۶. امتحان"],
+	["publish", "۷. ارسال و انتشار"],
 	["stats", "آمار"],
 ];
 const STAGE_TYPES: StageType[] = [
@@ -910,6 +917,10 @@ function PreviewRunner({ game }: { game: GameFull }) {
 	);
 }
 
+function dateTimeText(iso: string) {
+	return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
 function problemText(path: string, message: string, d: Definition) {
 	const m = path.match(/^stages\.(\d+)/);
 	if (m) {
@@ -930,22 +941,30 @@ function Stats({ id }: { id: string }) {
 			<div className="gm-stats">
 				{(
 					[
-						["شروع کرده‌اند", a.started, "users"],
-						["تمام کرده‌اند", a.completed, "trophy"],
-						["امتیاز پرداخت‌شده", a.budget.spent, "coins"],
-						["بودجهٔ مانده", a.budget.left, "wallet"],
-					] as [string, number, IconName][]
-				).map(([label, n, icon]) => (
-					<div key={label} className="bd-panel gm-stat">
+						["وارد شده‌اند", a.enrolled ?? a.started, "user-plus", "بازی را شروع کرده‌اند (ثبت‌نام)"],
+						["مرحله حل کرده‌اند", a.started_playing ?? a.started, "users", "دست‌کم یک مرحله را درست حل کرده‌اند"],
+						["فعال", a.active ?? 0, "zap", "در ۷ روز گذشته پیش رفته‌اند و هنوز تمام نکرده‌اند"],
+						["تمام کرده‌اند", a.completed_players ?? a.completed, "trophy", ""],
+						["درصد پایان", a.completion_rate ?? 0, "flag", "از کسانی که وارد شده‌اند"],
+						["میانگین پیشرفت", a.average_progress ?? 0, "arrow-up-right", "درصد"],
+						["مرحله‌های حل‌شده", a.stage_completions ?? 0, "check", "همهٔ اثبات‌های معتبر"],
+						["بازدید تأییدشده", a.verified_visits ?? 0, "badge-check", "اسکن QR نمایشگر محل"],
+						["کد هدیهٔ دریافت‌شده", a.reward_claims ?? 0, "gift", ""],
+						["امتیاز پرداخت‌شده", a.budget.spent, "coins", "هزینهٔ کمپین"],
+						["بودجهٔ مانده", a.budget.left, "wallet", ""],
+					] as [string, number, IconName, string][]
+				).map(([label, n, icon, hint]) => (
+					<div key={label} className="bd-panel gm-stat" title={hint || undefined}>
 						<Icon name={icon} />
-						<b>{fa(n)}</b>
+						<b>{fa(n)}{label === "درصد پایان" || label === "میانگین پیشرفت" ? "٪" : ""}</b>
 						<small>{label}</small>
 					</div>
 				))}
 			</div>
+			<small className="bd-muted">دورهٔ {fa(a.edition ?? 1)} · «وارد شده»، «مرحله حل کرده»، «فعال» و «تمام کرده» چهار گروه جدا هستند.</small>
 			<Panel title="هر مرحله">
 				<ul className="gm-bars">
-					{a.stages.map((s) => (
+					{a.stages.map((s, i) => (
 						<li key={s.order}>
 							<span>
 								{fa(s.order)}. {s.place}
@@ -959,6 +978,7 @@ function Stats({ id }: { id: string }) {
 								<i style={{ width: `${(s.total / top) * 100}%` }} />
 							</span>
 							<b>{fa(s.total)}</b>
+							{a.drop_off?.[i] ? <small className="gm-drop">ریزش {fa(a.drop_off[i])}٪</small> : null}
 						</li>
 					))}
 				</ul>
@@ -968,7 +988,23 @@ function Stats({ id }: { id: string }) {
 					آن. آمار جمعی است و اطلاعات شخصی بازیکنان نشان داده نمی‌شود.
 				</small>
 			</Panel>
+			{a.leaderboard && a.leaderboard !== "none" ? <CreatorBoard id={id} /> : null}
 		</>
+	);
+}
+
+/** The game's leaderboard as its creator sees it (names masked unless a player chose otherwise). */
+function CreatorBoard({ id }: { id: string }) {
+	const { data } = useGameBoard(id);
+	const b = data?.result?.board;
+	if (!b?.rows) return null;
+	return (
+		<Panel title={b.final ? "جدول رده‌بندی (نتیجهٔ نهایی)" : "جدول رده‌بندی"}>
+			<p className="bd-muted">
+				{fa(b.totals.players)} شرکت‌کننده · {fa(b.totals.finishers)} نفر تمام کردند{b.config.rules ? ` · ${b.config.rules}` : ""}
+			</p>
+			{b.rows.length ? <LeaderList rows={b.rows} show={{ ...b.config.show, rank: true }} /> : <p className="bd-muted">هنوز کسی در جدول نیست.</p>}
+		</Panel>
 	);
 }
 
@@ -978,6 +1014,8 @@ export default function Editor({ id }: { id: string }) {
 	const queryClient = useQueryClient();
 	const { data, isLoading, error, refetch } = useGame(id);
 	const share = useShare(id);
+	const options = useGmOptions();
+	const [edition, setEdition] = useState<"continue" | "new">("continue");
 	const server = data?.result?.game ?? null;
 	const points = usePoints();
 	const [draft, setDraft] = useState<Definition | null>(null);
@@ -1085,7 +1123,7 @@ export default function Editor({ id }: { id: string }) {
 		await flush();
 		setAction({ busy: a, message: null });
 		try {
-			const { game } = await gameAction(id, a);
+			const { game } = await gameAction(id, a, a === "publish" ? { new_edition: edition === "new" } : {});
 			if (a === "duplicate" && game) {
 				router.push(GM.game(game.id));
 				return;
@@ -1162,9 +1200,22 @@ export default function Editor({ id }: { id: string }) {
 					بردینو جای نسخهٔ فعلی را می‌گیرد.
 				</Notice>
 			) : null}
+			{live && server.days_left != null && server.days_left <= 7 ? (
+				<Notice tone="warn">
+					{server.days_left === 0 ? "این بازی امروز تمام می‌شود." : `این بازی ${fa(server.days_left)} روز دیگر تمام می‌شود.`} برای تمدید، تاریخ یا مدت را عوض کن و نسخهٔ تازه بفرست
+					(بعد از تأیید بردینو).
+				</Notice>
+			) : null}
+			{server.status === "expired" ? (
+				<Notice tone="info">
+					این بازی به پایان رسیده
+					{server.grace_ends_at && new Date(server.grace_ends_at) > new Date() ? ` (کسانی که شروع کرده‌اند تا ${dateTimeText(server.grace_ends_at)} وقت دارند تمامش کنند)` : ""}. سابقه
+					و آمارش می‌ماند. برای تمدید یا دورهٔ تازه، تغییر بده و دوباره بفرست.
+				</Notice>
+			) : null}
 			<nav className="gm-tabs" aria-label="مراحل ساخت بازی">
 				{TABS.filter(
-					([k]) => k !== "stats" || live || server.status === "archived",
+					([k]) => k !== "stats" || live || server.status === "archived" || server.status === "expired",
 				).map(([k, label]) => (
 					<button
 						key={k}
@@ -1335,11 +1386,31 @@ export default function Editor({ id }: { id: string }) {
 					<button
 						type="button"
 						className="bd-action"
+						onClick={() => setTab("board")}
+					>
+						بعدی: رقابت و جدول <Icon name="arrow-left" />
+					</button>
+				</>
+			) : null}
+
+			{tab === "board" ? (
+				<Panel title="رقابت و جدول رده‌بندی">
+					<BoardSetup
+						value={d.leaderboard ?? { preset: "none" }}
+						options={options.data?.result}
+						category={server.category}
+						stages={d.stages.length}
+						disabled={locked}
+						onChange={(leaderboard) => set({ leaderboard })}
+					/>
+					<button
+						type="button"
+						className="bd-action"
 						onClick={() => setTab("audience")}
 					>
 						بعدی: مخاطب و زمان <Icon name="arrow-left" />
 					</button>
-				</>
+				</Panel>
 			) : null}
 
 			{tab === "audience" ? (
@@ -1426,56 +1497,13 @@ export default function Editor({ id }: { id: string }) {
 							<option value="M">آقایان</option>
 						</select>
 					</Field>
-					<div className="gm-row-2">
-						<Field label="شروع (اختیاری)">
-							<input
-								type="datetime-local"
-								dir="ltr"
-								value={d.starts_at ? d.starts_at.slice(0, 16) : ""}
-								disabled={locked}
-								onChange={(e) =>
-									set({
-										starts_at: e.target.value
-											? new Date(e.target.value).toISOString()
-											: null,
-									})
-								}
-							/>
-						</Field>
-						<Field label="پایان (اختیاری)">
-							<input
-								type="datetime-local"
-								dir="ltr"
-								value={d.ends_at ? d.ends_at.slice(0, 16) : ""}
-								disabled={locked}
-								onChange={(e) =>
-									set({
-										ends_at: e.target.value
-											? new Date(e.target.value).toISOString()
-											: null,
-									})
-								}
-							/>
-						</Field>
-					</div>
-					<Field
-						label="ظرفیت بازیکنان (اختیاری)"
-						hint="خالی = تا جایی که بودجه اجازه بدهد."
-					>
-						<input
-							type="number"
-							inputMode="numeric"
-							dir="ltr"
-							min={1}
-							value={d.capacity ?? ""}
-							disabled={locked}
-							onChange={(e) =>
-								set({
-									capacity: e.target.value ? Number(e.target.value) : null,
-								})
-							}
-						/>
-					</Field>
+					<AvailabilitySetup
+						d={d}
+						options={options.data?.result}
+						category={server.category}
+						disabled={locked}
+						set={set}
+					/>
 					<button
 						type="button"
 						className="bd-action"
@@ -1646,6 +1674,22 @@ export default function Editor({ id }: { id: string }) {
 									? ` با انتشار، ${fa(d.budget_points)} امتیاز برای جایزه‌ها از کیف امتیازت کنار گذاشته می‌شود.`
 									: ""}
 							</p>
+							{server.next_publish === "continue" ? (
+								<div className="gm-choice-grid" role="radiogroup" aria-label="دورهٔ بازی">
+									<button type="button" role="radio" aria-checked={edition === "continue"} className="gm-choice" onClick={() => setEdition("continue")}>
+										<b>ادامهٔ همین دوره</b>
+										<small>تمدید یا اصلاح: بازیکنان و جدول همین دوره ادامه پیدا می‌کنند؛ کسی دوباره از اول بازی نمی‌کند.</small>
+									</button>
+									<button type="button" role="radio" aria-checked={edition === "new"} className="gm-choice" onClick={() => setEdition("new")}>
+										<b>دورهٔ تازه</b>
+										<small>همه می‌توانند دوباره بازی کنند و جدول تازه شروع می‌شود؛ نتیجهٔ دورهٔ {fa(server.edition)} همان‌طور می‌ماند.</small>
+									</button>
+								</div>
+							) : server.next_publish === "new_only" ? (
+								<Notice tone="info">
+									دورهٔ {fa(server.edition)} تمام شده و نتیجه‌اش ثبت شده است؛ این انتشار دورهٔ {fa(server.edition + 1)} را شروع می‌کند (بازیکنان و جدول تازه).
+								</Notice>
+							) : null}
 							{v.fee_toman && !v.fee_paid ? (
 								<button
 									type="button"
@@ -1831,6 +1875,7 @@ function LiveTools({
 					: game.status === "scheduled"
 						? "منتشر شده و از زمان شروع باز می‌شود."
 						: "برای بازیکنان باز است."}
+				{game.expires_at ? ` تا ${dateTimeText(game.expires_at)}.` : " بدون پایان خودکار."}
 				{game.budget
 					? ` بودجه: ${fa(game.budget.spent)} پرداخت‌شده از ${fa(game.budget.reserved)}.`
 					: ""}

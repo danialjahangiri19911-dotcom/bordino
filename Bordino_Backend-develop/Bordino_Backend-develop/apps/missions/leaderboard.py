@@ -383,9 +383,11 @@ def board(mystery: Mystery, customer=None, offset: int = 0, limit: int | None = 
         out["final"] = False
         # Still open to progress (or within its grace): results may change until it ends.
     out.update(rows=rows, count=end, offset=offset, more=offset + limit < end)
-    if me_id is not None and out.get("me") is None:
+    if me_id is not None:
         run = MysteryRun.objects.filter(mystery__in=scope_mysteries(cur), customer=customer).order_by("create_time").first()
-        out["my_progress"] = {"stages": run.checkins.count(), "completed": run.status == RunStatus.COMPLETED} if run else None
+        out["show_identity"] = bool(run and run.show_identity)
+        if out.get("me") is None:
+            out["my_progress"] = {"stages": run.checkins.count(), "completed": run.status == RunStatus.COMPLETED} if run else None
     return out
 
 
