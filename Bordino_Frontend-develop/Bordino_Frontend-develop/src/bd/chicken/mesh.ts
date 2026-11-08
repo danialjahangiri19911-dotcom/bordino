@@ -6,6 +6,8 @@
  */
 export interface ChickenMesh {
 	canvas: HTMLCanvasElement;
+	/** The sprite sheet it draws (a style change needs a new mesh). */
+	sprite: string;
 	update: (phase: string, moving: boolean, hidden: boolean) => void;
 	destroy: () => void;
 }
@@ -144,6 +146,7 @@ export function createChickenMesh(canvas: HTMLCanvasElement, url: string): Chick
 	img.src = url;
 	return {
 		canvas,
+		sprite: url,
 		update(next, moving, hidden) {
 			if (next !== phase) {
 				phase = next;

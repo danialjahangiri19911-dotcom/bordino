@@ -1,8 +1,10 @@
 import Link from "next/link";
 
+import StyledProduct from "@/bd/StyledProduct";
+
 export default function NotFound() {
 	return (
-		<article className="bd-product bd-app rt-product st-brutal lay-1 bd-page" aria-label="صفحه پیدا نشد">
+		<StyledProduct className="bd-app rt-product lay-1 bd-page" label="صفحه پیدا نشد">
 			<header className="bd-app-top">
 				<Link href="/" className="bd-brand">
 					<span className="bd-logomark" aria-hidden="true">
@@ -24,6 +26,6 @@ export default function NotFound() {
 					</section>
 				</main>
 			</div>
-		</article>
+		</StyledProduct>
 	);
 }

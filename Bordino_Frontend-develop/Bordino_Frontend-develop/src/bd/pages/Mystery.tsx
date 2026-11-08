@@ -96,11 +96,12 @@ const NEXT_HINT: Record<MysteryHint["kind"], string> = {
 /** The step's help, a level at a time: each costs some of its points, so it asks once first. */
 function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: () => void }) {
 	const [asking, setAsking] = useState(false);
-	useEffect(() => setAsking(false), [step.id, step.hints.length]);
-	const next = step.next_hint;
+	const shown = step.hints ?? []; // (a server before the help levels sends none)
+	useEffect(() => setAsking(false), [step.id, shown.length]);
+	const next = step.next_hint ?? null;
 	return (
 		<div className="my-hints">
-			{step.hints.map((h, i) => (
+			{shown.map((h, i) => (
 				<div key={i} className={`my-hint my-hint-${h.kind}`}>
 					<b>{h.kind === "text" ? `راهنمایی ${fa(i + 1)}` : h.kind === "place" ? "محل" : "جواب"}</b>
 					{h.kind === "text" ? <p>{h.text}</p> : null}
@@ -142,9 +143,9 @@ function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: (
 					</div>
 				) : (
 					<button type="button" className="my-hint-button" disabled={busy} onClick={() => setAsking(true)}>
-						<Icon name="lightbulb" /> {step.hints.length && next === "text" ? "راهنمایی بیشتر" : NEXT_HINT[next]}
+						<Icon name="lightbulb" /> {shown.length && next === "text" ? "راهنمایی بیشتر" : NEXT_HINT[next]}
 						<small>
-							({fa(step.hints.length + 1)} از {fa(step.hints_total)}
+							({fa(shown.length + 1)} از {fa(step.hints_total)}
 							{step.next_hint_cost && next !== "answer" ? ` · −${fa(step.next_hint_cost)} امتیاز` : ""})
 						</small>
 					</button>

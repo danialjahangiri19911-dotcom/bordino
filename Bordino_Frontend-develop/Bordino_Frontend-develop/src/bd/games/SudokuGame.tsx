@@ -5,7 +5,7 @@ import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
-import { useResolvedScheme } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -51,6 +51,7 @@ export default function SudokuGame() {
 	const allowed = useRequireLogin();
 	const { push } = useRouter();
 	const scheme = useResolvedScheme();
+	const bdStyle = useBdStyle();
 	const game = useSudoku();
 	const { isMediumUnlocked, isHardUnlocked, getCompletionCounts } = useSudokuStore();
 	const { chargeAsync, isCharging } = useChargeGamePlay();
@@ -326,7 +327,7 @@ export default function SudokuGame() {
 
 	return (
 		<div className="bd-game-page">
-			<article className={`sd sd-brutal ${scheme === "dark" ? "sd-dark" : ""} ${game.paused ? "sd-paused" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
+			<article className={`sd ${gameStyleClass("sd", bdStyle)} ${scheme === "dark" ? "sd-dark" : ""} ${game.paused ? "sd-paused" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
 				<GameBar playing={barPlaying}>
 				<header className="sd-header" {...inertIf(!!modal && modal !== "pause")}>
 					<div className="sd-brand">

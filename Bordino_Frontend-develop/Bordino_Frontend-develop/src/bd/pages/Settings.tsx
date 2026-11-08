@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
+import { useBdStyle } from "../appearance";
 import Icon from "../Icon";
 import { BadgeArt, type BadgeFacts, badgeStates } from "../achievements";
 import {
@@ -29,7 +30,7 @@ import useWalletHistory from "@/api/wallet/hooks/useWalletHistory";
 import type { ResponseApiData } from "@/libs/http/interfaces";
 import useQuery from "@/libs/http/query";
 import signOut from "@/libs/http/signOut";
-import useThemeModeStore, { type Appearance } from "@/libs/uiHooks/useThemeModeStore";
+import useThemeModeStore, { type Appearance, type BdStyle } from "@/libs/uiHooks/useThemeModeStore";
 
 export function Security() {
 	const { profile } = useProfileSync();
@@ -292,21 +293,54 @@ const THEMES: [Appearance, string, string][] = [
 	["system", "مطابق دستگاه", "swatch-auto"],
 ];
 
+/** The design styles: neobrutalism (the default), neon (always dark), neumorphism. */
+const STYLES: [BdStyle, string, string][] = [
+	["brutal", "نئوبروتال", "پوستر قرمز؛ خط‌های پررنگ"],
+	["neon", "نئونی", "نبض بنفش؛ همیشه تیره"],
+	["neu", "نرم", "نرم و روشن؛ سایه‌های ملایم"],
+];
+
 export function AppearancePage() {
-	const { mode, setMode } = useThemeModeStore();
+	const { mode, setMode, style, setStyle } = useThemeModeStore();
+	const bdStyle = useBdStyle();
+	const neon = bdStyle === "neon";
 	return (
 		<AppShell nav="profile" title="ظاهر برنامه">
-			<Panel title="ظاهر دلخواه تو">
-				<div className="rt-theme-options" role="radiogroup" aria-label="ظاهر برنامه">
+			<Panel title="طرح برنامه">
+				<div className="rt-style-options" role="radiogroup" aria-label="طرح برنامه">
+					{STYLES.map(([value, label, note]) => (
+						<button
+							key={value}
+							type="button"
+							className="rt-style-option"
+							role="radio"
+							aria-checked={style === value}
+							onClick={() => setStyle(value)}
+						>
+							<span className={`rt-style-swatch sw-${value}`} aria-hidden="true">
+								<i />
+								<i />
+								<i />
+							</span>
+							<b>{label}</b>
+							<small>{note}</small>
+						</button>
+					))}
+				</div>
+				<small className="bd-muted">طرح همهٔ صفحه‌ها و بازی‌ها عوض می‌شود؛ امتیاز و حسابت همان می‌ماند.</small>
+			</Panel>
+			<Panel title="روشن یا تیره">
+				<div className="rt-theme-options" role="radiogroup" aria-label="روشن یا تیره">
 					{THEMES.map(([value, label, swatch]) => (
 						<button
 							key={value}
 							type="button"
 							className="rt-theme-option"
 							role="radio"
-							aria-checked={mode === value}
-							aria-pressed={mode === value}
-							onClick={() => setMode(value)}
+							aria-checked={neon ? value === "dark" : mode === value}
+							aria-pressed={neon ? value === "dark" : mode === value}
+							aria-disabled={neon && value !== "dark"}
+							onClick={() => !neon && setMode(value)}
 						>
 							<span className={`rt-theme-swatch ${swatch}`}>
 								<i />
@@ -317,7 +351,9 @@ export function AppearancePage() {
 						</button>
 					))}
 				</div>
-				<small className="bd-muted">انتخاب روی همین دستگاه ذخیره می‌شود و برای همهٔ صفحه‌ها اعمال می‌شود.</small>
+				<small className="bd-muted">
+					{neon ? "طرح نئونی همیشه تیره است. " : ""}انتخاب روی همین دستگاه ذخیره می‌شود و برای همهٔ صفحه‌ها اعمال می‌شود.
+				</small>
 			</Panel>
 		</AppShell>
 	);

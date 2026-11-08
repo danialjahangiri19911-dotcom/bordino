@@ -5,7 +5,7 @@ import { type CSSProperties, type KeyboardEvent, type PointerEvent, useContext, 
 import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
-import { useResolvedScheme } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -33,6 +33,7 @@ function View() {
 	if (!game) throw new Error("2048 view needs its GameProvider");
 	const { push } = useRouter();
 	const scheme = useResolvedScheme();
+	const bdStyle = useBdStyle();
 	const { data: costData, refetch: refetchCost } = useGetPlayCost({ gameName: "game_2048" });
 	const [confirm, setConfirm] = useState<Confirm>("");
 	const [help, setHelp] = useState(false);
@@ -187,7 +188,7 @@ function View() {
 
 	return (
 		<div className="bd-game-page">
-			<article className={`g48 g48-brutal ${scheme === "dark" ? "g48-dark" : ""}`} dir="rtl" aria-label="بازی ۲۰۴۸" onKeyDown={onKey}>
+			<article className={`g48 ${gameStyleClass("g48", bdStyle)} ${scheme === "dark" ? "g48-dark" : ""}`} dir="rtl" aria-label="بازی ۲۰۴۸" onKeyDown={onKey}>
 				<GameBar playing={barPlaying}>
 				<header className="g48-header" {...inertIf(!!modal)}>
 					<div className="g48-brand">

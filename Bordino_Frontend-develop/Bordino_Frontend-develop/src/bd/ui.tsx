@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "./Icon";
+import { styleClass, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
 import { fa } from "./format";
@@ -184,6 +185,7 @@ interface ShellProps {
 
 /** The signed-in app: brand header, main navigation (sidebar, a row on phones) and the page. */
 export function AppShell({ nav, title, heading, headingExtra, allowGuest = false, children }: Readonly<ShellProps>) {
+	const st = styleClass(useBdStyle());
 	const loggedIn = useRequireLogin(allowGuest);
 	const { user } = useUserStore();
 	useEffect(() => {
@@ -192,7 +194,7 @@ export function AppShell({ nav, title, heading, headingExtra, allowGuest = false
 	if (!loggedIn) {
 		if (!allowGuest) return null;
 		return (
-			<article className="bd-product bd-app rt-product st-brutal lay-1 bd-page" aria-label={title}>
+			<article className={`bd-product bd-app rt-product ${st} lay-1 bd-page`} aria-label={title}>
 				<header className="bd-app-top">
 					<Brand href={R.landing} />
 					<Link href={R.login} className="bd-action">
@@ -224,10 +226,11 @@ function SignedInShell({
 	username,
 	children,
 }: Omit<ShellProps, "allowGuest"> & { username?: string }) {
+	const st = styleClass(useBdStyle());
 	useProfileSync();
 	usePendingQr();
 	return (
-		<article className="bd-product bd-app rt-product st-brutal lay-1 bd-page" aria-label={title}>
+		<article className={`bd-product bd-app rt-product ${st} lay-1 bd-page`} aria-label={title}>
 			<header className="bd-app-top">
 				<Brand />
 				<div className="bd-user">
@@ -271,11 +274,12 @@ function SignedInShell({
 
 /** Phone, code, profile and onboarding: brand and a home link only, never a balance. */
 export function AuthShell({ title, children }: { title: string; children: ReactNode }) {
+	const st = styleClass(useBdStyle());
 	useEffect(() => {
 		document.title = `${title} | بردینو`;
 	}, [title]);
 	return (
-		<article className="bd-product bd-app rt-product st-brutal lay-1 au-product bd-page" aria-label={title}>
+		<article className={`bd-product bd-app rt-product ${st} lay-1 au-product bd-page`} aria-label={title}>
 			<header className="bd-app-top">
 				<Brand href={R.landing} />
 				<Link href={R.landing} className="bd-secondary">
@@ -312,6 +316,7 @@ export function GameShell({
 	onExit?: () => boolean;
 	children: ReactNode;
 }) {
+	const st = styleClass(useBdStyle());
 	const allowed = useRequireLogin();
 	const [open, setOpen] = useState(false);
 	const helpBox = useRef<HTMLElement>(null);
@@ -324,7 +329,7 @@ export function GameShell({
 	}, [title]);
 	if (!allowed) return null;
 	return (
-		<article className="bd-product bd-app rt-product gf-product st-brutal bd-page" aria-label={title}>
+		<article className={`bd-product bd-app rt-product gf-product ${st} bd-page`} aria-label={title}>
 			<header className="gf-top">
 				<div className="gf-title">
 					<Icon name={icon} />

@@ -1,0 +1,133 @@
+/* The two styles a player can pick in «ظاهر برنامه» beside the default neobrutalism (brutal-a,
+   bd.css + app.css, untouched): neon «نبض بنفش» (neon-a, always dark) and neumorphism «نرم و روشن»
+   (neu-a, light and dark). Palettes from the handoffs' design/tokens.css and reference ui.js; the
+   style rules from reference/ui.css (light-dark() pairs written out per scheme, as app.css does).
+   The surface classes come from appearance.ts styleClass(): .st-neon.bd-night / .st-neu. */
+
+html[data-bd-style="neon"] { background: #0e1020; }
+html[data-bd-style="neu"] { background: #eceef2; }
+html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
+
+/* ── palettes (the :root[data-bd-scheme] prefix outranks bd.css's dark defaults) ── */
+
+:root[data-bd-scheme] #bordino-directions .bd-product.st-neon {
+	--bd-accent: #b781ff; --bd-tint: #24183d; --bd-bg: #0e1020; --bd-surface: #191c30; --bd-on: #150c28;
+	--bd-hi: #55556b; --bd-lo: #12131b; --ng-second: #51e4ff;
+	--bd-fg: #fcfdff; --bd-muted: #d9e2f1; --bd-border: #465570; --bd-shadow: #0008;
+	--bd-outline: #465570; --bd-hard-shadow: transparent;
+	color-scheme: dark;
+	border-color: var(--bd-border);
+}
+:root[data-bd-scheme] #bordino-directions .bd-product.st-neu {
+	--bd-accent: #6757ba; --bd-tint: #e6e3ee; --bd-bg: #eceef2; --bd-surface: #eceef2; --bd-on: #ffffff;
+	--bd-hi: #ffffff; --bd-lo: #d1d5de;
+	--bd-fg: #25252b; --bd-muted: #68666e; --bd-border: #d0d4dc;
+	--bd-outline: transparent; --bd-hard-shadow: transparent;
+	--bd-radius: 23px;
+	border-color: transparent;
+}
+:root[data-bd-scheme="dark"] #bordino-directions .bd-product.st-neu {
+	--bd-accent: #c0b2ff; --bd-tint: #343340; --bd-bg: #292e37; --bd-surface: #292e37; --bd-on: #221d29;
+	--bd-hi: #3c4350; --bd-lo: #1b1e25;
+	--bd-fg: #f5f7fb; --bd-muted: #c2cad7; --bd-border: #56616f;
+}
+
+/* ── shared text rules of the reference ── */
+#bordino-directions .st-neu :where(h1,h2,h3,h4,p,span,small,b,strong,label,legend,dt,dd,summary) { color: inherit; }
+#bordino-directions .st-neu :is(h1,h2,h3,h4) { color: var(--bd-fg); }
+#bordino-directions .st-neu .bd-em { color: var(--bd-accent); }
+#bordino-directions .st-neu .bd-muted { color: var(--bd-muted); }
+#bordino-directions .st-neu .bd-tag { color: var(--bd-accent); }
+
+/* ── neumorphism: raised surfaces, pressed wells ── */
+#bordino-directions .st-neu .bd-panel,
+#bordino-directions .st-neu .bd-step,
+#bordino-directions .st-neu .bd-ticket,
+#bordino-directions .st-neu .bd-logomark { background: var(--bd-bg); border: 0; box-shadow: 7px 7px 15px var(--bd-lo), -7px -7px 15px var(--bd-hi); }
+#bordino-directions .st-neu .bd-ticket { transform: rotate(0); padding: 24px; }
+#bordino-directions .st-neu .bd-art { box-shadow: inset 8px 8px 17px var(--bd-lo), inset -8px -8px 17px var(--bd-hi); background: var(--bd-bg); }
+#bordino-directions .st-neu .bd-logomark { color: var(--bd-accent); }
+#bordino-directions .st-neu .bd-action { box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); border-radius: 30px; border-color: transparent !important; }
+#bordino-directions .st-neu .bd-secondary { background: var(--bd-bg) !important; border-color: transparent !important; border-radius: 30px; box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); }
+#bordino-directions .st-neu .bd-balls span,
+#bordino-directions .st-neu .bd-balance { background: var(--bd-bg); box-shadow: inset 3px 3px 6px var(--bd-lo), inset -3px -3px 6px var(--bd-hi); }
+#bordino-directions .st-neu .bd-sidebar .bd-nav-item[aria-pressed=true],
+#bordino-directions .st-neu .bd-sidebar .bd-nav-item[aria-current=page] { background: var(--bd-bg) !important; box-shadow: inset 4px 4px 8px var(--bd-lo), inset -4px -4px 8px var(--bd-hi); }
+#bordino-directions .st-neu :is(.au-welcome,.au-intro-art,.au-layout-3 .au-form-panel) { background: var(--bd-bg); box-shadow: 7px 7px 15px var(--bd-lo), -7px -7px 15px var(--bd-hi); }
+#bordino-directions .st-neu .au-main-symbol { background: var(--bd-bg); color: var(--bd-accent); box-shadow: 9px 9px 18px var(--bd-lo), -9px -9px 18px var(--bd-hi); }
+#bordino-directions .st-neu :is(.au-phone-box,.au-entry-icon) { border: 0; background: var(--bd-bg); box-shadow: inset 4px 4px 9px var(--bd-lo), inset -4px -4px 9px var(--bd-hi); }
+/* Fields and wells sit pressed in. */
+#bordino-directions .st-neu :is(input,select,textarea):not([type=checkbox]):not([type=radio]) { border-color: transparent !important; background: var(--bd-bg); box-shadow: inset 3px 3px 7px var(--bd-lo), inset -3px -3px 7px var(--bd-hi); }
+#bordino-directions .st-neu .bd-tag { background: var(--bd-bg); box-shadow: inset 2px 2px 4px var(--bd-lo), inset -2px -2px 4px var(--bd-hi); }
+
+/* ── neon: dark glass, light glows (.bd-night) ── */
+#bordino-directions .bd-night { color: var(--bd-fg); background: var(--bd-bg); }
+#bordino-directions .bd-night :where(h1,h2,h3,h4,p,span,small,strong,b,em,label,legend,dt,dd,summary) { color: inherit; text-shadow: none; }
+#bordino-directions .bd-night :is(h1,h2,h3,h4) { color: var(--bd-fg); text-shadow: none; }
+#bordino-directions .bd-night .bd-em { color: var(--bd-accent); }
+#bordino-directions .bd-night .bd-action { color: var(--bd-on) !important; border-radius: 8px; border-color: transparent !important; box-shadow: 0 0 25px color-mix(in srgb, var(--bd-accent) 24%, transparent); }
+#bordino-directions .bd-night .bd-logomark { border-radius: 8px; box-shadow: 0 0 23px color-mix(in srgb, var(--bd-accent) 40%, transparent); }
+#bordino-directions .bd-night .bd-secondary { color: var(--bd-fg) !important; border-color: var(--bd-border) !important; background: var(--bd-surface) !important; border-radius: 8px; }
+#bordino-directions .bd-night .bd-panel,
+#bordino-directions .bd-night .bd-step,
+#bordino-directions .bd-night .bd-ticket { background: var(--bd-surface); border: 1px solid var(--bd-border); border-radius: 14px; box-shadow: 0 5px 18px var(--bd-shadow); }
+#bordino-directions .bd-night .bd-tag { background: var(--bd-tint); color: var(--bd-accent); border-color: transparent; }
+#bordino-directions .bd-night .ng-banner { background: var(--bd-surface); box-shadow: inset 0 0 35px color-mix(in srgb, var(--bd-accent) 7%, transparent); }
+#bordino-directions .bd-night .ng-banner > div:first-child { position: relative; z-index: 2; }
+#bordino-directions .st-neon .ng-hero { background: radial-gradient(ellipse at 70% 50%, color-mix(in srgb, var(--bd-accent) 9%, transparent), transparent 65%); }
+#bordino-directions .st-neon .ng-game { box-shadow: 0 5px 18px var(--bd-shadow); }
+#bordino-directions .bd-night .ng-game-name { background: var(--bd-surface); color: var(--bd-fg); flex-wrap: wrap; }
+#bordino-directions .bd-night .ng-side { flex-wrap: wrap; }
+#bordino-directions .bd-night .ng-side .bd-nav-item { white-space: nowrap; }
+#bordino-directions .bd-night .bd-sidebar .bd-nav-item[aria-pressed=true],
+#bordino-directions .bd-night .bd-sidebar .bd-nav-item[aria-current=page] { background: var(--bd-tint) !important; color: var(--bd-accent) !important; }
+#bordino-directions .bd-night button:disabled { opacity: 1; color: var(--bd-muted) !important; background: var(--bd-surface) !important; border: 1px solid var(--bd-border) !important; box-shadow: none; }
+#bordino-directions .bd-night :is(input,select,textarea):not([type=checkbox]):not([type=radio]) { background: var(--bd-bg); border-color: var(--bd-border) !important; color: var(--bd-fg); }
+#bordino-directions .bd-night :is(input,select,textarea):focus-visible { outline: 2px solid var(--bd-accent); outline-offset: 1px; box-shadow: 0 0 14px color-mix(in srgb, var(--bd-accent) 35%, transparent); }
+#bordino-directions .st-neon :is(.au-welcome,.au-intro-art) { background: var(--bd-surface); border: 1px solid var(--bd-border); }
+#bordino-directions .st-neon .au-main-symbol { box-shadow: 0 0 40px color-mix(in srgb, var(--bd-accent) 28%, transparent); }
+#bordino-directions .st-neon .au-orbit { border-color: var(--bd-accent); box-shadow: 0 0 25px color-mix(in srgb, var(--bd-accent) 15%, transparent); }
+#bordino-directions .st-neon .au-orbit::after { border-color: var(--ng-second); }
+
+/* ── the app's own pages (app.css draws them with neobrutalism's outlines and hard shadows) ── */
+/* Hard offset shadows go (--bd-hard-shadow is transparent); outlines turn into the style's line. */
+#bordino-directions .st-neu .bd-sheet,
+#bordino-directions .st-neu .bd-mission-icon { border-color: transparent; box-shadow: 7px 7px 15px var(--bd-lo), -7px -7px 15px var(--bd-hi); }
+#bordino-directions .bd-night .bd-sheet { border: 1px solid var(--bd-border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px #0008; }
+#bordino-directions :is(.st-neu,.bd-night) .bd-sheet-backdrop { backdrop-filter: blur(2px); }
+/* «معمای شهری» and the missions */
+#bordino-directions .st-neu :is(.my-card-cover,.my-cover,.my-clue-image,.my-place-head img,.my-step-number) { border-color: transparent; box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); border-radius: 12px; }
+#bordino-directions .st-neu :is(.my-progress) { border: 0; border-radius: 10px; box-shadow: inset 3px 3px 6px var(--bd-lo), inset -3px -3px 6px var(--bd-hi); }
+#bordino-directions .st-neu :is(.my-problem,.my-hint-ask) { border-color: transparent; border-radius: 14px; }
+#bordino-directions .st-neu :is(.my-clue,.my-hint,.my-note,.my-offer,.my-locked) { border-radius: 14px; }
+#bordino-directions .bd-night :is(.my-card-cover,.my-cover,.my-clue-image,.my-place-head img,.my-step-number,.my-progress,.my-problem,.my-hint-ask) { border-width: 1px; border-color: var(--bd-border); border-radius: 8px; }
+#bordino-directions .bd-night .my-progress span { box-shadow: 0 0 12px color-mix(in srgb, var(--bd-accent) 60%, transparent); }
+#bordino-directions .bd-night :is(.my-done .my-step-number) { background: #2f8f5b; border-color: #2f8f5b; }
+#bordino-directions .bd-night .my-clue { border-inline-start-color: var(--bd-accent); background: color-mix(in srgb, var(--bd-accent) 12%, var(--bd-surface)); }
+#bordino-directions .bd-night .mi-points, #bordino-directions .bd-night .my-step-points { text-shadow: 0 0 10px color-mix(in srgb, var(--bd-accent) 50%, transparent); }
+
+/* ── «ظاهر برنامه»: the style cards ── */
+#bordino-directions .rt-style-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 12px; }
+#bordino-directions .rt-style-option { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; border: 2px solid var(--bd-border); border-radius: 12px; background: var(--bd-surface); color: var(--bd-fg); font: inherit; font-size: 13px; cursor: pointer; text-align: center; }
+#bordino-directions .rt-style-option[aria-checked=true] { border-color: var(--bd-accent); box-shadow: 0 0 0 2px var(--bd-accent); }
+#bordino-directions .rt-style-option small { color: var(--bd-muted); font-size: 10px; line-height: 1.6; }
+#bordino-directions .rt-style-swatch { display: grid; gap: 5px; padding: 9px 8px; height: 76px; border-radius: 8px; align-content: center; }
+#bordino-directions .rt-style-swatch i { display: block; height: 12px; border-radius: 3px; }
+#bordino-directions .rt-style-swatch i:nth-child(2) { width: 70%; }
+#bordino-directions .rt-style-swatch i:nth-child(3) { width: 45%; height: 16px; justify-self: end; }
+#bordino-directions .sw-brutal { background: #fff8eb; border: 2px solid #25252b; box-shadow: 3px 3px 0 #25252b; }
+#bordino-directions .sw-brutal i { background: #25252b; border-radius: 0; }
+#bordino-directions .sw-brutal i:nth-child(3) { background: #d64142; }
+#bordino-directions .sw-neon { background: #0e1020; border: 1px solid #465570; }
+#bordino-directions .sw-neon i { background: #25203e; }
+#bordino-directions .sw-neon i:nth-child(3) { background: #b781ff; box-shadow: 0 0 10px #b781ffaa; }
+#bordino-directions .sw-neu { background: #eceef2; box-shadow: 4px 4px 9px #d1d5de, -4px -4px 9px #fff; }
+#bordino-directions .sw-neu i { background: #eceef2; box-shadow: inset 2px 2px 4px #d1d5de, inset -2px -2px 4px #fff; }
+#bordino-directions .sw-neu i:nth-child(3) { background: #6757ba; box-shadow: none; border-radius: 10px; }
+#bordino-directions .rt-theme-option[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
+@media (max-width: 380px) { #bordino-directions .rt-style-options { gap: 8px; } #bordino-directions .rt-style-option { font-size: 12px; padding: 6px; } }
+
+/* ── the game pages' surroundings (app.css paints them neobrutalism's paper) ── */
+:root[data-bd-style="neon"] #bordino-directions :is(.bd-game-page,.bd-chicken-page,.bd-crash-page,.bd-wheel-page,.bd-pm-page) { background: #0d1021; color-scheme: dark; }
+:root[data-bd-style="neu"] #bordino-directions :is(.bd-game-page,.bd-chicken-page,.bd-crash-page,.bd-wheel-page,.bd-pm-page) { background: #e9edf3; }
+:root[data-bd-style="neu"][data-bd-scheme="dark"] #bordino-directions :is(.bd-game-page,.bd-chicken-page,.bd-crash-page,.bd-wheel-page,.bd-pm-page) { background: #222937; }

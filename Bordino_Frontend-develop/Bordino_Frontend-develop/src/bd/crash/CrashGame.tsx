@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
-import { useResolvedScheme } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { useDismissOutside } from "../dismiss";
@@ -76,6 +76,7 @@ export default function CrashGame() {
 	const allowed = useRequireLogin();
 	const { push } = useRouter();
 	const scheme = useResolvedScheme();
+	const bdStyle = useBdStyle();
 	const game = useCrashGame();
 	const { config, balance, round, history, busy } = game;
 
@@ -390,7 +391,7 @@ export default function CrashGame() {
 				if (sound) music.current?.prime();
 			}}
 		>
-			<article className={`cr cr-brutal ${scheme === "dark" ? "cr-dark" : ""}`} data-style-name="brutal" dir="rtl" aria-label="بازی انفجار">
+			<article className={`cr ${gameStyleClass("cr", bdStyle)} ${scheme === "dark" ? "cr-dark" : ""}`} data-style-name={bdStyle} dir="rtl" aria-label="بازی انفجار">
 				<GameBar playing={barPlaying}>
 				<header className="cr-header">
 					<div className="cr-brand">

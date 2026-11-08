@@ -1,5 +1,6 @@
 "use client";
 
+import { styleClass, useBdStyle } from "./appearance";
 import { useEffect, useRef, useState } from "react";
 
 import Icon from "./Icon";
@@ -10,6 +11,7 @@ interface InstallEvent extends Event {
 
 /** «نصب اپلیکیشن» when the browser offers to install the PWA (Chrome's beforeinstallprompt). */
 export default function InstallPrompt() {
+	const st = styleClass(useBdStyle());
 	const deferred = useRef<InstallEvent | null>(null);
 	const [show, setShow] = useState(false);
 
@@ -26,7 +28,7 @@ export default function InstallPrompt() {
 
 	if (!show) return null;
 	return (
-		<div className="bd-product st-brutal bd-install" role="dialog" aria-label="نصب اپلیکیشن">
+		<div className={`bd-product ${st} bd-install`} role="dialog" aria-label="نصب اپلیکیشن">
 			<span>بردینو را روی گوشی نصب کن.</span>
 			<button
 				type="button"

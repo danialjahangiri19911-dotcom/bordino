@@ -19,7 +19,7 @@ const spinAsync = jest.fn((_payload?: unknown) => new Promise((done) => (answer 
 const effects: string[] = [];
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }), useSearchParams: () => new URLSearchParams() }));
-jest.mock("../appearance", () => ({ useResolvedScheme: () => "light" }));
+jest.mock("../appearance", () => ({ useResolvedScheme: () => "light", useBdStyle: () => "brutal", gameStyleClass: (p: string, s: string) => `${p}-${s}` }));
 jest.mock("../autoHide", () => ({ GameBar: ({ children }: { children: React.ReactNode }) => children }));
 jest.mock("../back", () => ({ useBackHandler: () => undefined }));
 jest.mock("../ui", () => ({

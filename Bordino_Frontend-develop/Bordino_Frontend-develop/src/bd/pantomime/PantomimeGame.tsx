@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from
 import { useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "../Icon";
+import { gameStyleClass, useBdStyle } from "../appearance";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { fa, faDate } from "../format";
@@ -82,6 +83,7 @@ const limitsOf = (c: PantomimeConfig): Limits => ({
  */
 export default function PantomimeGame() {
 	const allowed = useRequireLogin();
+	const bdStyle = useBdStyle();
 	const { push } = useRouter();
 	const configQuery = usePantomimeConfig();
 	const config = configQuery.data?.result;
@@ -1302,7 +1304,7 @@ export default function PantomimeGame() {
 	return (
 		<div className="bd-pm-page">
 			<article
-				className={`pm pm-brutal ${urgent ? "pm-urgent" : ""}`}
+				className={`pm ${gameStyleClass("pm", bdStyle)} ${urgent ? "pm-urgent" : ""}`}
 				dir="rtl"
 				aria-label="پانتومیم"
 				data-pantomime

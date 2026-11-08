@@ -5,7 +5,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
-import { useResolvedScheme } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -19,8 +19,9 @@ import useChickenGame from "@/_pages/PwaApp/Chicken/useChickenGame";
 import type { ChickenDifficulty, ChickenRound } from "@/api/games/chicken/types";
 import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 
-const ART = "/bd/chicken/chicken-brutal.webp";
-const SPRITE = "/bd/chicken/chicken-brutal-sprite.webp";
+/** The chicken's artwork in each style (the design's originals). */
+const ART = (style: string) => `/bd/chicken/chicken-${style}.webp`;
+const SPRITE = (style: string) => `/bd/chicken/chicken-${style}-sprite.webp`;
 const AUDIO = "/bd/chicken/audio/";
 const JUMP_MS = 640;
 const COLLISION_MS = 1000;
@@ -81,6 +82,7 @@ export default function ChickenGame() {
 	const { push } = useRouter();
 	const game = useChickenGame();
 	const scheme = useResolvedScheme();
+	const bdStyle = useBdStyle();
 	const root = useRef<HTMLElement>(null);
 	const canvas = useRef<HTMLCanvasElement>(null);
 	const mesh = useRef<ChickenMesh | null>(null);
@@ -202,12 +204,12 @@ export default function ChickenGame() {
 	useEffect(() => {
 		const el = canvas.current;
 		if (!el) return;
-		if (!mesh.current || mesh.current.canvas !== el) {
+		if (!mesh.current || mesh.current.canvas !== el || mesh.current.sprite !== SPRITE(bdStyle)) {
 			mesh.current?.destroy();
-			mesh.current = createChickenMesh(el, SPRITE);
+			mesh.current = createChickenMesh(el, SPRITE(bdStyle));
 		}
 		mesh.current?.update(view.phase === "won" ? "ready" : view.phase, !reduced(), hidden);
-	}, [view.phase, hidden, reduced, allowed]);
+	}, [view.phase, hidden, reduced, allowed, bdStyle]);
 	useEffect(() => () => mesh.current?.destroy(), []);
 
 	const values = useMemo(() => {
@@ -345,8 +347,8 @@ export default function ChickenGame() {
 		<div className="bd-chicken-page">
 			<article
 				ref={root}
-				className={`ck-game ck-brutal ${scheme === "dark" ? "ck-dark" : ""} ${motion ? "" : "ck-still"} ${hidden ? "ck-paused" : ""}`}
-				style={{ "--ck-sprite": `url("${SPRITE}")` } as CSSProperties}
+				className={`ck-game ${gameStyleClass("ck", bdStyle)} ${scheme === "dark" ? "ck-dark" : ""} ${motion ? "" : "ck-still"} ${hidden ? "ck-paused" : ""}`}
+				style={{ "--ck-sprite": `url("${SPRITE(bdStyle)}")` } as CSSProperties}
 				dir="rtl"
 				aria-label="مرغ فراری"
 				onKeyDown={(e) => {
@@ -356,7 +358,7 @@ export default function ChickenGame() {
 				<GameBar playing={barPlaying}>
 				<header className="ck-top">
 					<div className="ck-heading">
-						<img src={ART} alt="" width={48} height={56} />
+						<img src={ART(bdStyle)} alt="" width={48} height={56} />
 						<div>
 							<div className="ck-kicker">BORDINO / CHICKEN ROAD</div>
 							<h1>مرغ فراری</h1>

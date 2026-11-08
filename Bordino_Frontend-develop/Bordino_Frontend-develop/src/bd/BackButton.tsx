@@ -1,5 +1,6 @@
 "use client";
 
+import { styleClass, useBdStyle } from "./appearance";
 import { useEffect, useRef, useState } from "react";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -70,6 +71,7 @@ function closeOpenDialog(): boolean {
  * In a browser (no Capacitor) nothing changes: Back is the browser's.
  */
 export default function BackButton() {
+	const st = styleClass(useBdStyle());
 	const router = useRouter();
 	const pathname = usePathname();
 	const path = useRef(pathname);
@@ -179,7 +181,7 @@ export default function BackButton() {
 	if (oldApp && !question) {
 		return (
 			<div className="bd-sheet-backdrop" role="presentation">
-				<div className="bd-product st-brutal bd-sheet bd-leave" role="alertdialog" aria-modal="true" aria-labelledby="app-update-title">
+				<div className={`bd-product ${st} bd-sheet bd-leave`} role="alertdialog" aria-modal="true" aria-labelledby="app-update-title">
 					<p className="bd-leave-title" id="app-update-title">
 						نسخهٔ تازهٔ اپ بردینو
 					</p>
@@ -211,7 +213,7 @@ export default function BackButton() {
 	if (!question) return null;
 	return (
 		<div ref={sheet} className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && stay()}>
-			<div className="bd-product st-brutal bd-sheet bd-leave" role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
+			<div className={`bd-product ${st} bd-sheet bd-leave`} role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
 				<p className="bd-leave-title" id="leave-title">
 					{question.title}
 				</p>

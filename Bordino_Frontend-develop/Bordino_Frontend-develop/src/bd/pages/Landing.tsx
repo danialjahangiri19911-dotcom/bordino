@@ -1,5 +1,6 @@
 "use client";
 
+import { styleClass, useBdStyle } from "../appearance";
 import { useEffect, useState } from "react";
 
 import Link from "next/link";
@@ -26,6 +27,7 @@ function useInstalled() {
 }
 
 export default function Landing() {
+	const st = styleClass(useBdStyle());
 	const installed = useInstalled();
 	const { isLoggedIn } = useAuthStore();
 	const appHref = isLoggedIn ? R.home : R.login;
@@ -33,7 +35,7 @@ export default function Landing() {
 		document.title = "بردینو | بازی کن، امتیاز بگیر، در قرعه‌کشی شرکت کن";
 	}, []);
 	return (
-		<article className="bd-product bd-landing st-brutal lay-1 bd-page" aria-label="بردینو">
+		<article className={`bd-product bd-landing ${st} lay-1 bd-page`} aria-label="بردینو">
 			<header className="bd-header">
 				<Brand href={R.landing} />
 				<nav className="bd-header-links" aria-label="بخش‌های صفحه">

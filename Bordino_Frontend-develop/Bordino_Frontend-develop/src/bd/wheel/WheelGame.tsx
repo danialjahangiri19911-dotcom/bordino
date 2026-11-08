@@ -5,7 +5,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Icon from "../Icon";
-import { useResolvedScheme } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { GameBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
@@ -52,6 +52,7 @@ export default function WheelGame() {
 	const points = usePoints();
 	const { spinAsync } = useSpinWheel();
 	const scheme = useResolvedScheme();
+	const bdStyle = useBdStyle();
 
 	// The player's bet, like crash and chicken (typed or −/+); null until the wheel tells its range.
 	const [betText, setBetText] = useState<string | null>(null);
@@ -313,8 +314,8 @@ export default function WheelGame() {
 	return (
 		<div className="bd-wheel-page">
 			<article
-				className={`wh wh-brutal ${scheme === "dark" ? "wh-dark" : ""} ${celebrate ? "wh-celebrate" : ""}`}
-				data-wh-style="brutal"
+				className={`wh ${gameStyleClass("wh", bdStyle)} ${scheme === "dark" ? "wh-dark" : ""} ${celebrate ? "wh-celebrate" : ""}`}
+				data-wh-style={bdStyle}
 				data-phase={phase === "spinning" ? "spinning" : phase}
 				data-paused={String(paused)}
 				dir="rtl"
