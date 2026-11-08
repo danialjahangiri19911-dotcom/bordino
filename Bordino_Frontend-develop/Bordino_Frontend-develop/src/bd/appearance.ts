@@ -55,6 +55,20 @@ export function styleClass(style: BdStyle): string {
 	return style === "neon" ? "st-neon bd-night" : style === "neu" ? "st-neu" : "st-brutal";
 }
 
+/**
+ * One of the design's illustrations in the chosen style: neobrutalism's sit in /bd/art, the other
+ * styles' (their own handoff's pictures) in /bd/art/<style>/, each at 400 and 840 px wide.
+ */
+export function artSrc(style: BdStyle, name: string, width: 400 | 840): string {
+	return style === "brutal" ? `/bd/art/${name}-${width}.webp` : `/bd/art/${style}/${name}-${width}.webp`;
+}
+
+/** src and srcSet of an illustration in the player's style. */
+export function useArt(name: string): { src: string; srcSet: string } {
+	const style = useBdStyle();
+	return { src: artSrc(style, name, 400), srcSet: `${artSrc(style, name, 400)} 400w, ${artSrc(style, name, 840)} 840w` };
+}
+
 /** A game's style class: `<prefix>-brutal`, `<prefix>-neon`, or `<prefix>-neu` (the games' base look). */
 export function gameStyleClass(prefix: string, style: BdStyle): string {
 	return `${prefix}-${style}`;

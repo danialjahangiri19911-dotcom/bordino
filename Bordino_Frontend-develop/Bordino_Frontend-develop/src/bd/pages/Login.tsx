@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { normalizePhone } from "../format";
+import { useArt } from "../appearance";
 import { AuthShell, R } from "../ui";
 
 import { authErrorMessage } from "@/api/login/errorMessage";
@@ -19,6 +20,7 @@ import useAuthStore from "@/libs/stores/authStore";
 import { useRegisterPhoneNumberStore } from "@/libs/stores/useUerRegisterPhoneNumber";
 
 export default function Login() {
+	const discover = useArt("discover");
 	const { push, replace } = useRouter();
 	const { isLoggedIn, setAlreadyExist } = useAuthStore();
 	const { phone_number, setPhoneNumber, markOtpSent } = useRegisterPhoneNumberStore();
@@ -63,7 +65,7 @@ export default function Login() {
 					</h2>
 					<p>بازی‌ها، سرگرمی‌ها و فضای شخصی‌ات، همه یک‌جا.</p>
 					<div className="au-image-art" aria-hidden="true">
-						<img src="/bd/art/discover-400.webp" srcSet="/bd/art/discover-400.webp 400w, /bd/art/discover-840.webp 840w" sizes="(max-width: 540px) 80vw, 420px" alt="" width={1280} height={1280} decoding="async" />
+						<img src={discover.src} srcSet={discover.srcSet} sizes="(max-width: 540px) 80vw, 420px" alt="" width={1280} height={1280} decoding="async" />
 					</div>
 					<div className="au-benefits">
 						<span>

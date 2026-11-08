@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import JalaliDateField from "../JalaliDateField";
 import { fa } from "../format";
+import { useArt } from "../appearance";
 import { AuthShell, LoadState, Notice, Panel, R, usePoints } from "../ui";
 import { usernameProblem } from "./Personal";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 		heading.current?.focus();
 	}, [step]);
 	const item = INTRO[step];
+	const art = useArt(item.art);
 	const last = step === INTRO.length - 1;
 	// Swipe between the slides. Right to left like the app: «ادامه» points left, so the next slide
 	// comes by swiping to the right and the previous one by swiping to the left. A swipe on the
@@ -97,8 +99,8 @@ function Intro({ welcome, onDone }: { welcome: string | null; onDone: () => void
 				<section className="au-intro-art">
 					<div className="au-image-art" aria-hidden="true">
 						<img
-							src={`/bd/art/${item.art}-400.webp`}
-							srcSet={`/bd/art/${item.art}-400.webp 400w, /bd/art/${item.art}-840.webp 840w`}
+							src={art.src}
+							srcSet={art.srcSet}
 							sizes="(max-width: 540px) 80vw, 420px"
 							alt=""
 							width={1280}

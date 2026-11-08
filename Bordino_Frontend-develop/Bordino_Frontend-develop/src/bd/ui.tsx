@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "./Icon";
-import { styleClass, useBdStyle } from "./appearance";
+import { styleClass, useArt, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
 import { fa } from "./format";
@@ -80,11 +80,12 @@ type ArtName = "hero" | "rewards" | "empty" | "hafez" | "tarot" | "discover" | "
 
 /** One of the design's transparent illustrations (decorative: the real title and text are in HTML). */
 export function Art({ name, kind, eager = false }: { name: ArtName; kind?: string; eager?: boolean }) {
+	const art = useArt(name);
 	return (
 		<div className={`bi-illustration bi-${kind ?? name}`} aria-hidden="true">
 			<img
-				src={`/bd/art/${name}-400.webp`}
-				srcSet={`/bd/art/${name}-400.webp 400w, /bd/art/${name}-840.webp 840w`}
+				src={art.src}
+				srcSet={art.srcSet}
 				sizes="(max-width: 540px) 70vw, 420px"
 				alt=""
 				width={1254}
