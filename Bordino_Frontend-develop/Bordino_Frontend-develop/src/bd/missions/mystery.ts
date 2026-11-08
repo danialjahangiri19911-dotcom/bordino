@@ -5,7 +5,7 @@ import useQuery from "@/libs/http/query";
 
 /** «معمای شهری»: a chain of clues, each solved at a real place (a café, a shop, a landmark). */
 export type MysteryState = "available" | "in_progress" | "done" | "upcoming" | "expired" | "full" | "inactive" | "empty";
-export type MysteryProof = "qr" | "gps" | "answer" | "staff";
+export type MysteryProof = "qr" | "gps" | "answer" | "staff" | "choice" | "info";
 
 export interface MysteryCard {
 	id: string;
@@ -24,6 +24,9 @@ export interface MysteryCard {
 	ends_at: string | null;
 	order: number;
 	state: MysteryState;
+	/** A creator's game (Game Master), and who presents it (servers before 2026-11-08: absent). */
+	creator?: boolean;
+	presenter?: string;
 }
 
 /** The place of a solved step: what the mystery introduces. */
@@ -35,6 +38,10 @@ export interface MysteryPlace {
 	offer: string;
 	url: string;
 	map: string;
+	/** A stage at no real place (a question): no address or map. */
+	is_place?: boolean;
+	/** A coupon or gift code the stage gives once solved. */
+	coupon?: string;
 }
 
 /** One help level: a hint line, the place itself, or (an answer step's last) the answer. */
@@ -61,6 +68,11 @@ export type MysteryStep =
 			points_now: number;
 			/** «پاسخ در محل»: a number gets the number keypad. */
 			answer_type: "text" | "number";
+			/** «انتخاب گزینهٔ درست»: the options (the right one stays on the server). */
+			options?: string[];
+			/** A time limit (seconds) and what is left of it: solved later, the stage pays nothing. */
+			time_limit_s?: number | null;
+			time_left_s?: number | null;
 			proof: MysteryProof;
 			/** «پاسخ در محل»: what to find out there. */
 			question: string;
@@ -72,6 +84,8 @@ export type MysteryStep =
 
 export interface MysteryDetail extends MysteryCard {
 	story: string;
+	/** The creator's message once the game is finished. */
+	completion_message?: string;
 	run: {
 		status: "active" | "completed";
 		started_at: string;
@@ -101,6 +115,9 @@ const MYSTERIES = `${MISSIONS}mysteries/`;
 export function useMystery(id: string) {
 	return useQuery<ResponseApiData<{ mystery: MysteryDetail }>>({ url: `${MYSTERIES}${id}/`, headers: true });
 }
+
+/** A private game's invite: joins it (or reopens it). */
+export const joinByInvite = (token: string) => call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}invite/${encodeURIComponent(token)}/`, {});
 
 export const startMystery = (id: string) => call<{ mystery: MysteryDetail }>("post", `${MYSTERIES}${id}/start/`, {});
 

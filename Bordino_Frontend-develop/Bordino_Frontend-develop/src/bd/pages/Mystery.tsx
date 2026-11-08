@@ -4,11 +4,11 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import Icon from "../Icon";
 import { APK_URL } from "../BackButton";
+import Icon from "../Icon";
 import { fa } from "../format";
-import { claimQr } from "../missions/api";
 import QrScanner, { canScanQr } from "../missions/QrScanner";
+import { claimQr } from "../missions/api";
 import {
 	LocationError,
 	type MysteryDetail,
@@ -39,24 +39,48 @@ const STATE_TEXT: Record<string, string> = {
 };
 
 type Current = Extract<MysteryStep, { state: "current" }>;
-type Win = { place: string; points: number; bonus: number; finished: boolean };
+/** A solved step's celebration: `found` = a real place reached (else an answer that was right). */
+type Win = {
+	place: string;
+	found: boolean;
+	points: number;
+	bonus: number;
+	finished: boolean;
+};
 
 function dateText(iso: string) {
-	return new Intl.DateTimeFormat("fa-IR", { month: "long", day: "numeric" }).format(new Date(iso));
+	return new Intl.DateTimeFormat("fa-IR", {
+		month: "long",
+		day: "numeric",
+	}).format(new Date(iso));
 }
 
 /** A solved step's place: what the mystery is there to introduce. */
 function PlaceCard({ place }: { place: MysteryPlace }) {
+	const real = place.is_place !== false;
 	return (
 		<div className="my-place">
-			<div className="my-place-head">
-				{place.logo ? <img src={place.logo} alt="" width={48} height={48} /> : <Icon name="map-pin" />}
-				<div>
-					<b>{place.name}</b>
-					{place.address ? <small>{place.address}</small> : null}
+			{real ? (
+				<div className="my-place-head">
+					{place.logo ? (
+						<img src={place.logo} alt="" width={48} height={48} />
+					) : (
+						<Icon name="map-pin" />
+					)}
+					<div>
+						<b>{place.name}</b>
+						{place.address ? <small>{place.address}</small> : null}
+					</div>
 				</div>
-			</div>
-			{place.about ? <p className="my-place-about">{place.about}</p> : null}
+			) : null}
+			{real && place.about ? (
+				<p className="my-place-about">{place.about}</p>
+			) : null}
+			{place.coupon ? (
+				<p className="my-offer my-coupon">
+					<Icon name="ticket" /> کد هدیه: <bdi dir="ltr">{place.coupon}</bdi>
+				</p>
+			) : null}
 			{place.offer ? (
 				<p className="my-offer">
 					<Icon name="gift" /> {place.offer}
@@ -65,12 +89,22 @@ function PlaceCard({ place }: { place: MysteryPlace }) {
 			{place.map || place.url ? (
 				<div className="my-place-links">
 					{place.map ? (
-						<a className="bd-secondary" href={place.map} target="_blank" rel="noopener noreferrer">
+						<a
+							className="bd-secondary"
+							href={place.map}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<Icon name="map-pin" /> مسیریابی
 						</a>
 					) : null}
 					{place.url ? (
-						<a className="bd-secondary" href={place.url} target="_blank" rel="noopener noreferrer">
+						<a
+							className="bd-secondary"
+							href={place.url}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
 							<Icon name="external-link" /> سایت یا صفحه
 						</a>
 					) : null}
@@ -85,7 +119,42 @@ const PROOF_HELP: Record<Current["proof"], string> = {
 	gps: "به محل که رسیدی، «من اینجام» را بزن تا موقعیت گوشی سنجیده شود.",
 	answer: "جواب این پرسش فقط در خود محل پیدا می‌شود.",
 	staff: "به محل که رسیدی، از کارکنان آنجا «کد بردینو» را بگیر.",
+	choice: "گزینهٔ درست را انتخاب کن.",
+	info: "بخوان و «ادامه» را بزن.",
 };
+
+/** «۲:۰۵» */
+function clock(seconds: number) {
+	const m = Math.floor(seconds / 60);
+	return `${fa(m)}:${fa(seconds % 60).padStart(2, "۰")}`;
+}
+
+/** A stage's time limit, ticking down (the server decides; this only shows it). */
+function StageTimer({ step }: { step: Current }) {
+	const [until] = useState(() =>
+		step.time_left_s != null ? Date.now() + step.time_left_s * 1000 : 0,
+	);
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		if (!until) return;
+		const t = window.setInterval(() => setNow(Date.now()), 1000);
+		return () => window.clearInterval(t);
+	}, [until]);
+	if (!until) return null;
+	const left = Math.max(0, Math.ceil((until - now) / 1000));
+	return (
+		<p
+			className={`my-timer ${left ? "" : "my-timer-over"}`}
+			role="timer"
+			aria-live="off"
+		>
+			<Icon name="timer" />{" "}
+			{left
+				? `مهلت: ${clock(left)}`
+				: "مهلت تمام شد؛ هنوز می‌توانی حل کنی ولی امتیاز این مرحله صفر است."}
+		</p>
+	);
+}
 
 const NEXT_HINT: Record<MysteryHint["kind"], string> = {
 	text: "راهنمایی",
@@ -94,7 +163,15 @@ const NEXT_HINT: Record<MysteryHint["kind"], string> = {
 };
 
 /** The step's help, a level at a time: each costs some of its points, so it asks once first. */
-function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: () => void }) {
+function Hints({
+	step,
+	busy,
+	onHint,
+}: {
+	step: Current;
+	busy: boolean;
+	onHint: () => void;
+}) {
 	const [asking, setAsking] = useState(false);
 	const shown = step.hints ?? []; // (a server before the help levels sends none)
 	useEffect(() => setAsking(false), [step.id, shown.length]);
@@ -103,7 +180,13 @@ function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: (
 		<div className="my-hints">
 			{shown.map((h, i) => (
 				<div key={i} className={`my-hint my-hint-${h.kind}`}>
-					<b>{h.kind === "text" ? `راهنمایی ${fa(i + 1)}` : h.kind === "place" ? "محل" : "جواب"}</b>
+					<b>
+						{h.kind === "text"
+							? `راهنمایی ${fa(i + 1)}`
+							: h.kind === "place"
+								? "محل"
+								: "جواب"}
+					</b>
 					{h.kind === "text" ? <p>{h.text}</p> : null}
 					{h.kind === "place" ? (
 						<p>
@@ -121,7 +204,8 @@ function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: (
 					) : null}
 					{h.kind === "answer" ? (
 						<p>
-							<bdi className="my-hint-answer">{h.answer}</bdi> — همین را بنویس؛ این مرحله امتیازی ندارد.
+							<bdi className="my-hint-answer">{h.answer}</bdi> — همین را بنویس؛
+							این مرحله امتیازی ندارد.
 						</p>
 					) : null}
 				</div>
@@ -134,19 +218,40 @@ function Hints({ step, busy, onHint }: { step: Current; busy: boolean; onHint: (
 								? "با دیدن جواب، امتیاز این مرحله صفر می‌شود."
 								: `${fa(step.next_hint_cost)} امتیاز از این مرحله کم می‌شود.`}
 						</span>
-						<button type="button" className="bd-action" disabled={busy} onClick={onHint}>
+						<button
+							type="button"
+							className="bd-action"
+							disabled={busy}
+							onClick={onHint}
+						>
 							{NEXT_HINT[next]}
 						</button>
-						<button type="button" className="bd-secondary" disabled={busy} onClick={() => setAsking(false)}>
+						<button
+							type="button"
+							className="bd-secondary"
+							disabled={busy}
+							onClick={() => setAsking(false)}
+						>
 							نه
 						</button>
 					</div>
 				) : (
-					<button type="button" className="my-hint-button" disabled={busy} onClick={() => setAsking(true)}>
-						<Icon name="lightbulb" /> {shown.length && next === "text" ? "راهنمایی بیشتر" : NEXT_HINT[next]}
+					<button
+						type="button"
+						className="my-hint-button"
+						disabled={busy}
+						onClick={() => setAsking(true)}
+					>
+						<Icon name="lightbulb" />{" "}
+						{shown.length && next === "text"
+							? "راهنمایی بیشتر"
+							: NEXT_HINT[next]}
 						<small>
 							({fa(shown.length + 1)} از {fa(step.hints_total)}
-							{step.next_hint_cost && next !== "answer" ? ` · −${fa(step.next_hint_cost)} امتیاز` : ""})
+							{step.next_hint_cost && next !== "answer"
+								? ` · −${fa(step.next_hint_cost)} امتیاز`
+								: ""}
+							)
 						</small>
 					</button>
 				)
@@ -179,6 +284,8 @@ function CurrentStep({
 	}, []);
 	useEffect(() => setText(""), [step.id]);
 	const typed = step.proof === "answer" || step.proof === "staff";
+	const [picked, setPicked] = useState<string | null>(null);
+	useEffect(() => setPicked(null), [step.id]);
 	const submit = (e: FormEvent) => {
 		e.preventDefault();
 		if (!text.trim()) return;
@@ -187,39 +294,116 @@ function CurrentStep({
 	return (
 		<div className="my-current">
 			<p className="my-clue">{step.clue}</p>
-			{step.clue_image ? <img className="my-clue-image" src={step.clue_image} alt="تصویر سرنخ" /> : null}
+			{step.clue_image ? (
+				<img className="my-clue-image" src={step.clue_image} alt="تصویر سرنخ" />
+			) : null}
 			<Hints step={step} busy={busy} onHint={onHint} />
 			<p className="my-proof-help">
-				<Icon name="info" /> {PROOF_HELP[step.proof]}
-				{step.check_location && step.proof !== "gps" ? " موقعیت گوشی هم سنجیده می‌شود." : ""}
+				<Icon name="info" />{" "}
+				{step.proof === "answer" && !step.check_location
+					? "جواب را بنویس."
+					: PROOF_HELP[step.proof]}
+				{step.check_location && step.proof !== "gps"
+					? " موقعیت گوشی هم سنجیده می‌شود."
+					: ""}
 			</p>
 			{lockedIn > 0 ? (
 				<p className="my-locked" role="status">
-					<Icon name="hourglass" /> چند بار اشتباه شد؛ {fa(Math.ceil(lockedIn / 60))} دقیقهٔ دیگر دوباره امتحان کن.
+					<Icon name="hourglass" /> چند بار اشتباه شد؛{" "}
+					{fa(Math.ceil(lockedIn / 60))} دقیقهٔ دیگر دوباره امتحان کن.
 				</p>
 			) : null}
 			{step.proof === "qr" ? (
 				scanHere ? (
-					<button type="button" className="bd-action my-go" disabled={busy} onClick={onScan}>
+					<button
+						type="button"
+						className="bd-action my-go"
+						disabled={busy}
+						onClick={onScan}
+					>
 						<Icon name="qr-code" /> اسکن QR محل
 					</button>
 				) : (
-					<p className="my-note">QR محل را با دوربین گوشی اسکن کن؛ همین معما باز می‌شود و مرحله ثبت می‌شود.</p>
+					<p className="my-note">
+						QR محل را با دوربین گوشی اسکن کن؛ همین معما باز می‌شود و مرحله ثبت
+						می‌شود.
+					</p>
 				)
 			) : null}
 			{oldApp && step.check_location ? (
 				<p className="my-note">
-					برای سنجیدن موقعیت، اپ بردینو را به‌روز کن (نسخهٔ ۱٫۴). <a href={APK_URL}>دانلود نسخهٔ تازه</a>
+					برای سنجیدن موقعیت، اپ بردینو را به‌روز کن (نسخهٔ ۱٫۴).{" "}
+					<a href={APK_URL}>دانلود نسخهٔ تازه</a>
 				</p>
 			) : null}
+			<StageTimer key={step.id} step={step} />
+			{step.proof === "choice" && !(oldApp && step.check_location) ? (
+				<div className="my-choices">
+					{step.question ? (
+						<p className="my-question">{step.question}</p>
+					) : null}
+					<div
+						className="my-choice-list"
+						role="radiogroup"
+						aria-label={step.question || "گزینه‌ها"}
+					>
+						{(step.options ?? []).map((o) => (
+							<button
+								key={o}
+								type="button"
+								role="radio"
+								aria-checked={picked === o}
+								className="my-choice"
+								disabled={busy || lockedIn > 0}
+								onClick={() => setPicked(o)}
+							>
+								{o}
+							</button>
+						))}
+					</div>
+					<button
+						type="button"
+						className="bd-action my-go"
+						disabled={busy || lockedIn > 0 || !picked}
+						onClick={() => picked && onProve({ answer: picked })}
+					>
+						{busy ? <Icon name="loader-circle" className="bd-spin" /> : null}{" "}
+						ثبت جواب
+					</button>
+				</div>
+			) : null}
+			{step.proof === "info" && !(oldApp && step.check_location) ? (
+				<button
+					type="button"
+					className="bd-action my-go"
+					disabled={busy}
+					onClick={() => onProve({})}
+				>
+					{busy ? <Icon name="loader-circle" className="bd-spin" /> : null}{" "}
+					ادامه <Icon name="arrow-right" />
+				</button>
+			) : null}
 			{step.proof === "gps" && !oldApp ? (
-				<button type="button" className="bd-action my-go" disabled={busy} onClick={() => onProve({})}>
-					<Icon name={busy ? "loader-circle" : "map-pin"} className={busy ? "bd-spin" : undefined} /> من اینجام
+				<button
+					type="button"
+					className="bd-action my-go"
+					disabled={busy}
+					onClick={() => onProve({})}
+				>
+					<Icon
+						name={busy ? "loader-circle" : "map-pin"}
+						className={busy ? "bd-spin" : undefined}
+					/>{" "}
+					من اینجام
 				</button>
 			) : null}
 			{typed && !(oldApp && step.check_location) ? (
 				<form className="my-answer" onSubmit={submit}>
-					{step.proof === "answer" ? <label htmlFor={`my-${step.id}`}>{step.question}</label> : <label htmlFor={`my-${step.id}`}>کد کارکنان محل</label>}
+					{step.proof === "answer" ? (
+						<label htmlFor={`my-${step.id}`}>{step.question}</label>
+					) : (
+						<label htmlFor={`my-${step.id}`}>کد کارکنان محل</label>
+					)}
 					<div>
 						<input
 							id={`my-${step.id}`}
@@ -227,12 +411,18 @@ function CurrentStep({
 							onChange={(e) => setText(e.target.value)}
 							maxLength={100}
 							autoComplete="off"
-							{...(step.answer_type === "number" && step.proof === "answer" ? { inputMode: "numeric" as const, dir: "ltr" } : {})}
+							{...(step.answer_type === "number" && step.proof === "answer"
+								? { inputMode: "numeric" as const, dir: "ltr" }
+								: {})}
 							enterKeyHint="send"
 							disabled={busy || lockedIn > 0}
 							placeholder={step.proof === "staff" ? "کدی که گرفتی" : "جوابت"}
 						/>
-						<button type="submit" className="bd-action" disabled={busy || lockedIn > 0 || !text.trim()}>
+						<button
+							type="submit"
+							className="bd-action"
+							disabled={busy || lockedIn > 0 || !text.trim()}
+						>
 							{busy ? <Icon name="loader-circle" className="bd-spin" /> : "ثبت"}
 						</button>
 					</div>
@@ -266,7 +456,8 @@ export default function Mystery({ id }: { id: string }) {
 		return () => window.clearTimeout(t);
 	}, [lockedIn, now]);
 
-	const current = m?.step_list.find((s): s is Current => s.state === "current") ?? null;
+	const current =
+		m?.step_list.find((s): s is Current => s.state === "current") ?? null;
 
 	const refreshAll = () => void queryClient.invalidateQueries();
 
@@ -294,7 +485,13 @@ export default function Mystery({ id }: { id: string }) {
 			if (current.check_location) Object.assign(sent, await currentPosition());
 			const reward = await checkinMystery(id, current.id, sent);
 			setLive(reward.mystery);
-			if (!reward.already_rewarded) setWin({ place: placeOf(reward.mystery, current.id), points: reward.points, bonus: reward.bonus, finished: reward.finished });
+			if (!reward.already_rewarded)
+				setWin({
+					...placeOf(reward.mystery, current.id),
+					points: reward.points,
+					bonus: reward.bonus,
+					finished: reward.finished,
+				});
 			refreshAll();
 		} catch (e) {
 			setProblem(e instanceof LocationError ? e.message : gameErrorMessage(e));
@@ -330,11 +527,22 @@ export default function Mystery({ id }: { id: string }) {
 		try {
 			const reward = (await claimQr(code)) as MysteryQrReward;
 			if (reward.mystery && reward.mystery.id === id) {
-				if (!reward.already_rewarded) setWin({ place: reward.title ?? "", points: reward.points - reward.mystery.bonus, bonus: reward.mystery.bonus, finished: reward.mystery.finished });
+				if (!reward.already_rewarded)
+					setWin({
+						place: reward.title ?? "",
+						found: true,
+						points: reward.points - reward.mystery.bonus,
+						bonus: reward.mystery.bonus,
+						finished: reward.mystery.finished,
+					});
 			} else if (reward.mystery) {
-				setProblem(`این QR مال معمای دیگری است («${reward.summary ?? ""}»)؛ امتیازش ثبت شد.`);
+				setProblem(
+					`این QR مال معمای دیگری است («${reward.summary ?? ""}»)؛ امتیازش ثبت شد.`,
+				);
 			} else {
-				setProblem(`این QR مال مأموریت «${reward.title ?? ""}» بود${reward.already_rewarded ? "" : ` و ${fa(reward.points)} امتیاز گرفتی`}.`);
+				setProblem(
+					`این QR مال مأموریت «${reward.title ?? ""}» بود${reward.already_rewarded ? "" : ` و ${fa(reward.points)} امتیاز گرفتی`}.`,
+				);
 			}
 			refreshAll();
 		} catch (e) {
@@ -370,8 +578,11 @@ export default function Mystery({ id }: { id: string }) {
 			<section className="bd-panel my-hero">
 				{m.cover ? <img className="my-cover" src={m.cover} alt="" /> : null}
 				<span className="bd-tag my-kicker">
-					<Icon name="search" /> معمای شهری
+					<Icon name="search" /> {m.creator ? "بازی سازندگان" : "معمای شهری"}
 				</span>
+				{m.creator && m.presenter ? (
+					<span className="my-presenter">ارائه از {m.presenter}</span>
+				) : null}
 				<h2>{m.title}</h2>
 				{m.summary ? <p className="my-summary">{m.summary}</p> : null}
 				<ul className="my-facts">
@@ -399,15 +610,25 @@ export default function Mystery({ id }: { id: string }) {
 				</ul>
 				{m.story ? <p className="my-story">{m.story}</p> : null}
 				{m.run ? (
-					<div className="my-progress" aria-label={`${fa(solved)} از ${fa(m.steps)} مرحله`}>
-						<span style={{ width: `${m.steps ? (solved / m.steps) * 100 : 0}%` }} />
+					<div
+						className="my-progress"
+						aria-label={`${fa(solved)} از ${fa(m.steps)} مرحله`}
+					>
+						<span
+							style={{ width: `${m.steps ? (solved / m.steps) * 100 : 0}%` }}
+						/>
 					</div>
 				) : null}
 				{!m.run ? (
 					blocked ? (
 						<p className="my-note">{blocked}</p>
 					) : (
-						<button type="button" className="bd-action my-go" disabled={busy} onClick={() => void start()}>
+						<button
+							type="button"
+							className="bd-action my-go"
+							disabled={busy}
+							onClick={() => void start()}
+						>
 							<Icon name="rocket" /> شروع معما
 						</button>
 					)
@@ -415,12 +636,23 @@ export default function Mystery({ id }: { id: string }) {
 			</section>
 
 			{win ? (
-				<div className={`bd-panel my-win ${win.finished ? "my-win-final" : ""}`} role="status">
+				<div
+					className={`bd-panel my-win ${win.finished ? "my-win-final" : ""}`}
+					role="status"
+				>
 					<Icon name={win.finished ? "trophy" : "party-popper"} />
 					<div>
-						<b>{win.finished ? "معما را حل کردی!" : `پیدایش کردی${win.place ? `: «${win.place}»` : ""}!`}</b>
+						<b>
+							{win.finished
+								? "معما را حل کردی!"
+								: win.found
+									? `پیدایش کردی${win.place ? `: «${win.place}»` : ""}!`
+									: "درست بود!"}
+						</b>
 						<small>
-							+{fa(win.points)} امتیاز{win.bonus ? ` و ${fa(win.bonus)} امتیاز جایزهٔ پایان` : ""} به کیف امتیازت اضافه شد.
+							+{fa(win.points)} امتیاز
+							{win.bonus ? ` و ${fa(win.bonus)} امتیاز جایزهٔ پایان` : ""} به
+							کیف امتیازت اضافه شد.
 						</small>
 					</div>
 				</div>
@@ -436,10 +668,23 @@ export default function Mystery({ id }: { id: string }) {
 					{m.step_list.map((step) => (
 						<li key={step.id} className={`bd-panel my-step my-${step.state}`}>
 							<div className="my-step-head">
-								<span className="my-step-number">{step.state === "done" ? <Icon name="check" /> : fa(step.number)}</span>
-								<b>{step.state === "done" ? step.place.name : `مرحلهٔ ${fa(step.number)}`}</b>
+								<span className="my-step-number">
+									{step.state === "done" ? (
+										<Icon name="check" />
+									) : (
+										fa(step.number)
+									)}
+								</span>
+								<b>
+									{step.state === "done"
+										? step.place.name
+										: `مرحلهٔ ${fa(step.number)}`}
+								</b>
 								<span className="my-step-points">
-									{step.state === "current" && step.points_now < step.points ? <s>+{fa(step.points)}</s> : null}+
+									{step.state === "current" && step.points_now < step.points ? (
+										<s>+{fa(step.points)}</s>
+									) : null}
+									+
 									{fa(step.state === "current" ? step.points_now : step.points)}
 								</span>
 							</div>
@@ -453,11 +698,20 @@ export default function Mystery({ id }: { id: string }) {
 								</>
 							) : step.state === "current" ? (
 								m.state === "in_progress" ? (
-									<CurrentStep step={step} lockedIn={lockedIn} busy={busy} onProve={(p) => void prove(p)} onScan={() => setScanning(true)} onHint={() => void hint()} />
+									<CurrentStep
+										step={step}
+										lockedIn={lockedIn}
+										busy={busy}
+										onProve={(p) => void prove(p)}
+										onScan={() => setScanning(true)}
+										onHint={() => void hint()}
+									/>
 								) : (
 									<>
 										<p className="my-clue">{step.clue}</p>
-										<p className="my-note">{blocked ?? "این معما الان باز نیست."}</p>
+										<p className="my-note">
+											{blocked ?? "این معما الان باز نیست."}
+										</p>
 									</>
 								)
 							) : (
@@ -474,7 +728,7 @@ export default function Mystery({ id }: { id: string }) {
 				<EmptyState
 					icon="trophy"
 					title="همهٔ مرحله‌ها را حل کردی"
-					text={`${fa(m.run?.points_earned ?? 0)} امتیاز از این معما گرفتی. محل‌هایی که پیدا کردی همین بالا هستند.`}
+					text={`${m.completion_message ? `${m.completion_message} · ` : ""}${fa(m.run?.points_earned ?? 0)} امتیاز از این معما گرفتی. محل‌هایی که پیدا کردی همین بالا هستند.`}
 					action={
 						<Link className="bd-action" href={R.earn}>
 							مأموریت‌های دیگر
@@ -482,12 +736,22 @@ export default function Mystery({ id }: { id: string }) {
 					}
 				/>
 			) : null}
-			{scanning ? <QrScanner onCode={(t) => void scanned(t)} onClose={() => setScanning(false)} /> : null}
+			{scanning ? (
+				<QrScanner
+					onCode={(t) => void scanned(t)}
+					onClose={() => setScanning(false)}
+				/>
+			) : null}
 		</AppShell>
 	);
 }
 
-function placeOf(m: MysteryDetail, stepId: string) {
+function placeOf(
+	m: MysteryDetail,
+	stepId: string,
+): { place: string; found: boolean } {
 	const step = m.step_list.find((s) => s.id === stepId);
-	return step && step.state === "done" ? step.place.name : "";
+	return step && step.state === "done"
+		? { place: step.place.name, found: step.place.is_place !== false }
+		: { place: "", found: true };
 }

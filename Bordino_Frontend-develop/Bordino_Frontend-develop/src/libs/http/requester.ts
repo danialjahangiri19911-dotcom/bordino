@@ -42,6 +42,10 @@ const DISABLE_SHOW_ERROR_CLIENT_PATHS = [
 	"/pwa/2048",
 	// «دریافت امتیاز» (missions, a place's QR, «معمای شهری»): each shows its own message in place.
 	"/pwa/earn",
+	// Game Master and invite links show their own messages too.
+	"/pwa/gm",
+	"/pwa/play",
+	"/pwa/profile/mode",
 ];
 
 const DISABLE_401_ERRORS = ["/pwa/register"];

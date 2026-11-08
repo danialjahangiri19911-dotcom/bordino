@@ -10,7 +10,7 @@ import { styleClass, useArt, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
 import { fa } from "./format";
-import { takePendingQr } from "./missions/pendingQr";
+import { takePendingInvite, takePendingQr } from "./missions/pendingQr";
 import { reconcilePushOwner } from "./push";
 import useGetCustomerProfile from "@api/customer/hooks/useGetCustomerProfile";
 import useGetPointsSummary from "@api/wallet/hooks/useGetPointsSummary";
@@ -25,6 +25,9 @@ export const R = {
 	earn: "/pwa/earn",
 	earnQr: (token: string) => `/pwa/earn/qr/${token}`,
 	mystery: (id: string) => `/pwa/earn/mystery/${id}`,
+	play: (token: string) => `/pwa/play/${token}`,
+	appMode: "/pwa/profile/mode",
+	gm: "/pwa/gm",
 	wallet: "/pwa/wallet",
 	transactions: "/pwa/wallet/transactions",
 	withdraw: "/pwa/wallet/withdraw",
@@ -146,6 +149,8 @@ function usePendingQr() {
 	useEffect(() => {
 		const token = takePendingQr();
 		if (token) push(R.earnQr(token));
+		const invite = token ? null : takePendingInvite();
+		if (invite) push(R.play(invite));
 	}, [push]);
 }
 

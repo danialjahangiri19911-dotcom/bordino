@@ -25,3 +25,26 @@ export function takePendingQr(): string | null {
 		return null;
 	}
 }
+
+/** A private game's invite opened while signed out: kept through the sign-in like a QR. */
+const INVITE_KEY = "bd-pending-invite";
+
+export function rememberInvite(token: string) {
+	try {
+		localStorage.setItem(INVITE_KEY, JSON.stringify({ token, at: Date.now() }));
+	} catch {
+		// Storage blocked: the player opens the link again after signing in.
+	}
+}
+
+export function takePendingInvite(): string | null {
+	try {
+		const raw = localStorage.getItem(INVITE_KEY);
+		if (!raw) return null;
+		localStorage.removeItem(INVITE_KEY);
+		const { token, at } = JSON.parse(raw) as { token?: unknown; at?: unknown };
+		return typeof token === "string" && typeof at === "number" && Date.now() - at < KEEP_MS ? token : null;
+	} catch {
+		return null;
+	}
+}

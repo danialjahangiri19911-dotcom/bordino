@@ -246,7 +246,8 @@ export default function Profile() {
 				<section className="bd-panel rt-panel">
 					<h3>تنظیمات برنامه</h3>
 					<ProfileRow href={R.notifications} icon="bell" title="مدیریت اعلانات" text="اعلان‌های برنامه" />
-					<ProfileRow href={R.appearance} icon="moon" title="ظاهر برنامه" text="روشن، تیره یا هماهنگ با دستگاه" />
+					<ProfileRow href={R.appearance} icon="moon" title="ظاهر برنامه" text="طرح، روشن یا تیره" />
+					<ProfileRow href={R.appMode} icon="sparkles" title="حالت برنامه" text="بازیکن یا گیم مستر (ساخت بازی)" />
 				</section>
 				<section className="bd-panel rt-panel">
 					<h3>امتیازها و جوایز</h3>

@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { GAMES } from "../games";
+import { useGmProfile } from "../gm/api";
 import { fa } from "../format";
 import useCountdown, { formatLeft } from "../useCountdown";
 import { AppShell, Art, Balance, LoadState, R, useProfileSync } from "../ui";
@@ -56,8 +60,28 @@ function LotteryPanel() {
 	);
 }
 
+/**
+ * The app opens in the mode the player last chose («حالت برنامه»): once per session, a creator who
+ * left the app in Game Master is taken back there (going to Player Mode stays where it is).
+ */
+function useRestoreMode() {
+	const { replace } = useRouter();
+	const mode = useGmProfile().data?.result?.profile;
+	useEffect(() => {
+		if (!mode || mode.preferred_mode !== "creator" || !mode.available) return;
+		try {
+			if (sessionStorage.getItem("bd-mode-restored")) return;
+			sessionStorage.setItem("bd-mode-restored", "1");
+		} catch {
+			return;
+		}
+		replace(R.gm);
+	}, [mode, replace]);
+}
+
 export default function Home() {
 	const { profile } = useProfileSync();
+	useRestoreMode();
 	const streak = Number(profile?.consecutive_active_days ?? 0);
 	return (
 		<AppShell
