@@ -372,7 +372,7 @@ export default function ChickenGame() {
 							<Icon name="circle-help" />
 						</button>
 						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : leave())}>
-							<Icon name="arrow-right" />
+							<Icon name="arrow-left" />
 						</button>
 					</div>
 				</header>

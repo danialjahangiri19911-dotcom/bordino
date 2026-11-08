@@ -353,7 +353,7 @@ export default function WheelGame() {
 								<Icon name="circle-help" />
 							</button>
 							<button type="button" className="wh-icon" aria-label="خروج از گردونه" disabled={spinning} onClick={leave}>
-								<Icon name="arrow-right" />
+								<Icon name="arrow-left" />
 							</button>
 						</div>
 					</header>

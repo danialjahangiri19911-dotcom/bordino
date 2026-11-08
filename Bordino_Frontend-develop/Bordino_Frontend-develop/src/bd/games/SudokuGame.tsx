@@ -351,7 +351,7 @@ export default function SudokuGame() {
 							<Icon name="circle-help" />
 						</button>
 						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? askExit() : push(R.games))}>
-							<Icon name="arrow-right" />
+							<Icon name="arrow-left" />
 						</button>
 					</div>
 				</header>

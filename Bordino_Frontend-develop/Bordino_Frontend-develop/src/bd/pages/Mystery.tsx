@@ -365,7 +365,7 @@ export default function Mystery({ id }: { id: string }) {
 	return (
 		<AppShell nav="earn" title={m.title}>
 			<Link className="my-back" href={R.earn}>
-				<Icon name="arrow-right" /> دریافت امتیاز
+				<Icon name="arrow-left" /> دریافت امتیاز
 			</Link>
 			<section className="bd-panel my-hero">
 				{m.cover ? <img className="my-cover" src={m.cover} alt="" /> : null}

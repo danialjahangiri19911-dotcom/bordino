@@ -211,7 +211,7 @@ function View() {
 							<Icon name="circle-help" />
 						</button>
 						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? askExit() : push(R.games))}>
-							<Icon name="arrow-right" />
+							<Icon name="arrow-left" />
 						</button>
 					</div>
 				</header>

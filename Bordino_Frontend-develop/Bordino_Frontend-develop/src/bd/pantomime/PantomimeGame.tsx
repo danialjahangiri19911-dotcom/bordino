@@ -1339,7 +1339,7 @@ export default function PantomimeGame() {
 								<Icon name="circle-help" />
 							</button>
 							<button type="button" className="pm-icon" data-act="exit" aria-label="خروج از بازی" onClick={leave}>
-								<Icon name="arrow-right" />
+								<Icon name="arrow-left" />
 							</button>
 						</div>
 					</header>
