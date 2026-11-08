@@ -40,7 +40,7 @@ function MyTickets({ id, winning }: { id: string; winning: number[] }) {
 						<b>بلیت شمارهٔ {fa(index + 1)}</b>
 						{ticket.numbers?.length ? <Numbers numbers={ticket.numbers} hits={winning} /> : <small>عددی ثبت نشده</small>}
 					</span>
-					<span className="bd-text-btn">←</span>
+					<span className="bd-text-btn">→</span>
 				</Link>
 			))}
 		</div>
@@ -122,7 +122,7 @@ export default function LotteryDetail() {
 							</button>
 						)}
 						<Link className="bd-text-btn" href={R.lotteryGuide}>
-							راهنمای قرعه‌کشی ←
+							راهنمای قرعه‌کشی →
 						</Link>
 					</div>
 				</Panel>

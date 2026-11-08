@@ -180,7 +180,7 @@ function Intro({
 									onClick={() => (last ? onDone() : go(step + 1))}
 								>
 									{last ? "ورود به خانه" : "ادامه"}
-									<Icon name="arrow-left" />
+									<Icon name="arrow-right" />
 								</button>
 								{step > 0 ? (
 									<button

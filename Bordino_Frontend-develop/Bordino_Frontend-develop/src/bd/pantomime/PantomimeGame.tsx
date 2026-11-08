@@ -632,7 +632,7 @@ export default function PantomimeGame() {
 			<p className="pm-note pm-roster-note">نقش اجراکننده در هر دور بین اعضای تیم می‌چرخد.</p>
 			{button(
 				<>
-					ادامه؛ انتخاب روش بازی <Icon name="arrow-left" />
+					ادامه؛ انتخاب روش بازی <Icon name="arrow-right" />
 				</>,
 				"setup-next",
 				() => {
@@ -755,7 +755,7 @@ export default function PantomimeGame() {
 				</p>
 				{button(
 					<>
-						شروع بازی <Icon name="arrow-left" />
+						شروع بازی <Icon name="arrow-right" />
 					</>,
 					"start",
 					startGame,
@@ -859,7 +859,7 @@ export default function PantomimeGame() {
 					</p>
 					{button(
 						<>
-							ارسال برای تأیید <Icon name="arrow-left" />
+							ارسال برای تأیید <Icon name="arrow-right" />
 						</>,
 						"propose",
 						() => {
@@ -964,7 +964,7 @@ export default function PantomimeGame() {
 					{scoreRules}
 					{button(
 						<>
-							تأیید چالش <Icon name="arrow-left" />
+							تأیید چالش <Icon name="arrow-right" />
 						</>,
 						"choose",
 						() => {
@@ -1174,7 +1174,7 @@ export default function PantomimeGame() {
 							</>
 						) : (
 							<>
-								نوبت تیم بعد <Icon name="arrow-left" />
+								نوبت تیم بعد <Icon name="arrow-right" />
 							</>
 						),
 						"next",

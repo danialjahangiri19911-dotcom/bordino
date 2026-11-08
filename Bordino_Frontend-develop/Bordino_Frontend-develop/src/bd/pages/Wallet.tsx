@@ -88,7 +88,7 @@ export default function Wallet() {
 									درخواست برداشت
 								</Link>
 								<Link className="bd-text-btn" href={`${R.transactions}?kind=currency`}>
-									تراکنش‌های نقدی ←
+									تراکنش‌های نقدی →
 								</Link>
 							</div>
 						</>

@@ -31,7 +31,7 @@ function LotteryRow({ lottery }: { lottery: Lottery }) {
 					{lotteryStatus(lottery)} · جایزه {fa(lottery.balance_in_money)} تومان · {faDate(lottery.end_date)}
 				</small>
 			</span>
-			<span className="bd-text-btn">جزئیات ←</span>
+			<span className="bd-text-btn">جزئیات →</span>
 		</Link>
 	);
 }

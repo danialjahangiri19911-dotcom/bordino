@@ -336,7 +336,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						) : null}
 						{canStart && m.kind !== "qr" && !(open && m.kind !== "video") ? (
 							<button type="button" className="bd-sheet-item bd-reward-main" autoFocus disabled={busy} onClick={() => void start()}>
-								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name={m.kind === "video" || m.kind === "interstitial" ? "play" : "arrow-left"} />}
+								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name={m.kind === "video" || m.kind === "interstitial" ? "play" : "arrow-right"} />}
 								{m.kind === "video"
 									? `تماشای ویدیو و دریافت ${fa(m.points)} امتیاز`
 									: m.kind === "interstitial"

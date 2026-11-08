@@ -33,7 +33,7 @@ function LotteryPanel() {
 				<h3>منتظر دورهٔ بعدی باش</h3>
 				<p>در حال حاضر قرعه‌کشی فعالی وجود ندارد. دورهٔ بعدی به‌زودی اعلام می‌شود.</p>
 				<Link className="bd-action" href={R.wallet}>
-					مشاهدهٔ کیف‌پول <Icon name="arrow-left" />
+					مشاهدهٔ کیف‌پول <Icon name="arrow-right" />
 				</Link>
 			</section>
 		);
@@ -50,7 +50,7 @@ function LotteryPanel() {
 				{left > 0 ? <>زمان باقی‌مانده: {formatLeft(left)}</> : <>فروش بسته شد؛ در انتظار قرعه‌کشی</>}
 			</p>
 			<Link className="bd-action" href={R.lotteryDetail(lottery.id)}>
-				جزئیات و خرید بلیت <Icon name="arrow-left" />
+				جزئیات و خرید بلیت <Icon name="arrow-right" />
 			</Link>
 		</section>
 	);
@@ -101,13 +101,13 @@ export default function Home() {
 									<small>{game.blurb}</small>
 								</span>
 								<span className="bd-mission-go" aria-hidden="true">
-									<Icon name="arrow-left" />
+									<Icon name="arrow-right" />
 								</span>
 							</Link>
 						))}
 					</div>
 					<Link className="bd-text-btn" href={R.games}>
-						مشاهدهٔ همهٔ بازی‌ها ←
+						مشاهدهٔ همهٔ بازی‌ها →
 					</Link>
 				</section>
 				<LotteryPanel />
@@ -117,7 +117,7 @@ export default function Home() {
 						<h3>گردونهٔ بردینو</h3>
 						<small>یک انتخاب دیگر برای امتیازهایت</small>
 						<Link className="bd-text-btn" href={R.wheel}>
-							دیدن گردونه ←
+							دیدن گردونه →
 						</Link>
 					</div>
 				</section>

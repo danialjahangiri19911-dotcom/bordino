@@ -125,7 +125,7 @@ export default function Login() {
 							{error}
 						</p>
 						<button className="bd-action au-submit" type="submit" disabled={isSending}>
-							{isSending ? "در حال ارسال…" : "دریافت کد ورود"} <Icon name="arrow-left" />
+							{isSending ? "در حال ارسال…" : "دریافت کد ورود"} <Icon name="arrow-right" />
 						</button>
 					</form>
 					<p className="au-terms">

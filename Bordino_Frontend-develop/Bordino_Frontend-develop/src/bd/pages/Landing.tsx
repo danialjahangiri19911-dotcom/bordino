@@ -45,7 +45,7 @@ export default function Landing() {
 					<Link href={R.rules}>راهنما</Link>
 				</nav>
 				<Link className="bd-action" href={appHref}>
-					{isLoggedIn ? "ورود به برنامه" : "ورود به بردینو"} <Icon name="arrow-up-left" />
+					{isLoggedIn ? "ورود به برنامه" : "ورود به بردینو"} <Icon name="arrow-up-right" />
 				</Link>
 			</header>
 			<main id="main">
@@ -62,7 +62,7 @@ export default function Landing() {
 						<p>بازی کن، امتیاز جمع کن و امتیازهایت را به بلیت قرعه‌کشی یا فرصت گردونه تبدیل کن.</p>
 						<div className="bd-actions">
 							<Link className="bd-action" href={appHref}>
-								شروع یک بازی <Icon name="arrow-left" />
+								شروع یک بازی <Icon name="arrow-right" />
 							</Link>
 							<a className="bd-secondary" href="#how">
 								بردینو چطور کار می‌کند؟
@@ -139,7 +139,7 @@ export default function Landing() {
 						<p>بازی‌ها، امتیازها و بلیت‌هایت را در فضای خودت ببین.</p>
 					</div>
 					<Link className="bd-action" href={appHref}>
-						دیدن محیط اپلیکیشن <Icon name="arrow-left" />
+						دیدن محیط اپلیکیشن <Icon name="arrow-right" />
 					</Link>
 				</section>
 			</main>

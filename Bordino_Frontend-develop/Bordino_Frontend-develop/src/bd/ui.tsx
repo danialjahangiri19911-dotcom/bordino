@@ -500,7 +500,7 @@ export function ProfileRow({ href, icon, title, text }: { href: string; icon: Ic
 				<b>{title}</b>
 				<small>{text}</small>
 			</span>
-			<Icon name="chevron-left" />
+			<Icon name="chevron-right" />
 		</Link>
 	);
 }
