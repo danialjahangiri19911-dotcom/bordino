@@ -52,6 +52,7 @@ LOCAL_APPS = [
     "apps.missions.apps.MissionsConfig",
     "apps.pantomime.apps.PantomimeConfig",
     "apps.gamemaster.apps.GameMasterConfig",
+    "apps.ops.apps.OpsConfig",
 ]
 
 THIRD_PARTY_APPS = [
@@ -91,6 +92,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Counts 5xx answers per hour for «بردینو ادمین»'s maintenance page.
+    "apps.ops.middleware.ErrorCountMiddleware",
 ]
 if DEBUG:
     MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
@@ -343,6 +346,9 @@ KAVENEGAR_OTP_TEMPLATE = get_env_value("KAVENEGAR_OTP_TEMPLATE", default_value="
 ADMIN_OTP_WHITELIST = [
     p.strip() for p in get_env_value("ADMIN_OTP_WHITELIST", default_value="").split(",") if p.strip()
 ]
+
+# «بردینو ادمین» (/ops): its owners have every role and manage the staff (apps/ops/roles.py).
+OPS_OWNERS = [p.strip() for p in get_env_value("OPS_OWNERS", default_value="9128007728").split(",") if p.strip()]
 
 # Where the app lives for links made on the server (a place's QR, the partner's callback address).
 MISSIONS_PUBLIC_URL = get_env_value("MISSIONS_PUBLIC_URL", default_value="https://lottery.bordino.co")

@@ -56,31 +56,35 @@ def _admin_user(phone):
     return get_user_model().objects.filter(phone_number=phone, is_active=True, is_admin=True).first()
 
 
-def _digest(phone, code):
-    msg = f"admin-otp:{phone}:{code}".encode()
+def _digest(phone, code, scope="admin"):
+    msg = f"{scope}-otp:{phone}:{code}".encode()
     return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()
 
 
-def _keys(phone):
-    base = f"admin_otp:{phone}"
+def _keys(phone, scope="admin"):
+    base = f"{scope}_otp:{phone}"
     return f"{base}:code", f"{base}:tries", f"{base}:gap", f"{base}:hour"
 
 
-def send_code(phone):
+def send_code(phone, who=None, scope="admin"):
     """Returns "sent", "wait", "limit" or "sms_failed". An unlisted number also gets
-    "sent" (nothing is sent) so the answer reveals nothing about the list."""
-    code_key, tries_key, gap_key, hour_key = _keys(phone)
+    "sent" (nothing is sent) so the answer reveals nothing about the list.
+
+    `who(phone)` is the user allowed to log in with this number, or None (default: the Django
+    admin's allowlist); `scope` keeps each login's codes and limits apart (the admin app: "ops")."""
+    who = who or _admin_user
+    code_key, tries_key, gap_key, hour_key = _keys(phone, scope)
     # Throttle before the list check so listed and unlisted numbers behave alike.
     if not cache.add(gap_key, 1, RESEND_GAP):
         return "wait"
     cache.add(hour_key, 0, 3600)
     if cache.incr(hour_key) > MAX_SENDS_PER_HOUR:
         return "limit"
-    if _admin_user(phone) is None:
+    if who(phone) is None:
         return "sent"
 
     code = "".join(secrets.choice("0123456789") for _ in range(CODE_LENGTH))
-    cache.set(code_key, _digest(phone, code), CODE_TTL)
+    cache.set(code_key, _digest(phone, code, scope), CODE_TTL)
     cache.set(tries_key, 0, CODE_TTL)
     if SMSService().send_sms(phone, code) is None:
         cache.delete_many([code_key, tries_key, gap_key])
@@ -88,9 +92,10 @@ def send_code(phone):
     return "sent"
 
 
-def verify_code(phone, code):
-    """The admin user if `code` is the live code for `phone`, else None. Single use."""
-    code_key, tries_key, _gap, _hour = _keys(phone)
+def verify_code(phone, code, who=None, scope="admin"):
+    """The allowed user if `code` is the live code for `phone`, else None. Single use."""
+    who = who or _admin_user
+    code_key, tries_key, _gap, _hour = _keys(phone, scope)
     expected = cache.get(code_key)
     if not expected:
         return None
@@ -99,13 +104,13 @@ def verify_code(phone, code):
         cache.delete(code_key)
         return None
     given = "".join(str(int(ch)) for ch in str(code or "") if ch.isdecimal())
-    if not hmac.compare_digest(expected, _digest(phone, given)):
+    if not hmac.compare_digest(expected, _digest(phone, given, scope)):
         return None
     # delete() is True only for the request that actually removed the key.
     if not cache.delete(code_key):
         return None
     cache.delete(tries_key)
-    return _admin_user(phone)
+    return who(phone)
 
 
 def _mask(phone):

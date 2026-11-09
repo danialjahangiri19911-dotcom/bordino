@@ -68,6 +68,12 @@ class SessionRefreshToken(RefreshToken):
 
 
 class SessionTokenRefreshSerializer(TokenRefreshSerializer):
-    """/token/refresh/ within a session: refused once the session is logged out."""
+    """/token/refresh/ within a session: refused once the session is logged out. An admin-app token
+    (scope "ops") is refused too: it is renewed only by the admin app, which keeps it short."""
 
     token_class = SessionRefreshToken
+
+    def validate(self, attrs):
+        if self.token_class(attrs["refresh"]).get("scope"):
+            raise TokenError(_("This token cannot be refreshed here."))
+        return super().validate(attrs)
