@@ -199,12 +199,15 @@ class StaffMemberView(APIView):
         return OpsMember.objects.select_related("user").filter(pk=member_id).first()
 
     def patch(self, request, member_id):
-        m = self._get(member_id)
-        if m is None or roles.is_owner(m.user):
-            return err("پیدا نشد.", "not_found", 404)
         data = request.data or {}
-        before = staff_payload(m)
         with transaction.atomic():
+            # Locked: two owners' edits never undo each other (a stale «note» edit must not
+            # re-activate someone just deactivated).
+            m = OpsMember.objects.select_for_update().select_related("user").filter(pk=member_id).first()
+            if m is None or roles.is_owner(m.user):
+                return err("پیدا نشد.", "not_found", 404)
+            before = staff_payload(m)
+            fields = []
             if "roles" in data:
                 wanted = [r for r in (data.get("roles") or []) if r in roles.ROLES]
                 if not wanted:
@@ -212,9 +215,12 @@ class StaffMemberView(APIView):
                 roles.set_roles(m.user, wanted)
             if "active" in data:
                 m.is_active = bool(data.get("active"))
+                fields.append("is_active")
             if "note" in data:
                 m.note = str(data.get("note") or "")[:200]
-            m.save()
+                fields.append("note")
+            if fields:
+                m.save(update_fields=[*fields, "update_time"])
             after = staff_payload(m)
             audit(request, "staff_change", "user", m.user_id, before={k: before[k] for k in ("roles", "active", "note")}, after={k: after[k] for k in ("roles", "active", "note")})
         return Response({"member": after})
@@ -228,6 +234,18 @@ class StaffMemberView(APIView):
             audit(request, "staff_remove", "user", m.user_id, phone="0" + m.user.phone_number)
             m.delete()
         return Response({"ok": True})
+
+
+BANKING_KEYS = {"iban"}
+
+
+def redact(data):
+    """An audit payload without bank details (for whoever does not have the finance role now)."""
+    if isinstance(data, dict):
+        return {k: (f"{str(v)[:4]}…{str(v)[-4:]}" if k in BANKING_KEYS and v else redact(v)) for k, v in data.items()}
+    if isinstance(data, list):
+        return [redact(x) for x in data]
+    return data
 
 
 class AuditView(APIView):
@@ -247,6 +265,7 @@ class AuditView(APIView):
         except ValueError:
             offset = 0
         rows = list(qs[offset : offset + 50])
+        banking = roles.has_role(request.user, "finance")
         return Response(
             {
                 "rows": [
@@ -256,7 +275,7 @@ class AuditView(APIView):
                         "actor_name": (r.actor.username or "") if r.actor else "",
                         "action": r.action,
                         "target": f"{r.target_type}:{r.target_id}" if r.target_type else "",
-                        "data": r.data,
+                        "data": r.data if banking else redact(r.data),
                     }
                     for r in rows
                 ],

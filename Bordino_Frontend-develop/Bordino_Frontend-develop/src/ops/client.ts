@@ -57,57 +57,71 @@ export class OpsError extends Error {
 	}
 }
 
-let refreshing: Promise<boolean> | null = null;
+let refreshing: { refresh: string; done: Promise<string | null> } | null = null;
 
-async function renew(): Promise<boolean> {
-	const s = session();
-	if (!s?.refresh) return false;
-	refreshing ??= (async () => {
+/**
+ * A new access token for THIS session (the one a request started with). It is stored only if that
+ * session is still the device's session: a staff member who signs in meanwhile is never given, or
+ * overwritten by, the previous one's token.
+ */
+async function renew(started: Session): Promise<string | null> {
+	if (refreshing?.refresh === started.refresh) return refreshing.done;
+	const done = (async () => {
 		try {
 			const r = await fetch(API + "auth/refresh/", {
 				method: "POST",
 				headers: { "Content-Type": "application/json", "Accept-Language": "fa" },
-				body: JSON.stringify({ refresh: s.refresh }),
+				body: JSON.stringify({ refresh: started.refresh }),
 			});
-			if (!r.ok) return false;
-			const body = await r.json();
-			const access = body?.result?.access;
-			if (!access) return false;
-			saveSession({ ...s, access });
-			return true;
+			if (!r.ok) return null;
+			const access: string | undefined = (await r.json())?.result?.access;
+			if (!access) return null;
+			const now = session();
+			if (now?.refresh !== started.refresh) return null; // (someone else signed in meanwhile)
+			saveSession({ ...now, access });
+			return access;
 		} catch {
-			return false;
+			return null;
 		} finally {
 			setTimeout(() => {
-				refreshing = null;
+				if (refreshing?.refresh === started.refresh) refreshing = null;
 			}, 0);
 		}
 	})();
-	return refreshing;
+	refreshing = { refresh: started.refresh, done };
+	return done;
 }
 
-function signedOut() {
+function signedOut(started: Session | null) {
+	// Only the session that failed ends (another staff member who signed in meanwhile stays).
+	if (session()?.refresh !== started?.refresh) return;
 	saveSession(null);
 	// A full page load to the login page: nothing cached in memory survives the ended session.
 	if (!location.pathname.startsWith("/ops/login")) location.replace("/ops/login");
 }
 
-/** One admin-app API call: the answer's `result`, or an OpsError with the server's message. */
-export async function ops<T = unknown>(path: string, method = "GET", data?: unknown, retry = true): Promise<T> {
-	const s = session();
-	const r = await fetch(API + path, {
-		method,
-		headers: {
-			"Content-Type": "application/json",
-			"Accept-Language": "fa",
-			...(s?.access ? { Authorization: `Bearer ${s.access}` } : {}),
-		},
-		body: data === undefined ? undefined : JSON.stringify(data),
-	});
-	if (r.status === 401 && retry && path.indexOf("auth/") !== 0) {
-		if (await renew()) return ops<T>(path, method, data, false);
-		signedOut();
-		throw new OpsError("نشست تمام شد؛ دوباره وارد شو.", 401, "signed_out");
+/** One admin-app API call: the answer's `result`, or an OpsError with the server's message. A call
+ * belongs to the session it started with: renewed and retried only within that session. */
+export async function ops<T = unknown>(path: string, method = "GET", data?: unknown): Promise<T> {
+	const started = session();
+	const send = (access: string | undefined) =>
+		fetch(API + path, {
+			method,
+			headers: {
+				"Content-Type": "application/json",
+				"Accept-Language": "fa",
+				...(access ? { Authorization: `Bearer ${access}` } : {}),
+			},
+			body: data === undefined ? undefined : JSON.stringify(data),
+		});
+	let r = await send(started?.access);
+	if (r.status === 401 && started && path.indexOf("auth/") !== 0) {
+		const access = await renew(started);
+		if (!access) {
+			signedOut(started);
+			throw new OpsError("نشست تمام شد؛ دوباره وارد شو.", 401, "signed_out");
+		}
+		r = await send(access); // (the same session's new token, never whoever is signed in now)
 	}
 	let body: { is_successful?: boolean; result?: T; errors?: Record<string, unknown> } = {};
 	try {

@@ -366,3 +366,85 @@ class CodexPass1Tests(OpsTestCase):
         with mock.patch("apps.ops.views_dash.cache", broken):  # (only the overview's cache; sign-in still works)
             r = self.ops(self.owner).get(O + "overview/")
         self.assertEqual(r.status_code, 200)
+
+
+class CodexPass2Tests(OpsTestCase):
+    def test_1_a_stale_note_edit_never_reactivates_a_member(self):
+        own = self.ops(self.owner)
+        mid = str(OpsMember.objects.get(user=self.reviewer).pk)
+        self.assertEqual(own.patch(O + f"staff/{mid}/", {"active": False}, format="json").status_code, 200)
+        self.assertEqual(own.patch(O + f"staff/{mid}/", {"note": "یادداشت"}, format="json").status_code, 200)  # (from a stale page)
+        self.assertFalse(OpsMember.objects.get(pk=mid).is_active)
+        self.assertEqual(self.ops(self.reviewer).get(O + "me/").status_code, 403)
+
+    def test_3_the_audit_shows_ibans_only_to_finance_now(self):
+        bank = Bank.objects.create(name="ب", code="C3")
+        a = BankAccount.objects.create(user=self.player, iban="IR000000000000000000000999", bank=bank, account_holder="x")
+        self.assertEqual(self.ops(self.finance).post(O + f"bank-accounts/{a.pk}/approve/", {}, format="json").status_code, 200)
+        self.assertIn("IR000000000000000000000999", str(body(self.ops(self.finance).get(O + "audit/"))))
+        roles.set_roles(get_user_model().objects.get(pk=self.finance.pk), ["support"])
+        shown = str(body(self.ops(self.finance).get(O + "audit/")))
+        self.assertNotIn("IR000000000000000000000999", shown)
+        self.assertIn("IR00…0999", shown)
+
+    def test_4_a_failed_reset_leaves_no_cached_value(self):
+        import os  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.update_or_create(key="AD_REWARD_POINTS", defaults={"value": "5", "value_type": "int"})
+        cache.clear()
+        with mock.patch.dict(os.environ, {"AD_REWARD_POINTS": "99"}), mock.patch("apps.ops.auth.OpsAuditLog.objects.create", side_effect=RuntimeError("audit down")):
+            with self.assertRaises(RuntimeError):
+                self.ops(self.owner).delete(O + "settings/AD_REWARD_POINTS/")
+            self.assertEqual(SystemConfiguration.objects.get("AD_REWARD_POINTS", 5), 5)  # (not a cached 99)
+
+
+from django.test import TransactionTestCase  # noqa: E402  pylint: disable=wrong-import-position
+
+
+@override_settings(CACHES=LOCMEM, OPS_OWNERS=["9128007728"])
+class ConcurrentDecisionTests(TransactionTestCase):
+    """Two staff decide the same withdrawal at the same moment (real PostgreSQL row locks)."""
+
+    def test_one_decision_wins_and_the_money_moves_once(self):
+        import threading  # pylint: disable=import-outside-toplevel
+
+        from django.db import connection  # pylint: disable=import-outside-toplevel
+
+        a = make_customer("9120002001")
+        b = make_customer("9120002002")
+        for u in (a, b):
+            OpsMember.objects.create(user=u)
+            roles.set_roles(u, ["finance"])
+        player = make_customer("9120002009", rial=100_000)
+        bank = Bank.objects.create(name="ب", code="CC")
+        acc = BankAccount.objects.create(user=player, iban="IR000000000000000000000555", bank=bank, account_holder="x", status="approved")
+        papi = APIClient()
+        papi.force_authenticate(player)
+        papi.post("/api/v1/wallet/currency/withdraw/", {"amount": 60_000, "bank_account_id": str(acc.pk), "request_id": str(uuid.uuid4())}, format="json")
+        tx = CurrencyTransaction.objects.get()
+        tokens = {u.pk: tokens_for(u)["access"] for u in (a, b)}
+        barrier = threading.Barrier(2)
+        codes = {}
+
+        def decide(user, decision, payload):
+            try:
+                c = APIClient()
+                c.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens[user.pk]}")
+                barrier.wait()
+                codes[decision] = c.post(O + f"withdrawals/{tx.pk}/{decision}/", payload, format="json").status_code
+            finally:
+                connection.close()
+
+        with mock.patch("apps.notifications.services.queue"):
+            threads = [
+                threading.Thread(target=decide, args=(a, "pay", {"reference": "R1"})),
+                threading.Thread(target=decide, args=(b, "fail", {"reason": "x"})),
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        self.assertEqual(sorted(codes.values()), [200, 409], codes)
+        tx.refresh_from_db()
+        expected = 40_000 if tx.status == "completed" else 100_000
+        self.assertEqual(rial(player), expected)

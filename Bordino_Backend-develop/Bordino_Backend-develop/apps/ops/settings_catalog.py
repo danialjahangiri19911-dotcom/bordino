@@ -114,7 +114,9 @@ def current(entry: dict) -> dict:
     if raw is not None and str(raw).strip():
         source, value = "database", row.get_typed_value(raw)
     elif os.environ.get(entry["key"], "").strip():
-        source, value = "env", SystemConfiguration.objects.get(entry["key"], entry["default"])
+        # (read directly, never through the manager's get(): that would fill the shared cache from
+        # inside a transaction that may still roll back)
+        source, value = "env", SystemConfiguration.objects._cast_env(os.environ[entry["key"]], entry["default"])  # pylint: disable=protected-access
     else:
         source, value = "default", entry["default"]
     return {**entry, "value": value, "source": source, "updated": row.update_time.isoformat() if row is not None else None}
