@@ -102,6 +102,16 @@ def set_roles(user, roles: list[str]):
             delattr(user, attr)
 
 
+def ensure_owner(user):
+    """An owner holds every role's group too, so the rest of the code (Game Master's reviewer check,
+    the Django admin) agrees that they have every role."""
+    if not is_owner(user):
+        return
+    names = set(user.groups.values_list("name", flat=True))
+    if any(g not in names for g, *_r in ROLES.values()):
+        set_roles(user, list(ROLES))
+
+
 def user_for_phone(phone: str):
     """The user who may receive an admin-app code for this number, or None."""
     from django.contrib.auth import get_user_model  # pylint: disable=import-outside-toplevel

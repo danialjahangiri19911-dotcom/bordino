@@ -55,9 +55,9 @@ CATALOG = [
     _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "امتیاز تکمیل پروفایل", "یک بار برای هر کاربر.", 25, 0, 10_000),
     # Wallet
     _e("WALLET_TOKEN_EXPIRATION_DAYS", "wallet", "int", "اعتبار امتیازها (روز)", "", 365, 1, 3650),
-    _e("WALLET_CURRENCY_EXPIRATION_DAYS", "wallet", "int", "اعتبار موجودی ریالی (روز)", "", 365, 1, 3650),
+    _e("WALLET_CURRENCY_EXPIRATION_DAYS", "wallet", "int", "اعتبار موجودی نقدی (روز)", "", 365, 1, 3650),
     _e("WALLET_MAX_NEGATIVE_POINTS", "wallet", "int", "حداکثر منفی شدن امتیاز", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000),
-    _e("WALLET_MAX_NEGATIVE_CURRENCY", "wallet", "int", "حداکثر منفی شدن موجودی ریالی", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000_000),
+    _e("WALLET_MAX_NEGATIVE_CURRENCY", "wallet", "int", "حداکثر منفی شدن موجودی نقدی (تومان)", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000_000),
     # Files
     _e("FILE_VALIDATOR_MAX_FILE_SIZE", "files", "int", "حداکثر حجم فایل بارگذاری (بایت)", "", None, 10_000, 50_000_000),
 ]

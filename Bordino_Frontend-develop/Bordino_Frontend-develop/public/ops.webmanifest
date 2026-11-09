@@ -1,0 +1,20 @@
+{
+	"name": "بردینو ادمین",
+	"short_name": "بردینو ادمین",
+	"description": "اپ مدیریت بردینو: بررسی بازی‌ها، برداشت‌ها، تنظیمات و داشبوردها",
+	"lang": "fa",
+	"dir": "rtl",
+	"id": "/ops",
+	"start_url": "/ops",
+	"scope": "/ops",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#25252b",
+	"theme_color": "#25252b",
+	"icons": [
+		{ "src": "/bd/icons/ops-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/bd/icons/ops-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/bd/icons/ops-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+		{ "src": "/bd/icons/ops-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

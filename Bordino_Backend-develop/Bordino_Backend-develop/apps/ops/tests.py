@@ -182,6 +182,17 @@ class GameReviewTests(OpsTestCase):
         self.assertEqual(rv.post(O + f"games/{gid}/expire/", {}, format="json").status_code, 200)
         self.assertEqual(Game.objects.get(pk=gid).status, "expired")
 
+    def test_the_owner_has_every_role_where_it_is_checked_too(self):
+        creator = make_customer("9120001005")
+        from apps.wallet.models import TokenWalletAccount  # pylint: disable=import-outside-toplevel
+
+        TokenWalletAccount.objects.filter(wallet__owner=creator).update(amount=5000)
+        _api, _gid, v = self.submitted(creator)
+        self.assertFalse(self.owner.is_superuser)  # (an owner by settings, not a Django superuser)
+        r = self.ops(self.owner).post(O + f"games/versions/{v.pk}/decide/", {"decision": "approve"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(gm.is_reviewer(get_user_model().objects.get(pk=self.owner.pk)))
+
     def test_a_reviewer_never_reviews_their_own_game(self):
         from apps.wallet.models import TokenWalletAccount  # pylint: disable=import-outside-toplevel
 

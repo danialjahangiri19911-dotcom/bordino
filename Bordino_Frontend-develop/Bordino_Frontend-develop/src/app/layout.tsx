@@ -16,6 +16,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
 	title: "بردینو",
+	// The player app's manifest (public/manifest.json); /ops declares its own (src/app/ops/layout.tsx).
+	manifest: "/manifest.json",
 	// The tab icon: the «ب» brand tile (drawn as SVG; PNG for browsers without SVG favicons).
 	icons: {
 		icon: [

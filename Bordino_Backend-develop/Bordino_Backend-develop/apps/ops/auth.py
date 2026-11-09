@@ -60,7 +60,10 @@ class IsOps(BasePermission):
     message = "برای این کار باید با اپ ادمین وارد شوی."
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and scope_ok(request) and roles.can_sign_in(request.user))
+        ok = bool(request.user and request.user.is_authenticated and scope_ok(request) and roles.can_sign_in(request.user))
+        if ok:
+            roles.ensure_owner(request.user)
+        return ok
 
 
 def role_permission(*needed: str):

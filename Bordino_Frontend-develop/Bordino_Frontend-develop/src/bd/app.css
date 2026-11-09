@@ -657,3 +657,77 @@ body { margin: 0; }
 #bordino-directions .gm-problems :is(.gm-problem, .gm-problem-head) { display: block; width: 100%; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; line-height: 1.8; text-align: start; cursor: pointer; }
 #bordino-directions .gm-problems .gm-problem-head { font-weight: 800; }
 #bordino-directions .gm-problems :is(.gm-problem, .gm-problem-head):hover { background: color-mix(in srgb, #e3a21a 18%, transparent); }
+/* ── «بردینو ادمین» (/ops) ── */
+#bordino-directions .ops-product { --ops-chart: var(--bd-accent); }
+:root[data-bd-scheme="dark"] #bordino-directions .ops-product { --ops-chart: #e8587a; }
+:root[data-bd-scheme] #bordino-directions .ops-product.st-neon { --ops-chart: #9d6cf0; }
+:root[data-bd-scheme="dark"] #bordino-directions .ops-product.st-neu { --ops-chart: #8f7ce0; }
+#bordino-directions .ops-logomark { background: #25252b; color: #fff; }
+#bordino-directions .ops-top-tools { display: flex; gap: 8px; align-items: center; }
+#bordino-directions .ops-who { display: grid; gap: 2px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--bd-border); font-size: 12px; }
+#bordino-directions .ops-login main { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+#bordino-directions .ops-login-card { width: min(420px, 100%); display: grid; gap: 10px; text-align: center; }
+#bordino-directions .ops-login-card .ops-logomark { margin: 0 auto; width: 56px; height: 56px; font-size: 30px; display: grid; place-items: center; border-radius: 14px; }
+#bordino-directions .ops-login-card form { display: grid; gap: 10px; text-align: start; }
+#bordino-directions .ops-list { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+#bordino-directions .ops-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: inherit; text-decoration: none; text-align: start; width: 100%; font: inherit; cursor: pointer; }
+#bordino-directions .ops-row-col { flex-direction: column; align-items: stretch; cursor: default; }
+#bordino-directions .ops-row-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+#bordino-directions .ops-row-main small { line-height: 1.8; }
+#bordino-directions .ops-row-side { display: flex; align-items: center; gap: 6px; flex: none; }
+#bordino-directions .ops-row[data-inactive=true] { opacity: .65; }
+#bordino-directions .ops-late { background: color-mix(in srgb, #e3a21a 30%, transparent); }
+#bordino-directions .ops-facts { margin: 6px 0; padding-inline-start: 18px; line-height: 2; font-size: 13px; }
+#bordino-directions .ops-pre { white-space: pre-line; }
+#bordino-directions .ops-secret { background: color-mix(in srgb, #e3a21a 28%, transparent); padding: 1px 6px; border-radius: 6px; }
+#bordino-directions .ops-stage-img { max-width: 100%; max-height: 220px; border-radius: 10px; }
+#bordino-directions .ops-iban code, #bordino-directions code.ops-iban { font-size: 12px; overflow-wrap: anywhere; }
+#bordino-directions .ops-search { display: flex; gap: 8px; margin: 10px 0; }
+#bordino-directions .ops-search input { flex: 1 1 auto; min-width: 0; }
+#bordino-directions .ops-settings { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+#bordino-directions .ops-setting { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--bd-border); }
+#bordino-directions .ops-setting-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+#bordino-directions .ops-setting-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#bordino-directions .ops-setting-edit :is(input, select) { flex: 1 1 160px; min-width: 0; }
+#bordino-directions .ops-src-database { background: color-mix(in srgb, var(--bd-accent) 22%, transparent); }
+#bordino-directions .ops-checks { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+#bordino-directions .ops-checks > li { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; }
+#bordino-directions .ops-checks > li > svg { flex: none; width: 22px; height: 22px; margin-top: 3px; }
+#bordino-directions .ops-checks > li[data-ok=true] > svg { color: #1f9d55; }
+#bordino-directions .ops-checks > li[data-ok=false] > svg { color: #d6452f; }
+#bordino-directions .ops-checks > li > span { display: grid; gap: 2px; min-width: 0; }
+#bordino-directions .ops-roles { display: flex; flex-wrap: wrap; gap: 0 14px; }
+#bordino-directions .ops-data { font-size: 11px; overflow-wrap: anywhere; color: var(--bd-muted); }
+#bordino-directions a.ops-tile { color: inherit; text-decoration: none; }
+#bordino-directions a.ops-tile:hover { border-color: var(--bd-accent); }
+#bordino-directions .ops-tile small.bd-muted { font-size: 11px; }
+#bordino-directions .ops-st-pending { background: color-mix(in srgb, #e3a21a 28%, transparent); }
+#bordino-directions .ops-st-completed { background: color-mix(in srgb, #1f9d55 22%, transparent); }
+#bordino-directions :is(.ops-st-failed, .ops-st-cancelled) { background: color-mix(in srgb, #d6452f 20%, transparent); }
+/* charts (DayBars): one hue per theme (--ops-chart, validated), hairline grid, tooltip on hover/tap */
+#bordino-directions .ops-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 12px; }
+#bordino-directions .ops-chart { margin: 0; display: grid; gap: 6px; }
+#bordino-directions .ops-chart figcaption { display: grid; gap: 2px; }
+#bordino-directions .ops-chart-plot { position: relative; padding-inline-end: 34px; }
+#bordino-directions .ops-chart svg { display: block; width: 100%; height: 150px; overflow: visible; }
+#bordino-directions .ops-chart .ops-bar { fill: var(--ops-chart); }
+#bordino-directions .ops-chart .ops-bar[data-active=true] { fill: var(--bd-fg); }
+#bordino-directions .ops-chart .ops-grid { stroke: var(--bd-border); stroke-width: 1; }
+#bordino-directions .ops-axis-y { position: absolute; inset-block: 0; inset-inline-end: 0; width: 30px; display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--bd-muted); text-align: end; padding-top: 6px; transform: translateY(-6px); }
+#bordino-directions .ops-axis-x { display: flex; justify-content: space-between; font-size: 10px; color: var(--bd-muted); padding-inline-end: 34px; }
+#bordino-directions .ops-tip { position: absolute; top: -6px; transform: translate(-50%, -100%); padding: 4px 8px; border-radius: 8px; background: var(--bd-fg); color: var(--bd-bg); font-size: 11px; white-space: nowrap; pointer-events: none; display: grid; justify-items: center; }
+#bordino-directions .ops-tip small { color: inherit; opacity: .8; }
+#bordino-directions .ops-last { position: absolute; transform: translate(-50%, -4px); font-size: 11px; font-weight: 700; color: var(--bd-fg); pointer-events: none; }
+#bordino-directions .ops-table summary { cursor: pointer; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .ops-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#bordino-directions .ops-table :is(td, th) { padding: 2px 6px; border-bottom: 1px solid var(--bd-border); text-align: start; }
+/* The admin app's menu has nine entries: on a phone they scroll sideways (never widen the page). */
+#bordino-directions .ops-product .bd-shell > * { min-width: 0; }
+#bordino-directions .ops-top-logout { display: none; }
+@media (max-width: 750px) {
+	#bordino-directions .ops-product .ops-nav { overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+	#bordino-directions .ops-product .ops-nav::-webkit-scrollbar { display: none; }
+	#bordino-directions .ops-product .ops-nav .bd-nav-item { flex: none; min-width: 72px; }
+	#bordino-directions .ops-product .ops-who { display: none; }
+	#bordino-directions .ops-top-logout { display: inline-flex; }
+}
