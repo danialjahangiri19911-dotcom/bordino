@@ -574,7 +574,8 @@ body { margin: 0; }
 #bordino-directions .gm-qr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 10px; }
 #bordino-directions .gm-qr-list > b { grid-column: 1 / -1; }
 #bordino-directions .gm-qr { margin: 0; padding: 8px; border: 1px solid var(--bd-border); border-radius: 10px; background: #fff; color: #222; text-align: center; }
-#bordino-directions .gm-qr svg { width: 100%; height: auto; }
+/* (the QR picture only: the download link's icon keeps its own size) */
+#bordino-directions .gm-qr > span > svg { width: 100%; height: auto; }
 #bordino-directions .gm-qr figcaption { font-size: 11px; }
 #bordino-directions .gm-share { display: grid; gap: 6px; margin: 12px 0; padding: 12px; border: 1px solid var(--bd-border); border-radius: 12px; }
 #bordino-directions .gm-share > b { display: flex; align-items: center; gap: 6px; }
@@ -730,4 +731,17 @@ body { margin: 0; }
 	#bordino-directions .ops-product .ops-nav .bd-nav-item { flex: none; min-width: 72px; }
 	#bordino-directions .ops-product .ops-who { display: none; }
 	#bordino-directions .ops-top-logout { display: inline-flex; }
+}
+/* Landing: «بازی خودت را بساز» — the Game Master video beside its four steps (stacked on phones). */
+#bordino-directions .bd-make-row { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 28px; align-items: center; }
+#bordino-directions .bd-make-video { display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; background: var(--bd-tint); border: 1px solid var(--bd-border); border-radius: var(--bd-radius); }
+#bordino-directions .bd-make-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+#bordino-directions .bd-make-copy > p { font-size: 14px; line-height: 2; color: var(--bd-muted); }
+#bordino-directions .bd-make-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 13px; line-height: 1.8; }
+#bordino-directions .bd-make-steps li { display: flex; gap: 10px; align-items: baseline; }
+#bordino-directions .bd-make-steps b { flex: 0 0 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: var(--bd-tint); font-size: 12px; }
+#bordino-directions .st-brutal .bd-make-video { border: 2px solid var(--bd-fg); border-radius: 0; box-shadow: 5px 5px 0 var(--bd-fg); }
+@media (max-width: 640px) {
+	#bordino-directions .bd-make-row { grid-template-columns: 1fr; }
+	#bordino-directions .bd-make-video { max-width: 320px; margin-inline: auto; }
 }

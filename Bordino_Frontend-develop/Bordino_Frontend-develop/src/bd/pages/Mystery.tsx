@@ -605,9 +605,11 @@ export default function Mystery({ id }: { id: string }) {
 							<Icon name="clock" /> حدود {fa(m.duration_minutes)} دقیقه
 						</li>
 					) : null}
-					<li>
-						<Icon name="coins" /> تا {fa(m.points)} امتیاز
-					</li>
+					{m.points ? (
+						<li>
+							<Icon name="coins" /> تا {fa(m.points)} امتیاز
+						</li>
+					) : null}
 					{m.ends_at ? (
 						<li>
 							<Icon name="calendar-clock" /> تا {dateText(m.ends_at)}
@@ -615,9 +617,13 @@ export default function Mystery({ id }: { id: string }) {
 					) : null}
 				</ul>
 				{m.story ? <p className="my-story">{m.story}</p> : null}
-				{m.in_grace && m.grace_ends_at && m.run && m.run.status !== "completed" ? (
+				{m.in_grace &&
+				m.grace_ends_at &&
+				m.run &&
+				m.run.status !== "completed" ? (
 					<p className="my-note">
-						<Icon name="hourglass" /> زمان این بازی تمام شده؛ چون شروعش کرده‌ای تا {dateText(m.grace_ends_at)} وقت داری تمامش کنی.
+						<Icon name="hourglass" /> زمان این بازی تمام شده؛ چون شروعش کرده‌ای
+						تا {dateText(m.grace_ends_at)} وقت داری تمامش کنی.
 					</p>
 				) : null}
 				{m.leaderboard?.enabled ? (
@@ -681,11 +687,14 @@ export default function Mystery({ id }: { id: string }) {
 									? `پیدایش کردی${win.place ? `: «${win.place}»` : ""}!`
 									: "درست بود!"}
 						</b>
-						<small>
-							+{fa(win.points)} امتیاز
-							{win.bonus ? ` و ${fa(win.bonus)} امتیاز جایزهٔ پایان` : ""} به
-							کیف امتیازت اضافه شد.
-						</small>
+						{/* (a game without points, like a birthday surprise, says nothing about points) */}
+						{win.points || win.bonus ? (
+							<small>
+								+{fa(win.points)} امتیاز
+								{win.bonus ? ` و ${fa(win.bonus)} امتیاز جایزهٔ پایان` : ""} به
+								کیف امتیازت اضافه شد.
+							</small>
+						) : null}
 					</div>
 				</div>
 			) : null}
@@ -712,13 +721,18 @@ export default function Mystery({ id }: { id: string }) {
 										? step.place.name
 										: `مرحلهٔ ${fa(step.number)}`}
 								</b>
-								<span className="my-step-points">
-									{step.state === "current" && step.points_now < step.points ? (
-										<s>+{fa(step.points)}</s>
-									) : null}
-									+
-									{fa(step.state === "current" ? step.points_now : step.points)}
-								</span>
+								{step.points ? (
+									<span className="my-step-points">
+										{step.state === "current" &&
+										step.points_now < step.points ? (
+											<s>+{fa(step.points)}</s>
+										) : null}
+										+
+										{fa(
+											step.state === "current" ? step.points_now : step.points,
+										)}
+									</span>
+								) : null}
 							</div>
 							{step.state === "done" ? (
 								<>
@@ -760,7 +774,15 @@ export default function Mystery({ id }: { id: string }) {
 				<EmptyState
 					icon="trophy"
 					title="همهٔ مرحله‌ها را حل کردی"
-					text={`${m.completion_message ? `${m.completion_message} · ` : ""}${fa(m.run?.points_earned ?? 0)} امتیاز از این معما گرفتی. محل‌هایی که پیدا کردی همین بالا هستند.`}
+					text={[
+						m.completion_message,
+						m.run?.points_earned
+							? `${fa(m.run.points_earned)} امتیاز از این معما گرفتی.`
+							: "",
+						"محل‌هایی که پیدا کردی همین بالا هستند.",
+					]
+						.filter(Boolean)
+						.join(" ")}
 					action={
 						<Link className="bd-action" href={R.earn}>
 							مأموریت‌های دیگر

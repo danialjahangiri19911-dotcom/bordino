@@ -13,6 +13,9 @@ import useAuthStore from "@/libs/stores/authStore";
 /** The Android app (Bordino_Mobile) only wraps this site, so website changes reach it without an update. */
 const APK_HREF = "/download/bordino.apk";
 
+/** How to make a birthday game with Game Master (a 90 s screen recording, 720×1280, in public/). */
+const MAKE_VIDEO = { src: "/bd/video/birthday-game.mp4", poster: "/bd/video/birthday-game.jpg" };
+
 /** Inside the Android app or an installed PWA there is nothing left to install. */
 function useInstalled() {
 	const [installed, setInstalled] = useState(false);
@@ -41,6 +44,7 @@ export default function Landing() {
 				<nav className="bd-header-links" aria-label="بخش‌های صفحه">
 					<a href="#how">چطور کار می‌کند؟</a>
 					<a href="#games">بازی‌ها</a>
+					<a href="#make">بازی خودت را بساز</a>
 					{!installed && <a href="#app">نصب برنامه</a>}
 					<Link href={R.rules}>راهنما</Link>
 				</nav>
@@ -95,6 +99,52 @@ export default function Landing() {
 							<span className="bd-step-num">۰۳</span>
 							<h3>امتیازها را استفاده کن</h3>
 							<p>بلیت قرعه‌کشی یا فرصت گردونه را انتخاب کن.</p>
+						</div>
+					</div>
+				</section>
+				<section className="bd-how bd-make" id="make" aria-labelledby="make-title">
+					<div className="bd-section-head">
+						<h2 id="make-title">
+							بازی خودت را بساز؛
+							<br />
+							مثلاً برای تولد یک دوست
+						</h2>
+					</div>
+					<div className="bd-make-row">
+						{/* (downloaded only when played: preload none, a poster frame first) */}
+						<video
+							className="bd-make-video"
+							controls
+							playsInline
+							preload="none"
+							poster={MAKE_VIDEO.poster}
+							width={720}
+							height={1280}
+							aria-label="ویدیوی آموزش ساخت بازی تولد با گیم مستر"
+						>
+							<source src={MAKE_VIDEO.src} type="video/mp4" />
+						</video>
+						<div className="bd-make-copy">
+							<p>
+								با گیم مستر چند سرنخ می‌نویسی که آخرش به هدیهٔ تولد می‌رسد؛ بعد لینک دعوت یا QR آن را برای دوستت می‌فرستی. فقط کسی که لینک را دارد وارد بازی می‌شود.
+							</p>
+							<ol className="bd-make-steps">
+								<li>
+									<b>۱</b> در پروفایل «گیم مستر» را بزن و قالب «تولد معمایی» را بردار.
+								</li>
+								<li>
+									<b>۲</b> سرنخ‌ها، پیام خودت و جای هدیه را بنویس و امتحانش کن.
+								</li>
+								<li>
+									<b>۳</b> برای بررسی بردینو بفرست؛ بعد از تأیید، منتشرش کن.
+								</li>
+								<li>
+									<b>۴</b> لینک دعوت یا QR را برای دوستت بفرست.
+								</li>
+							</ol>
+							<Link className="bd-action" href={isLoggedIn ? R.gm : R.login}>
+								ساخت بازی تولد <Icon name="gift" />
+							</Link>
 						</div>
 					</div>
 				</section>
