@@ -83,7 +83,8 @@ const SORTS: [Sort, string][] = [
 	["ending", "زودتر تمام می‌شود"],
 ];
 
-function sorted(rows: Row[], sort: Sort) {
+/** Each order's own direction first («بیشترین امتیاز» = most first); the arrow reverses it. */
+function sorted(rows: Row[], sort: Sort, reverse = false) {
 	const list = [...rows];
 	const time = (s: string | null, none: number) =>
 		s ? new Date(s).getTime() : none;
@@ -101,7 +102,7 @@ function sorted(rows: Row[], sort: Sort) {
 				a.order - b.order ||
 				b.points - a.points,
 		);
-	return list;
+	return reverse ? list.reverse() : list;
 }
 
 /** «دریافت امتیاز»: the missions a player can do for points, by category, with their state. */
@@ -110,6 +111,10 @@ export default function Earn() {
 	const list = data?.result;
 	const [group, setGroup] = useState("all");
 	const [sort, setSort] = useState<Sort>("suggested");
+	const [reverse, setReverse] = useState(false);
+	// Tapped (not reached by keyboard): Chrome still calls a tapped select «focus-visible», so the
+	// keyboard-only focus border is switched off until the keyboard is used again.
+	const [tapped, setTapped] = useState(false);
 	const [openId, setOpenId] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 	const paid = useRef<Map<string, number> | null>(null);
@@ -168,8 +173,9 @@ export default function Earn() {
 							: r.m.category === group),
 				),
 				sort,
+				reverse,
 			),
-		[rows, group, sort],
+		[rows, group, sort, reverse],
 	);
 	const open = list?.missions.find((m) => m.id === openId) ?? null;
 	const doable = rows.filter(
@@ -200,12 +206,35 @@ export default function Earn() {
 							{fa(doable)} قابل انجام
 						</span>
 					</h3>
-					<label className="ng-sort">
-						<Icon name="arrow-down-wide-narrow" />
+					<div
+						className="ng-sort"
+						data-tapped={tapped ? "true" : undefined}
+						onPointerDown={() => setTapped(true)}
+						onKeyDown={(e) => {
+							if (e.key === "Tab" || e.key.startsWith("Arrow")) setTapped(false);
+						}}
+						onBlur={(e) => {
+							if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setTapped(false);
+						}}
+					>
+						<button
+							type="button"
+							className="ng-sort-dir"
+							aria-pressed={reverse}
+							aria-label={reverse ? "ترتیب برعکس (برگرداندن)" : "برعکس کردن ترتیب"}
+							title={reverse ? "ترتیب برعکس" : "برعکس کردن ترتیب"}
+							data-reverse={reverse ? "true" : undefined}
+							onClick={() => setReverse((r) => !r)}
+						>
+							<Icon name="arrow-down-wide-narrow" />
+						</button>
 						<select
 							aria-label="مرتب‌سازی"
 							value={sort}
-							onChange={(e) => setSort(e.target.value as Sort)}
+							onChange={(e) => {
+								setSort(e.target.value as Sort);
+								setReverse(false);
+							}}
 						>
 							{SORTS.map(([key, text]) => (
 								<option key={key} value={key}>
@@ -213,7 +242,7 @@ export default function Earn() {
 								</option>
 							))}
 						</select>
-					</label>
+					</div>
 				</div>
 				{list && groups.length > 1 ? (
 					<Chips

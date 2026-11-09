@@ -346,7 +346,18 @@ body { margin: 0; }
 /* «دریافت امتیاز»: the missions list (the home page's mission rows), its sort box and the mission sheet. */
 #bordino-directions .ng-sort { display: flex; align-items: center; gap: 8px; background: var(--bd-bg); border: 1px solid var(--bd-border); border-radius: 8px; padding: 0 10px; color: var(--bd-muted); }
 #bordino-directions .ng-sort svg { width: 16px; height: 16px; flex: none; }
-#bordino-directions .ng-sort select { font: inherit; font-size: 12px; color: var(--bd-fg); background: transparent; border: 0; padding: 8px 0; min-height: 36px; cursor: pointer; outline-offset: 4px; }
+#bordino-directions .ng-sort select { font: inherit; font-size: 12px; color: var(--bd-fg); background: transparent; border: 0; padding: 8px 0; min-height: 36px; cursor: pointer; }
+/* The sort box is one box in every style: no focus ring around it after a click (Chrome treats a
+   clicked select as focus-visible) and no theme border/shadow drawing a second box inside it.
+   Keyboard focus still shows, as the box's own border. */
+#bordino-directions .bd-product .ng-sort select { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; }
+#bordino-directions .bd-product .ng-sort:not([data-tapped]):has(select:focus-visible), #bordino-directions .bd-product .ng-sort:not([data-tapped]):has(.ng-sort-dir:focus-visible) { border-color: var(--bd-accent); }
+#bordino-directions .bd-product .ng-sort-dir { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-inline-start: -6px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--bd-muted); cursor: pointer; outline: none !important; box-shadow: none !important; }
+#bordino-directions .bd-product .ng-sort-dir:hover { color: var(--bd-fg); background: var(--bd-tint); }
+#bordino-directions .bd-product .ng-sort-dir svg { transition: transform .2s ease; }
+#bordino-directions .bd-product .ng-sort-dir[data-reverse=true] { color: var(--bd-accent); }
+#bordino-directions .bd-product .ng-sort-dir[data-reverse=true] svg { transform: scaleY(-1); }
+@media (prefers-reduced-motion: reduce) { #bordino-directions .bd-product .ng-sort-dir svg { transition: none; } }
 #bordino-directions .ng-filterbar h3 .bd-tag { margin-inline-start: 4px; font-weight: 400; }
 #bordino-directions .mi-list { margin-top: 14px; }
 #bordino-directions .mi-list .bd-mission:first-child { border-top: 0; }
