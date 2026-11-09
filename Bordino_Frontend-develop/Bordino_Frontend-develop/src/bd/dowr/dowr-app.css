@@ -33,3 +33,8 @@
 :root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-ring-progress { stroke: #ff718c; }
 :root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-timer-bar { background: #ff718c; }
 :root[data-bd-scheme="dark"] #bordino-directions .dowr-unsaved { color: #ff718c; }
+/* Neobrutalism, dark: what sits on the yellow accent keeps the design's dark ink (light text on yellow
+   would be unreadable). */
+:root[data-bd-scheme="dark"] #bordino-directions .dr.dr-brutal :is(.dr-intro em, .dr-categories button[aria-pressed=true], .dr-team.dr-active, .dr-mode-options [aria-pressed=true], .dr-stage-icon) {
+	--p-ink: #211a2e; --p-muted: #3b3346; color: #211a2e;
+}
