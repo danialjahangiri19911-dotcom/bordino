@@ -79,13 +79,31 @@ export function GameRow({ g }: { g: GameSummary }) {
 	);
 }
 
+export type Filter = "all" | "draft" | "review" | "live" | "archived";
+const FILTERS: [Filter, string][] = [
+	["all", "همه"],
+	["draft", "پیش‌نویس"],
+	["review", "بررسی"],
+	["live", "منتشرشده"],
+	["archived", "تمام‌شده"],
+];
+const IN: Record<Exclude<Filter, "all">, GameStatus[]> = {
+	draft: ["draft", "changes_requested", "rejected"],
+	review: ["submitted", "approved"],
+	live: ["published", "scheduled", "paused"],
+	archived: ["expired", "archived"],
+};
+
+const isFilter = (v: unknown): v is Filter => FILTERS.some(([k]) => k === v);
+const listHref = (f: Filter) => (f === "all" ? GM.games : `${GM.games}?filter=${f}`);
+
 /** Game Master home: my numbers, what needs me, and a way to make a new game. */
 export function Dashboard() {
 	const games = useMyGames();
 	const dash = useDashboard();
 	const list = games.data?.result?.games ?? [];
-	const by = dash.data?.result?.by_status ?? {};
-	const sum = (...keys: GameStatus[]) => keys.reduce((n, k) => n + (by[k] ?? 0), 0);
+	// Each card counts exactly what its «بازی‌های من» tab shows, and opens that tab.
+	const inTab = (f: Exclude<Filter, "all">) => list.filter((g) => IN[f].includes(g.status)).length;
 	const needsMe = list.filter(
 		(g) =>
 			["changes_requested", "rejected", "approved"].includes(g.status) ||
@@ -105,19 +123,20 @@ export function Dashboard() {
 			<div className="gm-stats">
 				{(
 					[
-						["همهٔ بازی‌ها", list.length, "list"],
-						["پیش‌نویس", sum("draft"), "pencil"],
-						["در بررسی", sum("submitted"), "hourglass"],
-						["منتشرشده", sum("published", "scheduled"), "badge-check"],
-						["بازیکنان", dash.data?.result?.players ?? 0, "users"],
-						["به پایان رسیده", dash.data?.result?.completed ?? 0, "trophy"],
-					] as [string, number, IconName][]
-				).map(([label, n, icon]) => (
-					<div key={label} className="bd-panel gm-stat">
+						["همهٔ بازی‌ها", list.length, "list", "all"],
+						["پیش‌نویس", inTab("draft"), "pencil", "draft"],
+						["در بررسی", inTab("review"), "hourglass", "review"],
+						["منتشرشده", inTab("live"), "badge-check", "live"],
+						["تمام‌شده", inTab("archived"), "inbox", "archived"],
+						["بازیکنان", dash.data?.result?.players ?? 0, "users", "all"],
+						["تمام کرده‌اند", dash.data?.result?.completed ?? 0, "trophy", "all"],
+					] as [string, number, IconName, Filter][]
+				).map(([label, n, icon, f]) => (
+					<Link key={label} href={listHref(f)} className="bd-panel gm-stat" aria-label={`${label}: ${fa(n)} — باز کردن در «بازی‌های من»`}>
 						<Icon name={icon} />
 						<b>{fa(n)}</b>
 						<small>{label}</small>
-					</div>
+					</Link>
 				))}
 			</div>
 			<LoadState loading={games.isLoading} error={games.error} onRetry={games.refetch} />
@@ -155,24 +174,15 @@ export function Dashboard() {
 	);
 }
 
-type Filter = "all" | "draft" | "review" | "live" | "archived";
-const FILTERS: [Filter, string][] = [
-	["all", "همه"],
-	["draft", "پیش‌نویس"],
-	["review", "بررسی"],
-	["live", "منتشرشده"],
-	["archived", "تمام‌شده"],
-];
-const IN: Record<Exclude<Filter, "all">, GameStatus[]> = {
-	draft: ["draft", "changes_requested", "rejected"],
-	review: ["submitted", "approved"],
-	live: ["published", "scheduled", "paused"],
-	archived: ["expired", "archived"],
-};
-
-export function GamesList() {
+export function GamesList({ initial }: { initial?: string }) {
 	const { data, isLoading, error, refetch } = useMyGames();
-	const [filter, setFilter] = useState<Filter>("all");
+	const router = useRouter();
+	const [filter, setFilterState] = useState<Filter>(isFilter(initial) ? initial : "all");
+	// The tab is in the address too: a dashboard card opens it, and «back» from a game returns to it.
+	const setFilter = (f: Filter) => {
+		setFilterState(f);
+		router.replace(listHref(f), { scroll: false });
+	};
 	const list = (data?.result?.games ?? []).filter((g) => filter === "all" || IN[filter].includes(g.status));
 	return (
 		<CreatorShell

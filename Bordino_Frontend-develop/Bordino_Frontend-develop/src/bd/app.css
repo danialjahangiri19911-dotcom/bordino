@@ -646,3 +646,8 @@ body { margin: 0; }
 #bordino-directions .gm-duration { display: grid; gap: 8px; margin: 6px 0 10px; }
 #bordino-directions .gm-drop { color: var(--bd-muted); font-size: 11px; }
 #bordino-directions .gm-row-meta { display: block; color: var(--bd-muted); font-size: 11px; }
+/* Dashboard cards open their «بازی‌های من» tab */
+#bordino-directions a.gm-stat { color: inherit; text-decoration: none; cursor: pointer; transition: transform .15s ease, border-color .15s ease; }
+#bordino-directions a.gm-stat:hover { border-color: var(--bd-accent); }
+#bordino-directions a.gm-stat:active { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) { #bordino-directions a.gm-stat { transition: none; } }
