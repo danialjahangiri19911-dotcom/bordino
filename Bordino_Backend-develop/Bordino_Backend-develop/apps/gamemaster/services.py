@@ -251,12 +251,12 @@ def problems(game: Game, definition: dict, now=None) -> dict:
     if most > 0:
         days = schema.length_days(d, now)
         if days is None:
-            errors["availability.expiry"] = f"بازی‌های این نوع حداکثر {most} روز باز می‌مانند؛ زمان پایان را مشخص کن."
+            errors["availability.expiry"] = f"بازی‌های این نوع حداکثر {schema.fa(most)} روز باز می‌مانند؛ زمان پایان را مشخص کن."
         elif days > most + 1e-6:
-            errors["availability.expiry"] = f"بازی‌های این نوع حداکثر {most} روز باز می‌مانند."
+            errors["availability.expiry"] = f"بازی‌های این نوع حداکثر {schema.fa(most)} روز باز می‌مانند."
     grace = d["availability"]["grace_hours"]
     if grace > int(setting("GM_MAX_GRACE_HOURS") or 0):
-        errors["availability.grace_hours"] = f"مهلت تمام کردن حداکثر {int(setting('GM_MAX_GRACE_HOURS') or 0)} ساعت است."
+        errors["availability.grace_hours"] = f"مهلت تمام کردن حداکثر {schema.fa(int(setting('GM_MAX_GRACE_HOURS') or 0))} ساعت است."
     if boards.enabled(d["leaderboard"]) and not leaderboard_allowed(game.category):
         errors["leaderboard.preset"] = "جدول رده‌بندی برای این نوع بازی فعال نیست."
     return errors
@@ -554,7 +554,7 @@ def publish(user, game_id, new_edition: bool = False) -> Game:
         if game.paused_by_admin:
             raise GameMasterError("این بازی توسط بردینو متوقف شده است.", "paused")
         if version.fee_toman and not version.fee_paid:
-            raise GameMasterError(f"اول هزینهٔ انتشار ({version.fee_toman} تومان) را پرداخت کن.", "payment_required")
+            raise GameMasterError(f"اول هزینهٔ انتشار ({schema.fa(version.fee_toman)} تومان) را پرداخت کن.", "payment_required")
         d = version.definition
         now = timezone.now()
         end, _ = schema.end_times(schema.clean(d), now)
@@ -696,7 +696,7 @@ def _tell_players(mystery: Mystery, title: str, body: str, only_playing: bool = 
 
 def _when_text(when) -> str:
     local = timezone.localtime(when, schema.ZONE)
-    return f"{local:%Y-%m-%d %H:%M}"
+    return f"{local:%Y/%m/%d %H:%M}".translate(schema.FA_DIGITS)
 
 
 def settle(game: Game, now=None) -> Game:

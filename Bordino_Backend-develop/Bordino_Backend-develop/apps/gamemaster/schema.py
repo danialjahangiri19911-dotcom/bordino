@@ -58,6 +58,14 @@ MAX_DURATION = {"days": 3650, "months": 120}
 MAX_GRACE_HOURS = 24 * 30
 
 
+FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def fa(n) -> str:
+    """A number in Persian digits (for messages the creator reads)."""
+    return f"{n:,}".replace(",", "٬").translate(FA_DIGITS) if isinstance(n, int) else str(n).translate(FA_DIGITS)
+
+
 class DefinitionError(Exception):
     """The definition is not valid: `errors` maps a path ("stages.2.answers") to a message."""
 
@@ -291,7 +299,7 @@ def check(definition: dict) -> dict:
     errors.update(boards.problems(d["leaderboard"]))
     need = max_run_points(d)
     if need and d["budget_points"] < need:
-        errors["budget_points"] = f"بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({need} امتیاز) باشد."
+        errors["budget_points"] = f"بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({fa(need)} امتیاز) باشد."
     return errors
 
 

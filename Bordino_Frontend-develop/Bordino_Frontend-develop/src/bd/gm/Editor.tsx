@@ -349,6 +349,7 @@ function StageCard({
 		t === "qr" || t === "location" || t === "staff" || stage.check_location;
 	return (
 		<li
+			id={`gm-stage-${stage.id}`}
 			className={`bd-panel gm-stage ${open ? "gm-stage-open" : ""}`}
 			data-problem={problems.length ? true : undefined}
 		>
@@ -921,13 +922,89 @@ function dateTimeText(iso: string) {
 	return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 }
 
-function problemText(path: string, message: string, d: Definition) {
-	const m = path.match(/^stages\.(\d+)/);
-	if (m) {
-		const n = Number(m[1]);
-		return `مرحلهٔ ${fa(n + 1)}${d.stages[n]?.title ? ` («${d.stages[n].title}»)` : ""}: ${message}`;
+/** Which part of a stage a problem is about (the server's path after "stages.<n>."). */
+const FIELD_NAME: Record<string, string> = {
+	id: "شناسهٔ مرحله",
+	text: "متن یا سرنخ",
+	question: "پرسش",
+	answers: "پاسخ درست",
+	options: "گزینه‌ها",
+	staff_code: "کد کارکنان",
+	lat: "مختصات محل",
+	lng: "مختصات محل",
+	"place.name": "نام محل",
+};
+/** Where a game-level problem is fixed: its step of the editor and a name for it. */
+const SECTION_OF: [RegExp, Tab, string][] = [
+	[/^title$/, "info", "اطلاعات · عنوان بازی"],
+	[/^(stages|images)$/, "stages", "مرحله‌ها"],
+	[/^leaderboard\./, "board", "رقابت و جدول"],
+	[/^audience\./, "audience", "مخاطب"],
+	[/^(starts_at|ends_at|availability\.)/, "audience", "زمان بازی و پایان آن"],
+	[/^(budget_points|finish_points|hint_penalty)$/, "rewards", "جایزه و بودجه"],
+];
+/** A stage's own title, unless it is just the automatic «مرحلهٔ N» (that says nothing). */
+function stageName(s: Stage | undefined): string {
+	const title = (s?.title ?? "").trim();
+	return title && !/^مرحلهٔ\s*[0-9۰-۹]+$/.test(title) ? `«${title}»` : "";
+}
+
+/** What is still missing, grouped: each stage once (number, kind, name) with the parts to fill in;
+ * then the game's other steps. Each line opens the place to fix it. */
+function ProblemList({ problems, d, go }: { problems: Record<string, string>; d: Definition; go: (tab: Tab, stageId?: string) => void }) {
+	const byStage = new Map<number, [string, string][]>();
+	const other: [string, string, Tab, string][] = [];
+	for (const [k, msg] of Object.entries(problems)) {
+		const m = k.match(/^stages\.(\d+)\.?(.*)$/);
+		if (m) {
+			const list = byStage.get(Number(m[1])) ?? [];
+			const field = FIELD_NAME[m[2]] ?? "";
+			if (!list.some(([f, x]) => f === field && x === msg)) list.push([field, msg]);
+			byStage.set(Number(m[1]), list);
+			continue;
+		}
+		const [, tab, name] = SECTION_OF.find(([re]) => re.test(k)) ?? [null, "info" as Tab, "اطلاعات"];
+		other.push([k, msg, tab, name]);
 	}
-	return message;
+	return (
+		<div className="gm-problems">
+			<b>قبل از ارسال، این‌ها را کامل کن:</b>
+			<ul>
+				{[...byStage.entries()]
+					.sort(([a], [b]) => a - b)
+					.map(([i, items]) => {
+						const s = d.stages[i];
+						return (
+							<li key={`s${i}`}>
+								<button type="button" className="gm-problem-head" onClick={() => go("stages", s?.id)}>
+									مرحلهٔ {fa(i + 1)}
+									{s ? ` · ${STAGE_LABEL[s.type]}` : ""} {stageName(s)}
+								</button>
+								<ul>
+									{items.map(([field, msg]) => (
+										<li key={field + msg}>
+											<button type="button" className="gm-problem" onClick={() => go("stages", s?.id)}>
+												{field ? <b>{field}: </b> : null}
+												{msg}
+											</button>
+										</li>
+									))}
+								</ul>
+							</li>
+						);
+					})}
+				{other.map(([k, msg, tab, name]) => (
+					<li key={k}>
+						<button type="button" className="gm-problem" onClick={() => go(tab)}>
+							<b>{name}: </b>
+							{msg}
+						</button>
+					</li>
+				))}
+			</ul>
+			<small className="bd-muted">روی هر مورد بزنی، همان‌جا باز می‌شود.</small>
+		</div>
+	);
 }
 
 function Stats({ id }: { id: string }) {
@@ -1638,15 +1715,20 @@ export default function Editor({ id }: { id: string }) {
 							) : null}
 						</div>
 					) : null}
-					{Object.keys(problems).length && !live ? (
-						<div className="gm-problems">
-							<b>قبل از ارسال، این‌ها را کامل کن:</b>
-							<ul>
-								{Object.entries(problems).map(([k, msg]) => (
-									<li key={k}>{problemText(k, msg, d)}</li>
-								))}
-							</ul>
-						</div>
+					{Object.keys(problems).length && !locked ? (
+						<ProblemList
+							problems={problems}
+							d={d}
+							go={(t, stageId) => {
+								setTab(t);
+								if (stageId) {
+									setOpen(stageId);
+									window.setTimeout(() => document.getElementById(`gm-stage-${stageId}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 150);
+								} else {
+									window.scrollTo({ top: 0, behavior: "smooth" });
+								}
+							}}
+						/>
 					) : null}
 					{!locked &&
 					server.status !== "archived" &&

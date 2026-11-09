@@ -559,6 +559,11 @@ class GameMasterAuditTests(TestCase):
             self.assertEqual(body(r)["code"], "limit")  # refused before anything is stored
         self.assertEqual(GameAsset.objects.count(), 1)
 
+    def test_problem_messages_use_persian_digits(self):
+        d = quiz(budget_points=1)
+        self.assertEqual(schema.check(d)["budget_points"], "بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن (۳۵ امتیاز) باشد.")
+        self.assertEqual(schema.fa(12500), "۱۲٬۵۰۰")
+
     def test_choice_options_must_differ(self):
         d = quiz()
         d["stages"][1]["options"] = ["ب", "ب"]

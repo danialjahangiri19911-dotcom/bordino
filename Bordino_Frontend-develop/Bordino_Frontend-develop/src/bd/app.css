@@ -651,3 +651,9 @@ body { margin: 0; }
 #bordino-directions a.gm-stat:hover { border-color: var(--bd-accent); }
 #bordino-directions a.gm-stat:active { transform: translateY(1px); }
 @media (prefers-reduced-motion: reduce) { #bordino-directions a.gm-stat { transition: none; } }
+/* «قبل از ارسال، این‌ها را کامل کن»: grouped by stage, each line opens its place */
+#bordino-directions .gm-problems ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+#bordino-directions .gm-problems ul ul { margin: 2px 0 6px; padding-inline-start: 14px; gap: 2px; border-inline-start: 2px solid color-mix(in srgb, #e3a21a 45%, transparent); }
+#bordino-directions .gm-problems :is(.gm-problem, .gm-problem-head) { display: block; width: 100%; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; line-height: 1.8; text-align: start; cursor: pointer; }
+#bordino-directions .gm-problems .gm-problem-head { font-weight: 800; }
+#bordino-directions .gm-problems :is(.gm-problem, .gm-problem-head):hover { background: color-mix(in srgb, #e3a21a 18%, transparent); }
