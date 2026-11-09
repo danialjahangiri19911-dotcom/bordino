@@ -88,6 +88,7 @@ async function renew(): Promise<boolean> {
 
 function signedOut() {
 	saveSession(null);
+	// A full page load to the login page: nothing cached in memory survives the ended session.
 	if (!location.pathname.startsWith("/ops/login")) location.replace("/ops/login");
 }
 
@@ -129,10 +130,30 @@ export function errorText(e: unknown): string {
 	return e instanceof Error ? e.message : "درخواست انجام نشد.";
 }
 
+/** Who the stored session belongs to: every cached answer is kept under it, so another staff member
+ * signing in on the same device never sees the previous one's data (not even for a moment). */
+export function sessionUser(): string {
+	return session()?.me?.id ?? "";
+}
+
+/** Ends the session on the server (by its refresh token: works after the access token expired),
+ * then forgets it here, with every cached admin answer. */
+export async function signOut(clear: () => void) {
+	const s = session();
+	try {
+		if (s?.refresh) await ops("auth/logout/", "POST", { refresh: s.refresh });
+	} catch {
+		// forgotten here anyway; the server refuses the session once its refresh expires
+	}
+	saveSession(null);
+	clear();
+}
+
 /** A GET that refreshes with the page (and after each action that invalidates "ops"). */
 export function useOps<T>(path: string | null, refetchInterval?: number) {
+	const who = typeof window === "undefined" ? "" : sessionUser();
 	return useQuery<T, OpsError>({
-		queryKey: ["ops", path],
+		queryKey: ["ops", who, path],
 		queryFn: () => ops<T>(path as string),
 		enabled: !!path,
 		refetchInterval,

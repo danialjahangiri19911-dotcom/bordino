@@ -4,12 +4,13 @@ import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } fro
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import Icon, { type IconName } from "@/bd/Icon";
 import { styleClass, useBdStyle } from "@/bd/appearance";
 import { LoadState } from "@/bd/ui";
 
-import { type OpsMe, type OpsRole, ROLE_NAME, ops, saveSession, session, useOps } from "./client";
+import { type OpsMe, type OpsRole, ROLE_NAME, session, signOut, useOps } from "./client";
 
 export const OPS = {
 	home: "/ops",
@@ -115,6 +116,7 @@ export default function OpsShell({
 	const meQ = useOps<{ me: OpsMe }>(signedIn ? "me/" : null);
 	const me = meQ.data?.me;
 	const install = useInstall();
+	const queryClient = useQueryClient();
 	useEffect(() => {
 		document.title = `${title} | بردینو ادمین`;
 	}, [title]);
@@ -123,12 +125,7 @@ export default function OpsShell({
 	}, [signedIn, router]);
 	if (!signedIn) return null;
 	const logout = async () => {
-		try {
-			await ops("auth/logout/", "POST", {});
-		} catch {
-			// signed out here anyway
-		}
-		saveSession(null);
+		await signOut(() => queryClient.removeQueries({ queryKey: ["ops"] }));
 		router.replace(OPS.login);
 	};
 	let body: ReactNode = children;

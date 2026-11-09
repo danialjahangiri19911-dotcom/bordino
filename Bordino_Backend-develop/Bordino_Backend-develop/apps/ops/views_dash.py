@@ -4,7 +4,7 @@ import shutil
 from datetime import timedelta
 
 from django.core.cache import cache
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -45,18 +45,20 @@ class SettingView(APIView):
 
     def put(self, request, key):
         try:
-            entry, before = catalog.put(key, (request.data or {}).get("value"))
+            with transaction.atomic():  # (the change and its audit row: both or neither)
+                entry, before = catalog.put(key, (request.data or {}).get("value"))
+                audit(request, "setting_change", "setting", key, before=before, after=entry["value"])
         except catalog.SettingError as exc:
             return err(str(exc), "invalid", 400)
-        audit(request, "setting_change", "setting", key, before=before, after=entry["value"])
         return Response({"setting": entry})
 
     def delete(self, request, key):
         try:
-            entry, before = catalog.reset(key)
+            with transaction.atomic():
+                entry, before = catalog.reset(key)
+                audit(request, "setting_reset", "setting", key, before=before, after=entry["value"])
         except catalog.SettingError as exc:
             return err(str(exc), "invalid", 400)
-        audit(request, "setting_reset", "setting", key, before=before, after=entry["value"])
         return Response({"setting": entry})
 
 
@@ -145,10 +147,17 @@ class OverviewView(APIView):
     permission_classes = (AnyRole,)
 
     def get(self, request):
-        data = cache.get("ops:overview")
+        # The cache only saves work: without it (Redis down) the numbers are computed each time.
+        try:
+            data = cache.get("ops:overview")
+        except Exception:  # pylint: disable=broad-except
+            data = None
         if data is None:
             data = overview()
-            cache.set("ops:overview", data, 60)
+            try:
+                cache.set("ops:overview", data, 60)
+            except Exception:  # pylint: disable=broad-except
+                pass
         return Response({"overview": data})
 
 
@@ -255,10 +264,17 @@ class UserSearchView(APIView):
         qs = User.objects.filter(Q(username__icontains=q) | (Q(phone_number__contains=phone) if len(phone) >= 4 else Q(pk__in=[])))
         users = list(qs.select_related("customer").order_by("-create_time")[:20])
         audit(request, "user_search", "user", "", q=q[:40])
-        return Response({"users": [user_card(u, brief=len(users) > 1) for u in users]})
+        finance = roles.has_role(request.user, "finance")
+        return Response({"users": [user_card(u, brief=len(users) > 1, banking=finance) for u in users]})
 
 
-def user_card(u, brief=False) -> dict:
+def _mask_iban(iban: str) -> str:
+    return f"{iban[:4]}…{iban[-4:]}" if iban and len(iban) > 8 else "…"
+
+
+def user_card(u, brief=False, banking=False) -> dict:
+    """One user at a glance. Bank details (IBANs, account holders) only for the finance role;
+    the others see the last four digits."""
     from apps.missions.models import MysteryRun  # pylint: disable=import-outside-toplevel
     from apps.ops.views_money import _withdrawal_row, withdrawals  # pylint: disable=import-outside-toplevel
     from apps.wallet.models import BankAccount  # pylint: disable=import-outside-toplevel
@@ -291,9 +307,19 @@ def user_card(u, brief=False) -> dict:
             {"title": r.mystery.title, "status": r.status, "points": r.points_earned, "at": r.create_time.isoformat()}
             for r in MysteryRun.objects.filter(customer=c).select_related("mystery").order_by("-create_time")[:10]
         ],
-        withdrawals=[_withdrawal_row(t) for t in withdrawals().filter(bank_account__user=u).order_by("-create_time")[:10]],
+        withdrawals=[
+            _withdrawal_row(t)
+            if banking
+            else {"id": str(t.pk), "amount": int(t.amount), "status": t.status, "requested_at": t.create_time.isoformat()}
+            for t in withdrawals().filter(bank_account__user=u).order_by("-create_time")[:10]
+        ],
         bank_accounts=[
-            {"bank": a.bank.name if a.bank_id else "", "iban": a.iban, "holder": a.account_holder, "status": a.status}
+            {
+                "bank": a.bank.name if a.bank_id else "",
+                "iban": a.iban if banking else _mask_iban(a.iban),
+                "holder": a.account_holder if banking else "",
+                "status": a.status,
+            }
             for a in BankAccount.objects.filter(user=u, is_deleted=False).select_related("bank")
         ],
     )

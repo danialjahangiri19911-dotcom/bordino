@@ -2,6 +2,7 @@
 staff), the decision, and the live games (pause, end, archive, a run off a leaderboard). Every rule
 is Game Master's own (apps.gamemaster.services); this only shows and calls it."""
 
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.response import Response
@@ -104,10 +105,11 @@ class DecideView(APIView):
         decision = str(data.get("decision") or "")
         note = str(data.get("note") or "")
         try:
-            v = services.review(request.user, version_id, decision, note)
+            with transaction.atomic():  # (the decision and its audit row: both or neither)
+                v = services.review(request.user, version_id, decision, note)
+                audit(request, f"game_{decision}", "game_version", v.pk, game=str(v.game_id), title=v.game.title, note=note[:300])
         except services.GameMasterError as exc:
             return err(exc.message, exc.code, 403 if exc.code == "forbidden" else 409)
-        audit(request, f"game_{decision}", "game_version", v.pk, game=str(v.game_id), title=v.game.title, note=note[:300])
         return Response({"version": _version_row(v)})
 
 
@@ -160,10 +162,11 @@ class GameActionView(APIView):
         if handler is None:
             return err("کار نامعتبر است.", "not_found", 404)
         try:
-            g = handler(request.user, game_id)
+            with transaction.atomic():
+                g = handler(request.user, game_id)
+                audit(request, f"game_{action}", "game", game_id, title=g.title)
         except services.GameMasterError as exc:
             return err(exc.message, exc.code, 404 if exc.code == "not_found" else 409)
-        audit(request, f"game_{action}", "game", game_id, title=g.title)
         return Response({"game": _live_row(Game.objects.select_related("owner__user", "live_version").get(pk=g.pk))})
 
 
@@ -211,8 +214,9 @@ class ExcludeRunView(APIView):
     def post(self, request, run_id):
         note = str((request.data or {}).get("note") or "").strip()
         try:
-            services.exclude_run(request.user, run_id, note)
+            with transaction.atomic():
+                services.exclude_run(request.user, run_id, note)
+                audit(request, "leaderboard_exclude", "run", run_id, note=note[:300])
         except services.GameMasterError as exc:
             return err(exc.message, exc.code, 404 if exc.code == "not_found" else 400)
-        audit(request, "leaderboard_exclude", "run", run_id, note=note[:300])
         return Response({"ok": True})

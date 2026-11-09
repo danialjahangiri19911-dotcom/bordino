@@ -43,8 +43,18 @@ class SendCodeView(APIView):
         if not phone:
             return err("شمارهٔ موبایل معتبر نیست.")
         result = admin_otp.send_code(phone, who=roles.user_for_phone, scope="ops")
+        if result == "sms_failed":
+            # Only a staff number reaches the SMS: its failure must look like any other number's
+            # answer (and keep the same one-minute gap), or it would tell who is staff.
+            import logging  # pylint: disable=import-outside-toplevel
+
+            from django.core.cache import cache  # pylint: disable=import-outside-toplevel
+
+            logging.getLogger(__name__).warning("ops sign-in SMS failed for a staff number")
+            cache.set(admin_otp._keys(phone, "ops")[2], 1, admin_otp.RESEND_GAP)  # pylint: disable=protected-access
+            result = "sent"
         if result != "sent":
-            return err(SEND_TEXT[result], result, 429 if result in ("wait", "limit") else 502)
+            return err(SEND_TEXT[result], result, 429)
         return Response({"message": SEND_TEXT["sent"]})
 
 
@@ -77,11 +87,37 @@ class RefreshView(APIView):
 
 
 class LogoutView(APIView):
-    permission_classes = (IsOps,)
+    """Ends the admin-app session by its refresh token (works after the 30-minute access token has
+    expired: a copied refresh token must stop working too)."""
+
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+    throttle_classes = (OpsAuthThrottle,)
 
     def post(self, request):
-        sessions.revoke(request.auth.get(sessions.CLAIM))
-        audit(request, "sign_out", "user", request.user.pk)
+        from django.contrib.auth import get_user_model  # pylint: disable=import-outside-toplevel
+        from rest_framework_simplejwt.exceptions import TokenError  # pylint: disable=import-outside-toplevel
+
+        raw = str((request.data or {}).get("refresh") or "")
+        try:
+            token = sessions.SessionRefreshToken(raw)
+        except TokenError:
+            # No live refresh token: the session's (still valid) access token ends it just as well.
+            from rest_framework_simplejwt.tokens import AccessToken  # pylint: disable=import-outside-toplevel
+
+            header = request.META.get("HTTP_AUTHORIZATION", "")
+            try:
+                token = AccessToken(header.split(" ", 1)[1]) if header.startswith("Bearer ") else None
+            except (TokenError, IndexError):
+                token = None
+            if token is None:
+                return Response({"ok": True})  # (already ended, or not a token: nothing to end)
+        if token.get("scope") != "ops":
+            return err("این نشست اپ ادمین نیست.", "invalid", 400)
+        sessions.revoke(token.get(sessions.CLAIM))
+        request.user = get_user_model().objects.filter(pk=token.get("user_id")).first() or request.user
+        if getattr(request.user, "is_authenticated", False):
+            audit(request, "sign_out", "user", request.user.pk)
         return Response({"ok": True})
 
 

@@ -203,6 +203,8 @@ class BankAccountDecideView(APIView):
             a = BankAccount.objects.select_for_update(of=("self",)).select_related("user", "bank").filter(pk=account_id, is_deleted=False).first()
             if a is None:
                 return err("پیدا نشد.", "not_found", 404)
+            if a.status != BankAccount.Status.PENDING:
+                return err("دربارهٔ این حساب قبلاً تصمیم گرفته شده است.", "closed", 409, account=_account_row(a))
             before = a.status
             a.status = BankAccount.Status.APPROVED if decision == "approve" else BankAccount.Status.REJECTED
             a.save(update_fields=["status", "update_time"])

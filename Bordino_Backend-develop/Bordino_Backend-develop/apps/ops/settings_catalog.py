@@ -110,8 +110,9 @@ def code_default(entry: dict):
 def current(entry: dict) -> dict:
     entry = {**entry, "default": code_default(entry)}
     row = SystemConfiguration.objects.filter(key=entry["key"]).first()
-    if row is not None and row.value not in (None, ""):
-        source, value = "database", row.get_typed_value(row.value)
+    raw = (row.value or row.default_value) if row is not None else None
+    if raw is not None and str(raw).strip():
+        source, value = "database", row.get_typed_value(raw)
     elif os.environ.get(entry["key"], "").strip():
         source, value = "env", SystemConfiguration.objects.get(entry["key"], entry["default"])
     else:

@@ -301,3 +301,68 @@ class SettingsAndDashboardTests(OpsTestCase):
         mw(None)
         ErrorCountMiddleware(lambda request: mock.Mock(status_code=404))(None)
         self.assertEqual(errors_last_24h(), 2)
+
+
+class CodexPass1Tests(OpsTestCase):
+    """The 2026-11-09 Codex review (pass 1): each finding, reproduced."""
+
+    def test_1_only_finance_sees_bank_details_in_a_user_card(self):
+        bank = Bank.objects.create(name="ب", code="C1")
+        BankAccount.objects.create(user=self.player, iban="IR000000000000000000000777", bank=bank, account_holder="صاحب", status="approved")
+        support = self.staff("9120001011", ["support"])
+        card = str(body(self.ops(support).get(O + "users/?q=09120001009")))
+        self.assertNotIn("IR000000000000000000000777", card)
+        self.assertNotIn("صاحب", card)
+        self.assertIn("IR000000000000000000000777", str(body(self.ops(self.finance).get(O + "users/?q=09120001009"))))
+
+    def test_3_logout_with_only_the_refresh_token_ends_the_session(self):
+        tokens = tokens_for(self.reviewer)
+        r = APIClient().post(O + "auth/logout/", {"refresh": tokens["refresh"]}, format="json")  # no access token
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(APIClient().post(O + "auth/refresh/", {"refresh": tokens["refresh"]}, format="json").status_code, 401)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        self.assertEqual(c.get(O + "me/").status_code, 401)
+        self.assertTrue(OpsAuditLog.objects.filter(action="sign_out", actor=self.reviewer).exists())
+
+    def test_4_a_bank_account_is_decided_once(self):
+        bank = Bank.objects.create(name="ب", code="C2")
+        a = BankAccount.objects.create(user=self.player, iban="IR000000000000000000000888", bank=bank, account_holder="x")
+        fn = self.ops(self.finance)
+        self.assertEqual(fn.post(O + f"bank-accounts/{a.pk}/reject/", {"reason": "نام نمی‌خواند"}, format="json").status_code, 200)
+        self.assertEqual(fn.post(O + f"bank-accounts/{a.pk}/approve/", {}, format="json").status_code, 409)  # a stale page
+        a.refresh_from_db()
+        self.assertEqual(a.status, "rejected")
+
+    def test_5_a_change_without_its_audit_row_does_not_happen(self):
+        own = self.ops(self.owner)
+        before = list(SystemConfiguration.objects.filter(key="AD_REWARD_POINTS").values_list("value", flat=True))
+        with mock.patch("apps.ops.auth.OpsAuditLog.objects.create", side_effect=RuntimeError("audit down")):
+            with self.assertRaises(RuntimeError):
+                own.put(O + "settings/AD_REWARD_POINTS/", {"value": "7"}, format="json")
+        # (a migration seeds this row: what matters is that its value did not change)
+        self.assertEqual(list(SystemConfiguration.objects.filter(key="AD_REWARD_POINTS").values_list("value", flat=True)), before)
+        self.assertNotIn("7", before)
+
+    def test_7_an_sms_failure_looks_like_any_other_number(self):
+        with mock.patch(SMS, return_value=None):
+            staff = APIClient().post(O + "auth/send/", {"phone": "09120001001"}, format="json")
+            other = APIClient().post(O + "auth/send/", {"phone": "09120001009"}, format="json")
+            self.assertEqual((staff.status_code, body(staff)), (other.status_code, body(other)))
+            again_staff = APIClient().post(O + "auth/send/", {"phone": "09120001001"}, format="json")
+            again_other = APIClient().post(O + "auth/send/", {"phone": "09120001009"}, format="json")
+            self.assertEqual((again_staff.status_code, body(again_staff)["code"]), (again_other.status_code, body(again_other)["code"]))  # both «wait»
+
+    def test_8_a_setting_shows_the_value_the_code_uses(self):
+        SystemConfiguration.objects.create(key="WALLET_MAX_NEGATIVE_CURRENCY", value="", default_value="100000", value_type="int")
+        listed = {s["key"]: s for s in body(self.ops(self.owner).get(O + "settings/"))["settings"]}
+        self.assertEqual(listed["WALLET_MAX_NEGATIVE_CURRENCY"]["value"], SystemConfiguration.objects.get("WALLET_MAX_NEGATIVE_CURRENCY", 0))
+        self.assertEqual(listed["WALLET_MAX_NEGATIVE_CURRENCY"]["value"], 100000)
+
+    def test_6_the_overview_works_without_its_cache(self):
+        broken = mock.Mock()
+        broken.get.side_effect = ConnectionError("redis down")
+        broken.set.side_effect = ConnectionError("redis down")
+        with mock.patch("apps.ops.views_dash.cache", broken):  # (only the overview's cache; sign-in still works)
+            r = self.ops(self.owner).get(O + "overview/")
+        self.assertEqual(r.status_code, 200)

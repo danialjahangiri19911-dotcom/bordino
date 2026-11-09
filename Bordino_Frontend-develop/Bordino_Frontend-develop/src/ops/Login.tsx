@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import Icon from "@/bd/Icon";
 import { styleClass, useBdStyle } from "@/bd/appearance";
@@ -18,6 +19,7 @@ const latin = (s: string) => s.replace(/[۰-۹]/g, (c) => DIGITS[c] ?? c);
 export default function OpsLogin() {
 	const st = styleClass(useBdStyle());
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [phone, setPhone] = useState("");
 	const [code, setCode] = useState("");
 	const [step, setStep] = useState<"phone" | "code">("phone");
@@ -47,6 +49,8 @@ export default function OpsLogin() {
 		setProblem(null);
 		try {
 			const r = await ops<{ tokens: { access: string; refresh: string }; me: OpsMe }>("auth/verify/", "POST", { phone: latin(phone), code: latin(code) });
+			// (nothing cached from an earlier session on this device survives a new sign-in)
+			queryClient.removeQueries({ queryKey: ["ops"] });
 			saveSession({ ...r.tokens, me: r.me });
 			router.replace(OPS.home);
 		} catch (err) {
