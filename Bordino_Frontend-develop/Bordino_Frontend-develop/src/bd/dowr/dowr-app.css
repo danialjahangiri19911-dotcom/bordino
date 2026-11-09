@@ -49,3 +49,16 @@
 /* Neobrutalism: the setup's highlighted words as the design marks them in its intro (dark ink on the
    yellow), not yellow text on cream, which cannot be read. */
 #bordino-directions .dr.dr-brutal .dr-setup-heading em { color: #211a2e; background: var(--p-accent); padding: 0 6px; font-style: normal; }
+
+/* The teams page: the team count, the table and its note in one card (each look's own panel), and
+   the seats without the member number and the seat number (only the team letter and the name). */
+#bordino-directions .dr .dowr-seat-box {
+	background: var(--p-panel); border: 1px solid var(--p-line); border-radius: var(--p-radius);
+	box-shadow: var(--p-shadow); padding: 16px 14px 14px; margin: 4px 0 18px;
+}
+#bordino-directions .dr.dr-brutal .dowr-seat-box { border: 2px solid var(--p-ink); }
+#bordino-directions .dr .dowr-seat-box .dr-seating { margin: 8px auto 4px; }
+#bordino-directions .dr .dowr-seat-box .dr-count-label { margin: 0 0 6px; }
+#bordino-directions .dr .dowr-seat-box .dr-note { padding-top: 8px; }
+#bordino-directions .dr .dr-seat-badge small,
+#bordino-directions .dr .dr-seat-number { display: none; }

@@ -81,6 +81,39 @@ function applyLimits(root: HTMLElement, limits: DowrConfig["limits"]) {
 	}
 }
 
+const SEATING_NOTE = "نوبت‌ها از بالای دایره، ساعت‌گرد می‌چرخد. دایره‌های روبه‌رو و هم‌رنگ، یک تیم‌اند.";
+
+/**
+ * The teams page as the app shows it: the team count, the table and its note in one card, and the
+ * seats without their two numbers (the order is clockwise from the top, as the note says).
+ * Runs after each of the module's renders; changes nothing that is already in place.
+ */
+function polishTeams(root: HTMLElement) {
+	const seating = root.querySelector<HTMLElement>(".dr-seating");
+	if (!seating || seating.parentElement?.classList.contains("dowr-seat-box")) return;
+	const box = document.createElement("div");
+	box.className = "dowr-seat-box";
+	const label = root.querySelector(".dr-count-label");
+	const note = seating.nextElementSibling?.classList.contains("dr-note") ? seating.nextElementSibling : null;
+	seating.before(box);
+	if (label) box.append(label);
+	box.append(seating);
+	if (note) {
+		note.textContent = SEATING_NOTE;
+		box.append(note);
+	}
+}
+
+/** «·» beside Persian digits reads as a zero («۲ تیم · ۴ نفر» looks like «۲ تیم ۰ ۴ نفر»): the
+ * design's separators become the Persian comma. (Text only; the module's markup is untouched.) */
+function persianSeparators(root: HTMLElement) {
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+		const text = node.nodeValue ?? "";
+		if (text.includes("·")) node.nodeValue = text.replace(/\s*·\s*/g, "، ");
+	}
+}
+
 export default function DowrGame() {
 	const allowed = useRequireLogin();
 	const style = useBdStyle();
@@ -147,7 +180,20 @@ export default function DowrGame() {
 					},
 				});
 				applyLimits(root, cfg.limits);
-				observer = new MutationObserver(() => applyLimits(root, cfg.limits));
+				polishTeams(root);
+				persianSeparators(root);
+				// (the clock re-renders ~20×/s: one pass per frame at most)
+				let queued = false;
+				observer = new MutationObserver(() => {
+					if (queued) return;
+					queued = true;
+					requestAnimationFrame(() => {
+						queued = false;
+						applyLimits(root, cfg.limits);
+						polishTeams(root);
+						persianSeparators(root);
+					});
+				});
 				observer.observe(root, { childList: true, subtree: true });
 				poll = window.setInterval(() => setPhase(game.current?.getState()?.phase ?? "setup"), 500);
 			})
