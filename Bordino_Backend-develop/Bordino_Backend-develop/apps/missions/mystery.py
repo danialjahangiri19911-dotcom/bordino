@@ -143,9 +143,9 @@ def listing(customer: Customer) -> list[View]:
     # A creator game's older version the player is still in (hidden since a new version replaced
     # it) stays in their list; the newer one of the same edition does not (one game per edition).
     mine = MysteryRun.objects.filter(customer=customer, mystery__series__isnull=False).values_list("mystery_id", flat=True)
+    # (A private game is listed only to those who joined it by its invite.)
     mysteries = list(
-        Mystery.objects.filter(Q(is_visible=True) | Q(pk__in=mine))
-        .exclude(access=Mystery.Access.PRIVATE)
+        Mystery.objects.filter((Q(is_visible=True) & ~Q(access=Mystery.Access.PRIVATE)) | Q(pk__in=mine))
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now - SHOW_ENDED_FOR))
     )
     if not mysteries:
@@ -260,6 +260,20 @@ def start_by_invite(customer: Customer, token: str) -> MysteryRun:
     """A private game's invite link (/pwa/play/<token>): joins (or reopens) the game."""
     mystery = Mystery.objects.filter(invite_token=token, access=Mystery.Access.PRIVATE).first() if token else None
     if mystery is None:
+        # A creator's game has its link from the first draft: say why it does not open yet.
+        from django.apps import apps  # pylint: disable=import-outside-toplevel
+
+        Game = apps.get_model("gamemaster", "Game")
+        game = Game.objects.select_related("owner").filter(invite_token=token).first() if token else None
+        if game is not None and game.status == "archived":
+            raise MissionError("این بازی بایگانی شده و دیگر باز نمی‌شود.", "closed")
+        if game is not None:
+            if game.owner.user_id == customer.user_id:
+                raise MissionError(
+                    "این لینک بازی خودت است و بازی هنوز منتشر نشده. در گیم مستر بفرستش برای بررسی بردینو و بعد از تأیید منتشرش کن؛ از آن به بعد همین لینک بازش می‌کند.",
+                    "not_published",
+                )
+            raise MissionError("این بازی هنوز منتشر نشده است. بعد از انتشار، همین لینک بازش می‌کند.", "not_published")
         raise NotFound("این لینک دعوت معتبر نیست.")
     return start(customer, mystery.pk, invite=token)
 

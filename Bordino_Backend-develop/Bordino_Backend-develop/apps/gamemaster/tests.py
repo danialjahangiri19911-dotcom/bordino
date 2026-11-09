@@ -309,6 +309,24 @@ class GameMasterTests(TestCase):
         self.assertEqual(body(self.player_api.get(f"/api/v1/missions/mysteries/{m.pk}/"))["mystery"]["run"]["status"], "active")
         game = body(self.api.get(f"/api/v1/gm/games/{gid}/"))["game"]
         self.assertTrue(game["invite_url"].endswith(m.invite_token))
+        # Joined: the game is in the player's own list (nobody else's).
+        self.assertEqual([x["id"] for x in body(self.player_api.get("/api/v1/missions/"))["mysteries"]], [str(m.pk)])
+        other = APIClient()
+        other.force_authenticate(make_player("9120009004"))
+        self.assertEqual(body(other.get("/api/v1/missions/"))["mysteries"], [])
+
+    def test_an_unpublished_games_invite_says_why_it_does_not_open(self):
+        self.onboard()
+        r = self.api.post("/api/v1/gm/games/", {"category": "personal"}, format="json")
+        gid = body(r)["game"]["id"]
+        token = body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))["url"].rsplit("/", 1)[-1]
+        r = self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json")
+        self.assertEqual((r.status_code, body(r)["code"]), (409, "not_published"))
+        self.assertIn("هنوز منتشر نشده", body(r)["error"])
+        mine = body(self.api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json"))
+        self.assertIn("بازی خودت", mine["error"])  # the creator is told what to do
+        services.archive(self.creator, gid)
+        self.assertEqual(body(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json"))["code"], "closed")
 
     def test_the_audience_is_checked_when_listing_and_starting(self):
         gid, m = self.published(quiz(audience={"age_min": 18, "age_max": 30}))
@@ -577,7 +595,7 @@ class GameMasterAuditTests(TestCase):
         self.assertIn("/pwa/play/", share["url"])
         self.assertTrue(share["svg"].startswith("<svg"))
         token = share["url"].rsplit("/", 1)[-1]
-        self.assertEqual(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json").status_code, 404)  # not yet
+        self.assertEqual(body(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json"))["code"], "not_published")  # not yet
         gid, m = self.publish(quiz(access="private"), gid=gid)
         self.assertTrue(body(self.api.get(f"/api/v1/gm/games/{gid}/share/"))["active"])
         self.assertEqual(self.player_api.post(f"/api/v1/missions/mysteries/invite/{token}/", {}, format="json").status_code, 200)
