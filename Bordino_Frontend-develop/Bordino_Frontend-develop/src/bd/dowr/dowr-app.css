@@ -3,7 +3,15 @@
    never reach the design. Here: the page frame, and the dark versions of the two looks that have one
    in the app (neobrutalism and neumorphism; the design ships them light only; neon is always dark). */
 
-#bordino-directions .dowr-page { max-width: 820px; margin: 0 auto; padding: 12px 12px 32px; display: grid; gap: 12px; }
+#bordino-directions .dowr-page { max-width: 820px; margin: 0 auto; padding: 16px 12px 32px; display: grid; gap: 12px; }
+/* On a phone the game fills the screen, as the other games (pantomime) do. */
+@media (max-width: 600px) {
+	#bordino-directions .dowr-page { padding: 0 0 24px; gap: 10px; }
+	#bordino-directions .dowr-host .dr { min-height: 100dvh; border-radius: 0; }
+	#bordino-directions .dowr-host .dr.dr-brutal { border-width: 0 0 3px; }
+	#bordino-directions .dowr-host .dr.dr-neon { border-width: 0 0 1px; }
+	#bordino-directions .dowr-page > .dowr-bar { margin: 0 12px; }
+}
 #bordino-directions .dowr-bar { border-radius: 16px; padding: 8px 12px; }
 #bordino-directions .dowr-bar .bd-text-btn { display: inline-flex; align-items: center; gap: 6px; }
 #bordino-directions .dowr-host .dr { margin: 0 auto; }
@@ -38,3 +46,6 @@
 :root[data-bd-scheme="dark"] #bordino-directions .dr.dr-brutal :is(.dr-intro em, .dr-categories button[aria-pressed=true], .dr-team.dr-active, .dr-mode-options [aria-pressed=true], .dr-stage-icon) {
 	--p-ink: #211a2e; --p-muted: #3b3346; color: #211a2e;
 }
+/* Neobrutalism: the setup's highlighted words as the design marks them in its intro (dark ink on the
+   yellow), not yellow text on cream, which cannot be read. */
+#bordino-directions .dr.dr-brutal .dr-setup-heading em { color: #211a2e; background: var(--p-accent); padding: 0 6px; font-style: normal; }

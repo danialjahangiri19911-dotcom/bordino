@@ -90,6 +90,7 @@ export default function DowrGame() {
 	const history = useDowrHistory();
 	const host = useRef<HTMLDivElement>(null);
 	const game = useRef<ReturnType<DowrApi["mount"]> | null>(null);
+	const leaveRef = useRef<() => void>(() => undefined);
 	const [phase, setPhase] = useState<string>("setup");
 	const [saved, setSaved] = useState<{ ok: boolean; text: string } | null>(null);
 	const [failed, setFailed] = useState<string | null>(null);
@@ -119,6 +120,16 @@ export default function DowrGame() {
 				host.current.innerHTML = api.markup(look);
 				const root = host.current.querySelector<HTMLElement>("[data-dowr]");
 				if (!root) return;
+				// Like the other games: the title without the design's dot, and the exit arrow in the
+				// game's own header (beside sound and help) instead of a bar above it.
+				root.querySelector(".dr-brand h2 span")?.remove();
+				const exit = document.createElement("button");
+				exit.type = "button";
+				exit.className = "dr-icon dowr-exit";
+				exit.setAttribute("aria-label", "خروج از بازی");
+				exit.innerHTML = '<i data-lucide="arrow-left" aria-hidden="true"></i>';
+				exit.addEventListener("click", () => leaveRef.current());
+				root.querySelector(".dr-tools")?.appendChild(exit);
 				// (one id per finished game, the same for its resends; also where crypto.randomUUID is missing)
 				const requestId = () =>
 					typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -179,6 +190,7 @@ export default function DowrGame() {
 			if (wasPlaying && game.current?.getState()?.phase === "paused") host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]')?.click();
 		});
 	};
+	leaveRef.current = leave;
 	useBackHandler(true, leave);
 	useBrowserBackGuard(running, leave);
 
@@ -186,11 +198,6 @@ export default function DowrGame() {
 	const recent = history.data?.result?.games ?? [];
 	return (
 		<div className={`dowr-page dowr-${look}`} data-scheme={scheme}>
-			<div className={`bd-product dowr-bar ${styleClass(style)}`}>
-				<button type="button" className="bd-text-btn" onClick={leave}>
-					<Icon name="arrow-left" /> گیمنت
-				</button>
-			</div>
 			{config.isLoading || config.error ? (
 				<div className={`bd-product dowr-bar ${styleClass(style)}`}>
 					<LoadState loading={config.isLoading} error={config.error} onRetry={config.refetch} />
