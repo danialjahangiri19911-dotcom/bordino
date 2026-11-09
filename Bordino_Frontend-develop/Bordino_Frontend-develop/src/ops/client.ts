@@ -168,7 +168,14 @@ export function useOps<T>(path: string | null, refetchInterval?: number) {
 	const who = typeof window === "undefined" ? "" : sessionUser();
 	return useQuery<T, OpsError>({
 		queryKey: ["ops", who, path],
-		queryFn: () => ops<T>(path as string),
+		// The answer is stored under `who`: fetched only while `who` is still the signed-in staff member
+		// (never someone else's answer filed under their name, or theirs under someone else's).
+		queryFn: async () => {
+			if (sessionUser() !== who) throw new OpsError("نشست عوض شد؛ صفحه را دوباره باز کن.", 401, "session_changed");
+			const result = await ops<T>(path as string);
+			if (sessionUser() !== who) throw new OpsError("نشست عوض شد؛ صفحه را دوباره باز کن.", 401, "session_changed");
+			return result;
+		},
 		enabled: !!path,
 		refetchInterval,
 		retry: (n, e) => n < 2 && !(e instanceof OpsError && e.status < 500),
