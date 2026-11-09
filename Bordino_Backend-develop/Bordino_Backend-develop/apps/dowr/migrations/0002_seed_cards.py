@@ -1253,13 +1253,9 @@ def forwards(apps, schema_editor):
             Card.objects.get_or_create(category=cat, text=card["text"], defaults={"difficulty": card["difficulty"], "forbidden": "،".join(card["forbidden"])})
 
 
-def backwards(apps, schema_editor):
-    apps.get_model("dowr", "DowrCard").objects.all().delete()
-    apps.get_model("dowr", "DowrCategory").objects.all().delete()
-    apps.get_model("dowr", "DowrSettings").objects.all().delete()
-
-
 class Migration(migrations.Migration):
     dependencies = [("dowr", "0001_initial")]
 
-    operations = [migrations.RunPython(forwards, backwards)]
+    # Going back keeps every card: by then Bordino may have edited or added cards and topics (undoing
+    # 0001 drops the tables anyway).
+    operations = [migrations.RunPython(forwards, migrations.RunPython.noop)]

@@ -114,3 +114,67 @@ class DowrTests(TestCase):
         other.force_authenticate(make_player("9120007002"))
         self.assertEqual(body(other.get(URL + "games/"))["total"], 0)
         self.assertIn(APIClient().get(URL + "config/").status_code, (401, 403))
+
+
+@override_settings(CACHES=LOCMEM)
+class DowrReviewFixTests(TestCase):
+    """The fixes from the 2026-11-09 review."""
+
+    def setUp(self):
+        self.player = make_player("9120007011")
+        self.api = APIClient()
+        self.api.force_authenticate(self.player)
+
+    def test_a_topic_name_cannot_carry_markup(self):
+        for bad in ('<img src=x onerror=alert(1)>', 'غذا & نوشیدنی', 'a"b', "a'b", "a`b"):
+            with self.assertRaises(ValidationError):
+                DowrCategory.objects.create(slug="bad", name=bad)
+        self.assertEqual(DowrCategory.objects.create(slug="ok", name="غذا و نوشیدنی").name, "غذا و نوشیدنی")
+
+    def test_a_resend_racing_the_first_answers_with_the_first(self):
+        from unittest import mock
+
+        from apps.dowr import services
+
+        data = result()
+        first = self.api.post(URL + "games/", data, format="json")
+        self.assertEqual(first.status_code, 201)
+        # The resend got past the «already there?» check before the first was saved: full_clean then
+        # refuses it (unique request id) and the answer is the first game, not an error.
+        real = DowrGame.objects.filter
+
+        def miss_once(*a, **kw):
+            qs = real(*a, **kw)
+            if not getattr(miss_once, "done", False):
+                miss_once.done = True
+                return qs.none()
+            return qs
+
+        with mock.patch.object(services.DowrGame.objects, "filter", side_effect=miss_once):
+            again = self.api.post(URL + "games/", data, format="json")
+        self.assertEqual((again.status_code, body(again)["already_saved"]), (200, True))
+        self.assertEqual(DowrGame.objects.count(), 1)
+
+    def test_long_games_can_go_far_below_zero(self):
+        data = result()
+        data["teams"][1]["score"] = -2_500_000
+        self.assertEqual(self.api.post(URL + "games/", data, format="json").status_code, 201)
+        data = result()
+        data["teams"][1]["score"] = -20_000_000
+        self.assertEqual(self.api.post(URL + "games/", data, format="json").status_code, 400)
+
+    def test_reads_are_throttled(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        codes = [self.api.get(URL + "config/").status_code for _ in range(61)]
+        self.assertEqual((codes[0], codes[-1]), (200, 429))
+
+    def test_undoing_the_seed_keeps_the_cards(self):
+        from importlib import import_module
+
+        from django.db import migrations
+
+        seed = import_module("apps.dowr.migrations.0002_seed_cards").Migration
+        # Going back does nothing to the cards (Bordino's edits survive; undoing 0001 drops the tables).
+        self.assertIs(seed.operations[0].reverse_code, migrations.RunPython.noop)

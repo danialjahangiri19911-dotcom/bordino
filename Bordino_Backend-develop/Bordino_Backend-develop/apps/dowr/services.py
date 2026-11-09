@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from apps.dowr.models import DowrCard, DowrCategory, DowrGame, DowrSettings
@@ -46,8 +47,13 @@ def save_game(customer: Customer, data: dict) -> tuple[DowrGame, bool]:
                 teams=teams,
                 log=data.get("log", [])[:LOG_KEEP],
             )
-    except IntegrityError:
-        return DowrGame.objects.get(customer=customer, request_id=data["request_id"]), False
+    except (IntegrityError, ValidationError):
+        # The same game sent twice at once: the model's full_clean (or the unique constraint) refuses
+        # the second, which answers with the first. Anything else is a real error.
+        existing = DowrGame.objects.filter(customer=customer, request_id=data["request_id"]).first()
+        if existing is None:
+            raise
+        return existing, False
     return game, True
 
 

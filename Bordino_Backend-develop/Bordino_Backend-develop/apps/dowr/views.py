@@ -10,14 +10,19 @@ from apps.dowr import services
 from apps.dowr.models import BOMB_PENALTIES, BOMB_SECONDS, ROUNDS, SECONDS, TEAMS_RANGE, DowrGame
 
 NAME = 24  # team and player names (the app cuts them at the same length)
-# Bounds of a real game: ≤ 10 rounds × 12 players, each answer ≤ 1000; swaps (−100) and the bomb
-# (≤ −2000 each) can push a team below zero.
-MAX_POINTS = 1_000_000
+# Bounds of a real game: ≤ 10 rounds × 12 players, each answer ≤ 1000; swaps (−100 each, no limit
+# on how many) and the bomb (≤ −2000 each) can push a team far below zero in a long game.
+MAX_POINTS = 10_000_000
 
 
 class SaveThrottle(UserRateThrottle):
     scope = "dowr_save"
     rate = "20/min"
+
+
+class ReadThrottle(UserRateThrottle):
+    scope = "dowr_read"
+    rate = "60/min"
 
 
 class TeamSerializer(serializers.Serializer):
@@ -65,6 +70,7 @@ class DowrConfigView(APIView):
     """The game's switch, limits, topics and cards (edited in the admin)."""
 
     permission_classes = (IsAuthenticated,)
+    throttle_classes = (ReadThrottle,)
 
     @extend_schema(tags=["dowr"], summary="Dowr settings and cards")
     def get(self, request):
@@ -77,7 +83,7 @@ class DowrGamesView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get_throttles(self):
-        return [SaveThrottle()] if self.request.method == "POST" else super().get_throttles()
+        return [SaveThrottle()] if self.request.method == "POST" else [ReadThrottle()]
 
     @extend_schema(tags=["dowr"], summary="My recent Dowr games")
     def get(self, request):

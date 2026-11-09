@@ -62,3 +62,5 @@
 #bordino-directions .dr .dowr-seat-box .dr-note { padding-top: 8px; }
 #bordino-directions .dr .dr-seat-badge small,
 #bordino-directions .dr .dr-seat-number { display: none; }
+/* The last seconds' clock on a dark surface: the neon pink, like the ring and the bar. */
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-time { color: #ff718c; }

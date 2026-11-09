@@ -59,6 +59,12 @@ class DowrCategory(AbstractBaseModel):
     order = models.PositiveSmallIntegerField(default=0, verbose_name=_("ترتیب"))
     is_active = models.BooleanField(default=True, verbose_name=_("فعال"))
 
+    def clean(self):
+        super().clean()
+        # The topic name is shown inside the game's markup: plain words only.
+        if any(ch in self.name for ch in "<>&\"'`"):
+            raise ValidationError({"name": _("نام موضوع نمی‌تواند < > & \" ' ` داشته باشد.")})
+
     def __str__(self):
         return self.name
 

@@ -81,6 +81,26 @@ function applyLimits(root: HTMLElement, limits: DowrConfig["limits"]) {
 	}
 }
 
+/** The vendor writes a topic's id, label and icon into its markup as they are; so they arrive here as
+ * plain text: the label escaped, the id and icon kept to slug letters. */
+const escapeHtml = (s: string) => s.replace(/[&<>"'`]/g, (c) => `&#${c.charCodeAt(0)};`);
+const slug = (s: string, fallback: string) => (/^[a-z0-9_-]{1,40}$/.test(s) ? s : fallback);
+function deckFrom(cfg: DowrConfig) {
+	const categories = cfg.categories.map((c, i) => ({ id: slug(c.id, `topic-${i}`), label: escapeHtml(String(c.label ?? "")), icon: slug(c.icon, "sparkles") }));
+	const ids = new Map(cfg.categories.map((c, i) => [c.id, categories[i].id]));
+	const cards = cfg.cards.filter((c) => ids.has(c.category)).map((c) => ({ ...c, category: ids.get(c.category) as string }));
+	return { categories, cards };
+}
+
+/** Whether a new game may start: Bordino's switch is on and there are cards to draw. */
+const playable = (cfg: DowrConfig | undefined) => !!cfg && cfg.enabled && cfg.cards.length > 0;
+
+/** When the game was switched off (or emptied) after the page opened: the start buttons stop working;
+ * a game already running plays to its end. */
+function blockStart(root: HTMLElement, blocked: boolean) {
+	for (const b of root.querySelectorAll<HTMLButtonElement>('[data-act="start"]')) b.disabled = blocked;
+}
+
 const SEATING_NOTE = "نوبت‌ها از بالای دایره، ساعت‌گرد می‌چرخد. دایره‌های روبه‌رو و هم‌رنگ، یک تیم‌اند.";
 
 /**
@@ -124,6 +144,8 @@ export default function DowrGame() {
 	const host = useRef<HTMLDivElement>(null);
 	const game = useRef<ReturnType<DowrApi["mount"]> | null>(null);
 	const leaveRef = useRef<() => void>(() => undefined);
+	const observer = useRef<MutationObserver | null>(null);
+	const poll = useRef(0);
 	const [phase, setPhase] = useState<string>("setup");
 	const [saved, setSaved] = useState<{ ok: boolean; text: string } | null>(null);
 	const [failed, setFailed] = useState<string | null>(null);
@@ -136,21 +158,27 @@ export default function DowrGame() {
 		document.title = "دُور | بردینو";
 	}, []);
 
-	// Mount once the cards are here; the server's topics and cards replace the bundled deck.
+	// The latest config and look for the module's callbacks (the game is mounted once and kept).
+	const cfgRef = useRef(cfg);
+	cfgRef.current = cfg;
+	const lookRef = useRef(look);
+	lookRef.current = look;
+	const canPlay = playable(cfg);
+	// One pass over the module's DOM: Bordino's limits, the start switch, the teams card, the commas.
+	const polish = useRef<(() => void) | null>(null);
+
+	// Mount once, when the game may first be played. Never again for this page (a refetched config or
+	// another style changes the running game, it never restarts it).
 	useEffect(() => {
-		if (!allowed || !cfg?.enabled || !host.current || game.current) return undefined;
+		if (!allowed || !canPlay || game.current) return undefined;
 		let cancelled = false;
-		let observer: MutationObserver | null = null;
-		let poll = 0;
 		loadModule()
 			.then((api) => {
-				if (cancelled || !host.current) return;
+				const first = cfgRef.current;
+				if (cancelled || !host.current || game.current || !first) return;
 				const decks = (globalThis as Globals).BordinoDowrDecks;
-				if (decks && cfg.cards.length) {
-					decks.categories = cfg.categories;
-					decks.cards = cfg.cards;
-				}
-				host.current.innerHTML = api.markup(look);
+				if (decks) Object.assign(decks, deckFrom(first));
+				host.current.innerHTML = api.markup(lookRef.current);
 				const root = host.current.querySelector<HTMLElement>("[data-dowr]");
 				if (!root) return;
 				// Like the other games: the title without the design's dot, and the exit arrow in the
@@ -179,31 +207,40 @@ export default function DowrGame() {
 						void send(2);
 					},
 				});
-				applyLimits(root, cfg.limits);
-				polishTeams(root);
-				persianSeparators(root);
+				polish.current = () => {
+					const now = cfgRef.current;
+					if (now) applyLimits(root, now.limits);
+					blockStart(root, !playable(now));
+					polishTeams(root);
+					persianSeparators(root);
+				};
+				polish.current();
 				// (the clock re-renders ~20×/s: one pass per frame at most)
 				let queued = false;
-				observer = new MutationObserver(() => {
+				observer.current = new MutationObserver(() => {
 					if (queued) return;
 					queued = true;
 					requestAnimationFrame(() => {
 						queued = false;
-						applyLimits(root, cfg.limits);
-						polishTeams(root);
-						persianSeparators(root);
+						polish.current?.();
 					});
 				});
-				observer.observe(root, { childList: true, subtree: true });
-				poll = window.setInterval(() => setPhase(game.current?.getState()?.phase ?? "setup"), 500);
+				observer.current.observe(root, { childList: true, subtree: true });
+				poll.current = window.setInterval(() => setPhase(game.current?.getState()?.phase ?? "setup"), 500);
 			})
 			.catch(() => setFailed("بارگذاری بازی نشد؛ صفحه را دوباره باز کن."));
 		return () => {
 			cancelled = true;
-			observer?.disconnect();
-			window.clearInterval(poll);
 		};
-	}, [allowed, cfg, look]);
+	}, [allowed, canPlay]);
+
+	// A newer config (Bordino edited the cards, the limits or the switch): the next game uses it.
+	useEffect(() => {
+		if (!cfg || !game.current) return;
+		const decks = (globalThis as Globals).BordinoDowrDecks;
+		if (decks && cfg.cards.length) Object.assign(decks, deckFrom(cfg));
+		polish.current?.();
+	}, [cfg]);
 
 	// The app's style changes while the page is open: the same game, another look (never a restart).
 	useEffect(() => {
@@ -213,9 +250,12 @@ export default function DowrGame() {
 		root.classList.add(`dr-${look}`);
 	}, [look]);
 
-	// Leaving the page ends the game (its timers and sound).
+	// Leaving the page ends the game (its timers and sound) and stops watching it.
 	useEffect(
 		() => () => {
+			observer.current?.disconnect();
+			window.clearInterval(poll.current);
+			polish.current = null;
 			game.current?.destroy();
 			game.current = null;
 		},
@@ -225,15 +265,17 @@ export default function DowrGame() {
 	const running = RUNNING.includes(phase);
 	const leave = () => {
 		const go = () => router.push(R.games);
-		if (!running) {
+		// (the game's phase now, not the last poll's: a game may have started a moment ago)
+		const now = game.current?.getState()?.phase ?? "setup";
+		if (!RUNNING.includes(now)) {
 			go();
 			return;
 		}
-		const pause = host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]');
-		const wasPlaying = phase === "playing" || phase === "handoff";
-		if (wasPlaying) pause?.click();
+		// Pause while asking; resume on «stay» only if this question is what paused it.
+		const pausedHere = (now === "playing" || now === "handoff") && !!host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]');
+		if (pausedHere) host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]')?.click();
 		askLeave(LEAVE, go, () => {
-			if (wasPlaying && game.current?.getState()?.phase === "paused") host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]')?.click();
+			if (pausedHere && game.current?.getState()?.phase === "paused") host.current?.querySelector<HTMLButtonElement>('[data-act="pause"]')?.click();
 		});
 	};
 	leaveRef.current = leave;
@@ -249,9 +291,14 @@ export default function DowrGame() {
 					<LoadState loading={config.isLoading} error={config.error} onRetry={config.refetch} />
 				</div>
 			) : null}
-			{cfg && !cfg.enabled ? (
+			{cfg && !cfg.enabled && !running ? (
 				<div className={`bd-product dowr-bar ${styleClass(style)}`}>
 					<EmptyState icon="messages-square" title="دُور فعلاً در دسترس نیست" text="به‌زودی دوباره باز می‌شود؛ تا آن موقع بازی‌های دیگر گیمنت را امتحان کن." action={<Link className="bd-action" href={R.games}>گیمنت</Link>} />
+				</div>
+			) : null}
+			{cfg?.enabled && !cfg.cards.length && !running ? (
+				<div className={`bd-product dowr-bar ${styleClass(style)}`}>
+					<EmptyState icon="messages-square" title="کارتی برای بازی نیست" text="کارت‌های دُور در حال آماده شدن‌اند؛ کمی بعد دوباره سر بزن." action={<Link className="bd-action" href={R.games}>گیمنت</Link>} />
 				</div>
 			) : null}
 			{failed ? (
@@ -260,7 +307,7 @@ export default function DowrGame() {
 				</div>
 			) : null}
 			{/* The design's own game (kept outside .bd-product: the app's element styles never reach it). */}
-			<div ref={host} className="dowr-host" />
+			<div ref={host} className="dowr-host" hidden={!!cfg && !canPlay && !running} />
 			{saved ? (
 				<div className={`bd-product dowr-bar ${styleClass(style)}`}>
 					<p className={saved.ok ? "dowr-saved" : "dowr-unsaved"} role="status">
