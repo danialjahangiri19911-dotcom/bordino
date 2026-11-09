@@ -26,6 +26,8 @@ export default [
 			"public/sw.js",
 			"public/workbox-*",
 			"public/service-worker.js",
+			// «دُور»: the design's own game module, kept exactly as delivered (src/bd/dowr/vendor/README.md).
+			"src/bd/dowr/vendor/**",
 		],
 	},
 	{

@@ -2,7 +2,7 @@ import type { IconName } from "./Icon";
 import { R } from "./ui";
 
 export interface GameEntry {
-	id: "sudoku" | "game2048" | "crash" | "chicken" | "pantomime";
+	id: "sudoku" | "game2048" | "crash" | "chicken" | "pantomime" | "dowr";
 	name: string;
 	tag: string;
 	blurb: string;
@@ -20,4 +20,5 @@ export const GAMES: GameEntry[] = [
 	{ id: "crash", name: "انفجار", tag: "آرکید", blurb: "ضریب بالا می‌رود؛ قبل از انفجار برداشت کن", icon: "rocket", logo: "/bd/games/crash-logo.svg", group: "arcade", href: R.crash },
 	{ id: "chicken", name: "مرغ فراری", tag: "آرکید", blurb: "از خیابان رد شو و ضریب را بالا ببر", icon: "bird", logo: "/bd/games/chicken-logo.svg", group: "arcade", href: R.chicken },
 	{ id: "pantomime", name: "پانتومیم", tag: "دورهمی", blurb: "بازی گروهی با یک گوشی؛ فقط با حرکت", icon: "drama", group: "party", href: R.pantomime },
+	{ id: "dowr", name: "دُور", tag: "دورهمی", blurb: "حدس کلمه با توضیح؛ تیم‌های دونفره، یک گوشی", icon: "messages-square", group: "party", href: R.dowr },
 ];

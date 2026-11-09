@@ -28,6 +28,7 @@ urlpatterns += [
     path("", include("apps.pantomime.urls")),
     path("", include("apps.gamemaster.urls")),
     path("", include("apps.ops.urls")),
+    path("", include("apps.dowr.urls")),
 ]
 
 if settings.DEBUG:

@@ -53,6 +53,7 @@ LOCAL_APPS = [
     "apps.pantomime.apps.PantomimeConfig",
     "apps.gamemaster.apps.GameMasterConfig",
     "apps.ops.apps.OpsConfig",
+    "apps.dowr.apps.DowrConfig",
 ]
 
 THIRD_PARTY_APPS = [

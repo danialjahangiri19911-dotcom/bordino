@@ -1,0 +1,35 @@
+/* «دُور» inside the app (the design's own stylesheet is vendor/dowr.css, unchanged).
+   The game sits outside .bd-product on purpose: the app's element styles (buttons, svg, headings)
+   never reach the design. Here: the page frame, and the dark versions of the two looks that have one
+   in the app (neobrutalism and neumorphism; the design ships them light only; neon is always dark). */
+
+#bordino-directions .dowr-page { max-width: 820px; margin: 0 auto; padding: 12px 12px 32px; display: grid; gap: 12px; }
+#bordino-directions .dowr-bar { border-radius: 16px; padding: 8px 12px; }
+#bordino-directions .dowr-bar .bd-text-btn { display: inline-flex; align-items: center; gap: 6px; }
+#bordino-directions .dowr-host .dr { margin: 0 auto; }
+#bordino-directions .dowr-recent h3 { margin: 4px 0 8px; font-size: 15px; }
+#bordino-directions .dowr-recent ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#bordino-directions .dowr-recent li { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--bd-border); }
+#bordino-directions .dowr-recent li small { color: var(--bd-muted); font-size: 12px; line-height: 1.8; }
+#bordino-directions :is(.dowr-saved, .dowr-unsaved) { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; }
+#bordino-directions .dowr-unsaved { color: #c33d59; }
+
+/* Neobrutalism, dark: the app's dark palette, light ink and lines, the design's yellow kept. */
+:root[data-bd-scheme="dark"] #bordino-directions .dr.dr-brutal {
+	--p-bg: #18191d; --p-panel: #24252c; --p-ink: #f5f2f0; --p-muted: #b7b3be;
+	--p-accent: #ffe332; --p-on: #211a2e; --p-line: #e8e4e2; --p-shadow: 4px 4px 0 #000;
+	border-color: #e8e4e2;
+}
+/* Neumorphism, dark: the app's dark neumorphism (soft light and shadow from the same surface). */
+:root[data-bd-scheme="dark"] #bordino-directions .dr.dr-neu {
+	--p-bg: #292e37; --p-panel: #2d333d; --p-ink: #f5f7fb; --p-muted: #c2cad7;
+	--p-accent: #c0b2ff; --p-on: #221d29; --p-line: #56616f;
+	--p-shadow: 7px 7px 17px #1b1e25, -7px -7px 17px #3c4350;
+}
+/* On a dark surface the deep reds of the bomb and the last seconds read too dark: the neon pinks. */
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu) .dr-bomb { --bomb-color: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu) :is(.dr-blast h3, .dr-bomb-deduction) { color: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu) .dr-blast { border-color: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-ring-progress { stroke: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-timer-bar { background: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions .dowr-unsaved { color: #ff718c; }
