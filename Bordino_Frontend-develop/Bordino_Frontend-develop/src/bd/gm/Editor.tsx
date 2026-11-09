@@ -48,6 +48,7 @@ import {
 } from "./api";
 import AvailabilitySetup from "./AvailabilitySetup";
 import BoardSetup from "./BoardSetup";
+import NumberInput from "./NumberInput";
 import { LeaderList } from "../board";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -301,15 +302,13 @@ function PointField({
 				) : null}
 			</div>
 			<Field label="شعاع پذیرش (متر)" hint="وسط شهر ۸۰ تا ۱۵۰ متر مناسب است.">
-				<input
-					type="number"
-					inputMode="numeric"
+				<NumberInput
 					min={20}
 					max={2000}
-					dir="ltr"
+					fallback={100}
 					value={stage.radius_m}
 					disabled={disabled}
-					onChange={(e) => set({ radius_m: Number(e.target.value) || 100 })}
+					onValue={(n) => set({ radius_m: n ?? 100 })}
 				/>
 			</Field>
 			{problem ? <Notice>{problem}</Notice> : null}
@@ -685,37 +684,25 @@ function StageCard({
 					) : null}
 					<div className="gm-row-2">
 						<Field label="امتیاز این مرحله">
-							<input
-								type="number"
-								inputMode="numeric"
+							<NumberInput
 								min={0}
 								max={500}
-								dir="ltr"
+								fallback={0}
 								value={stage.points}
 								disabled={disabled}
-								onChange={(e) =>
-									onChange({ points: Math.max(0, Number(e.target.value) || 0) })
-								}
+								onValue={(n) => onChange({ points: n ?? 0 })}
 							/>
 						</Field>
 						<Field
 							label="مهلت (ثانیه، اختیاری)"
 							hint="بعد از مهلت، مرحله امتیازی ندارد."
 						>
-							<input
-								type="number"
-								inputMode="numeric"
+							<NumberInput
 								min={10}
-								dir="ltr"
-								value={stage.time_limit_s ?? ""}
+								max={86400}
+								value={stage.time_limit_s}
 								disabled={disabled}
-								onChange={(e) =>
-									onChange({
-										time_limit_s: e.target.value
-											? Number(e.target.value)
-											: null,
-									})
-								}
+								onValue={(n) => onChange({ time_limit_s: n })}
 							/>
 						</Field>
 					</div>
@@ -1349,20 +1336,12 @@ export default function Editor({ id }: { id: string }) {
 							/>
 						</Field>
 						<Field label="زمان تقریبی (دقیقه)">
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={1}
-								value={d.duration_minutes ?? ""}
+								max={1440}
+								value={d.duration_minutes}
 								disabled={locked}
-								onChange={(e) =>
-									set({
-										duration_minutes: e.target.value
-											? Number(e.target.value)
-											: null,
-									})
-								}
+								onValue={(n) => set({ duration_minutes: n })}
 							/>
 						</Field>
 					</div>
@@ -1515,41 +1494,21 @@ export default function Editor({ id }: { id: string }) {
 					</Field>
 					<div className="gm-row-2">
 						<Field label="حداقل سن (اختیاری)">
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={7}
 								max={120}
-								value={d.audience.age_min ?? ""}
+								value={d.audience.age_min}
 								disabled={locked}
-								onChange={(e) =>
-									set({
-										audience: {
-											...d.audience,
-											age_min: e.target.value ? Number(e.target.value) : null,
-										},
-									})
-								}
+								onValue={(n) => set({ audience: { ...d.audience, age_min: n } })}
 							/>
 						</Field>
 						<Field label="حداکثر سن (اختیاری)">
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={7}
 								max={120}
-								value={d.audience.age_max ?? ""}
+								value={d.audience.age_max}
 								disabled={locked}
-								onChange={(e) =>
-									set({
-										audience: {
-											...d.audience,
-											age_max: e.target.value ? Number(e.target.value) : null,
-										},
-									})
-								}
+								onValue={(n) => set({ audience: { ...d.audience, age_max: n } })}
 							/>
 						</Field>
 					</div>
@@ -1595,38 +1554,23 @@ export default function Editor({ id }: { id: string }) {
 				<Panel title="جایزه و بودجه">
 					<div className="gm-row-2">
 						<Field label="جایزهٔ پایان (امتیاز)">
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={0}
 								max={500}
+								fallback={0}
 								value={d.finish_points}
 								disabled={locked}
-								onChange={(e) =>
-									set({
-										finish_points: Math.max(0, Number(e.target.value) || 0),
-									})
-								}
+								onValue={(n) => set({ finish_points: n ?? 0 })}
 							/>
 						</Field>
 						<Field label="هزینهٔ هر راهنمایی (درصد)">
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={0}
 								max={100}
+								fallback={0}
 								value={d.hint_penalty}
 								disabled={locked}
-								onChange={(e) =>
-									set({
-										hint_penalty: Math.min(
-											100,
-											Math.max(0, Number(e.target.value) || 0),
-										),
-									})
-								}
+								onValue={(n) => set({ hint_penalty: n ?? 0 })}
 							/>
 						</Field>
 					</div>
@@ -1646,16 +1590,13 @@ export default function Editor({ id }: { id: string }) {
 						label="بودجهٔ امتیاز جایزه‌ها"
 						hint="هنگام انتشار از کیف امتیاز تو کنار گذاشته می‌شود؛ باقی‌مانده در پایان بازی برمی‌گردد."
 					>
-						<input
-							type="number"
-							inputMode="numeric"
-							dir="ltr"
+						<NumberInput
 							min={0}
+							max={10000000}
+							fallback={0}
 							value={d.budget_points}
 							disabled={locked}
-							onChange={(e) =>
-								set({ budget_points: Math.max(0, Number(e.target.value) || 0) })
-							}
+							onValue={(n) => set({ budget_points: n ?? 0 })}
 						/>
 					</Field>
 					<ul className="gm-budget-facts">

@@ -2,6 +2,7 @@
 
 import { fa } from "../format";
 import type { Availability, Category, Definition, GmOptions } from "./api";
+import NumberInput from "./NumberInput";
 
 /** "2026-11-10T14:30" in the phone's own clock (what a datetime-local input shows and gives). */
 function toLocalInput(iso: string | null): string {
@@ -118,14 +119,12 @@ export default function AvailabilitySetup({
 					<div className="gm-row-2">
 						<label className="rt-field gm-field">
 							<span>{preset ? "یا مدت دلخواه" : "مدت دلخواه"}</span>
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={1}
-								value={a.duration_value ?? ""}
+								max={a.duration_unit === "months" ? 120 : 3650}
+								value={a.duration_value}
 								disabled={disabled}
-								onChange={(e) => setA({ duration_value: e.target.value ? Number(e.target.value) : null })}
+								onValue={(n) => setA({ duration_value: n })}
 							/>
 						</label>
 						<label className="rt-field gm-field">
@@ -144,15 +143,7 @@ export default function AvailabilitySetup({
 
 			<label className="rt-field gm-field">
 				<span>ظرفیت بازیکنان (اختیاری)</span>
-				<input
-					type="number"
-					inputMode="numeric"
-					dir="ltr"
-					min={1}
-					value={d.capacity ?? ""}
-					disabled={disabled}
-					onChange={(e) => set({ capacity: e.target.value ? Number(e.target.value) : null })}
-				/>
+				<NumberInput min={1} max={1000000} value={d.capacity} disabled={disabled} onValue={(n) => set({ capacity: n })} />
 				<small className="bd-muted">وقتی پر شود کسی تازه وارد نمی‌شود (جدا از زمان پایان). خالی = تا جایی که بودجه اجازه بدهد.</small>
 			</label>
 
@@ -179,16 +170,14 @@ export default function AvailabilitySetup({
 								))}
 								{!GRACES.some(([h]) => h === a.grace_hours) ? <option value="custom">{fa(a.grace_hours)} ساعت</option> : null}
 							</select>
-							<input
-								type="number"
-								inputMode="numeric"
-								dir="ltr"
+							<NumberInput
 								min={0}
 								max={maxGrace}
+								fallback={0}
 								aria-label="مهلت دلخواه (ساعت)"
 								value={a.grace_hours}
 								disabled={disabled}
-								onChange={(e) => setA({ grace_hours: Math.max(0, Number(e.target.value) || 0) })}
+								onValue={(n) => setA({ grace_hours: n ?? 0 })}
 							/>
 							<small className="bd-muted">به ساعت؛ حداکثر {fa(maxGrace)} ساعت (سقف بردینو). زمان پایان و پایان مهلت جدا ثبت می‌شوند.</small>
 						</label>
