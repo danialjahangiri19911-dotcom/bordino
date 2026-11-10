@@ -1102,3 +1102,40 @@ class GameMasterCodexAuditTests(TestCase):
             self.assertEqual(body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": "901", "success": "1"}, format="json"))["status"], "failed")
         self.assertFalse(GameVersion.objects.get(pk=version.pk).fee_paid)
         self.assertEqual(GamePayment.objects.get(track_id="901").status, GamePayment.Status.FAILED)
+
+
+@override_settings(CACHES=LOCMEM)
+class GameMasterCodexFixReviewTests(TestCase):
+    """The Codex review of the audit fixes (2026-11-10, pass 2)."""
+
+    setUp = GameMasterLeaderboardTests.setUp
+    player = GameMasterLeaderboardTests.player
+    publish = GameMasterLeaderboardTests.publish
+    play = GameMasterLeaderboardTests.play
+
+    # 2
+    def test_an_old_editions_wrap_up_never_refunds_a_newer_paused_edition(self):
+        gid, m1 = self.publish(quiz())
+        a = self.player()
+        self.play(a, m1, upto=1)
+        _gid, m2 = self.publish(quiz(), gid=gid, new_edition=True)
+        v2 = Game.objects.get(pk=gid).live_version
+        services.set_paused(self.creator, gid, True)
+        Mystery.objects.filter(pk=m1.pk).update(ends_at=timezone.now() - timedelta(days=2))
+        services.tick()
+        services.settle(Game.objects.get(pk=gid))
+        self.assertEqual(budget.summary(v2)["released"], 0)
+        self.assertIsNone(budget.release(v2, "test"))  # (paused is not ended: its budget stays whole)
+        services.set_paused(self.creator, gid, False)
+        self.assertEqual(budget.summary(v2)["left"], budget.summary(v2)["reserved"])
+
+    # 7
+    def test_an_archived_game_is_not_published_again(self):
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro"}, format="json"))["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz()}, format="json")
+        self.api.post(f"/api/v1/gm/games/{gid}/submit/", {}, format="json")
+        services.review(self.reviewer, GameVersion.objects.get(game_id=gid).pk, "approve")
+        services.archive(self.creator, gid)
+        r = self.api.post(f"/api/v1/gm/games/{gid}/publish/", {}, format="json")
+        self.assertEqual((r.status_code, body(r)["code"]), (409, "archived"))
+        self.assertFalse(GameBudgetLedger.objects.filter(game_id=gid).exists())

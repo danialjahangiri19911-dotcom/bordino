@@ -550,6 +550,8 @@ def publish(user, game_id, new_edition: bool = False) -> Game:
     or, with `new_edition`, starts a new edition (new players' games, a new leaderboard)."""
     with transaction.atomic():
         game = owned(user, game_id, lock=True)
+        if game.status == Status.ARCHIVED:
+            raise GameMasterError("این بازی بایگانی شده است؛ برای بازی دوباره، از آن یک کپی بساز.", "archived")
         version = game.versions.select_for_update().filter(status=VStatus.APPROVED).order_by("-number").first()
         if version is None:
             raise GameMasterError("نسخهٔ تأییدشده‌ای برای انتشار نیست.", "not_approved")
@@ -797,7 +799,8 @@ def _settle_earlier_editions(game: Game, now):
 def _wrap_up(game: Game, mystery: Mystery):
     """After the last possible move: the budget left goes back, the leaderboard is frozen, and its
     players (if the board is theirs to see) and the creator are told. Safe to run again."""
-    for v in game.versions.filter(mystery__isnull=False):
+    # (only this edition's versions: a newer edition — even a paused one — has its own budget and time)
+    for v in game.versions.filter(mystery__isnull=False, mystery__edition=mystery.edition):
         budget.release(v, "expired")
     snap = boards.finalize(mystery)
     if snap is not None and once(game, f"final-notice:{game.pk}:{game.edition}:{mystery.pk}"):

@@ -204,9 +204,11 @@ async function revoke(refresh: string): Promise<boolean> {
 export async function retryRevokes() {
 	const list = pendingRevokes();
 	if (!list.length) return;
-	const left: string[] = [];
-	for (const refresh of list) if (!(await revoke(refresh))) left.push(refresh);
-	keepRevokes(left);
+	const done = new Set<string>();
+	for (const refresh of list) if (await revoke(refresh)) done.add(refresh);
+	// Only what the server confirmed leaves the queue, read again now: a sign-out added meanwhile (this
+	// tab or another) stays.
+	keepRevokes(pendingRevokes().filter((r) => !done.has(r)));
 }
 
 /** Ends the session on the server (by its refresh token: works after the access token expired),

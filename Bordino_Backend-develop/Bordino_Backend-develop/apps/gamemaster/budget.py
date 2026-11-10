@@ -91,15 +91,20 @@ def summary(version: GameVersion) -> dict:
     return {"reserved": reserved, "spent": spent, "released": released, "left": reserved - spent - released}
 
 
-def outstanding(version: GameVersion) -> int | None:
+def outstanding(version: GameVersion, mystery=None) -> int | None:
     """What the players can still win from this version (kept back from a release); None while its
     game still takes new players (then nothing is free yet). Always read fresh from the database: a
     publication may have just moved its dates (an extension), and a cached copy would see it ended."""
     from apps.missions.models import Mystery  # pylint: disable=import-outside-toplevel
 
-    mystery = Mystery.objects.filter(source_version_id=version.pk).first()
-    if mystery is None or not mystery.is_active:
+    if mystery is None:
+        mystery = Mystery.objects.filter(source_version_id=version.pk).first()
+    if mystery is None:
         return 0
+    if not mystery.is_active:
+        # Paused is not ended: a paused game resumes with its players and its whole budget.
+        paused = Game.objects.filter(pk=version.game_id, status=Game.Status.PAUSED).exists()
+        return None if paused else 0
     now = timezone.now()
     # Ended for good (its end, and the end of its grace, passed): nobody can win anything more.
     last = max(mystery.ends_at, mystery.grace_ends_at or mystery.ends_at) if mystery.ends_at else None
@@ -124,7 +129,12 @@ def release(version: GameVersion, reason: str = "end"):
         version = GameVersion.objects.select_for_update().select_related("game__owner__user").filter(pk=version.pk).first()
         if version is None:
             return None
-        held = outstanding(version)
+        # The runtime's row, the lock every check-in takes before it checks the game is open and pays:
+        # a move already admitted is booked before this counts what is left; a later one finds it closed.
+        from apps.missions.models import Mystery  # pylint: disable=import-outside-toplevel
+
+        mystery = Mystery.objects.select_for_update().filter(source_version_id=version.pk).first()
+        held = outstanding(version, mystery)
         if held is None:
             return None  # (still taking new players: its whole budget may still be won)
         left = summary(version)["left"] - held

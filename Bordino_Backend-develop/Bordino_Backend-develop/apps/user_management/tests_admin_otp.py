@@ -154,3 +154,37 @@ class NormalizePhoneTests(TestCase):
             self.assertEqual(admin_otp.normalize_phone(raw), "9128007728", raw)
         for raw in ("", None, "12345", "08128007728", "091280077281"):
             self.assertEqual(admin_otp.normalize_phone(raw), "", raw)
+
+
+@override_settings(
+    ADMIN_OTP_WHITELIST=["09128007728"],
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+)
+class AdminOTPChallengeTests(TestCase):
+    """Codex fix review (2026-11-10): nothing removes a newer code; a waiting SMS of a replaced code is
+    not sent."""
+
+    def setUp(self):
+        cache.clear()
+        get_user_model().objects.create_superuser(phone_number=ADMIN_PHONE, password="pw-not-used-1")
+        patcher = mock.patch.object(admin_otp.SMSService, "send_sms", return_value={"ok": True})
+        self.send_sms = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_burning_an_old_code_leaves_the_new_one(self):
+        jobs = []
+        with mock.patch.object(admin_otp, "_deliver", side_effect=jobs.append):
+            admin_otp.send_code(ADMIN_PHONE)
+            cache.delete(admin_otp._keys(ADMIN_PHONE)[2])  # pylint: disable=protected-access
+            admin_otp.send_code(ADMIN_PHONE)  # replaced before the first SMS went out
+        jobs[0]()  # the first code's SMS: its code is no longer the live one, nothing is sent
+        self.send_sms.assert_not_called()
+        jobs[1]()
+        code = self.send_sms.call_args.args[1]
+        for _ in range(admin_otp.MAX_ATTEMPTS + 1):
+            admin_otp.verify_code(ADMIN_PHONE, "000000" if code != "000000" else "111111")
+        self.assertIsNone(admin_otp.verify_code(ADMIN_PHONE, code))  # burned by the guesses
+        cache.delete(admin_otp._keys(ADMIN_PHONE)[2])  # pylint: disable=protected-access
+        with mock.patch.object(admin_otp, "_deliver", side_effect=lambda job: job()):
+            admin_otp.send_code(ADMIN_PHONE)
+        self.assertIsNotNone(admin_otp.verify_code(ADMIN_PHONE, self.send_sms.call_args.args[1]))

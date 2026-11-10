@@ -75,6 +75,16 @@ def _challenge_keys(phone, scope, challenge):
     return f"{base}:tries:{challenge}", f"{base}:used:{challenge}"
 
 
+def _burn(phone, scope, challenge):
+    """This code no longer works (too many guesses, or its SMS failed). Marked on the code itself, never by
+    removing the shared entry: by then it may hold a newer code."""
+    cache.add(f"{scope}_otp:{phone}:burned:{challenge}", 1, CODE_TTL)
+
+
+def _burned(phone, scope, challenge) -> bool:
+    return bool(cache.get(f"{scope}_otp:{phone}:burned:{challenge}"))
+
+
 _SMS_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="otp-sms")
 
 
@@ -100,12 +110,16 @@ def send_code(phone, who=None, scope="admin"):
         return "limit"
     allowed = who(phone) is not None
     code = "".join(secrets.choice("0123456789") for _ in range(CODE_LENGTH))
-    record = f"{secrets.token_hex(8)}:{_digest(phone, code, scope)}"
+    challenge = secrets.token_hex(8)
+    record = f"{challenge}:{_digest(phone, code, scope)}"
     cache.set(code_key, record, CODE_TTL)
     if not allowed:
         return "sent"  # (nobody knows this code; checking it still finds no user)
 
     def job():
+        # (waited in the queue: a code already replaced by a newer one, or expired, is not sent)
+        if cache.get(code_key) != record:
+            return
         try:
             ok = SMSService().send_sms(phone, code) is not None
         except Exception:  # pylint: disable=broad-except
@@ -114,8 +128,7 @@ def send_code(phone, who=None, scope="admin"):
             logging.getLogger(__name__).warning("%s sign-in SMS failed", scope)
             # The code never arrived: it is burned. (The one-minute gap stays, as for any other
             # number: a quicker second try would tell that this one is listed.)
-            if cache.get(code_key) == record:
-                cache.delete(code_key)
+            _burn(phone, scope, challenge)
 
     _deliver(job)
     return "sent"
@@ -131,10 +144,11 @@ def verify_code(phone, code, who=None, scope="admin"):
     challenge, _sep, expected = str(record).rpartition(":")
     challenge = challenge or expected  # (a record from before challenge ids)
     tries_key, used_key = _challenge_keys(phone, scope, challenge)
+    if _burned(phone, scope, challenge):
+        return None
     cache.add(tries_key, 0, CODE_TTL)
     if cache.incr(tries_key) > MAX_ATTEMPTS:
-        if cache.get(code_key) == record:
-            cache.delete(code_key)
+        _burn(phone, scope, challenge)
         return None
     given = "".join(str(int(ch)) for ch in str(code or "") if ch.isdecimal())
     if not hmac.compare_digest(expected, _digest(phone, given, scope)):
@@ -143,8 +157,7 @@ def verify_code(phone, code, who=None, scope="admin"):
     # its check interleaves with others or with a resend.
     if not cache.add(used_key, 1, CODE_TTL):
         return None
-    if cache.get(code_key) == record:
-        cache.delete(code_key)
+    # (the code's entry is left to expire: removing it here could remove a newer code)
     return who(phone)
 
 

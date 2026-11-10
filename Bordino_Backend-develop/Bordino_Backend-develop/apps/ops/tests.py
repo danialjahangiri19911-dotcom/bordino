@@ -490,3 +490,20 @@ class CodexPass4Tests(OpsTestCase):
         mgr.invalidate("TEST_STALE_FILL")
         mgr._set_cache("TEST_STALE_FILL", old, generation)  # … and the reader caches 5 late  # pylint: disable=protected-access
         self.assertEqual(mgr.get("TEST_STALE_FILL"), 7)
+
+
+@override_settings(CACHES=LOCMEM, OPS_OWNERS=["9128007728"])
+class SettingsCacheFailureTests(OpsTestCase):
+    def test_a_failed_generation_move_still_drops_the_cached_value(self):
+        mgr = SystemConfiguration.objects
+        SystemConfiguration.objects.update_or_create(key="TEST_INVAL_FAIL", defaults={"value": "5", "value_type": "int"})
+        mgr.invalidate("TEST_INVAL_FAIL")
+        self.assertEqual(mgr.get("TEST_INVAL_FAIL"), 5)
+        row = SystemConfiguration.objects.filter(key="TEST_INVAL_FAIL").first()
+        with mock.patch("apps.configuration.models.system_configuration_manager.cache.incr", side_effect=RuntimeError("redis full")):
+            row.value = "9"
+            row.save()
+        self.assertEqual(mgr.get("TEST_INVAL_FAIL"), 9)
+        cache.set("system_config:TEST_INVAL_FAIL", 1)  # (a value older code cached during a deploy)
+        mgr.invalidate("TEST_INVAL_FAIL")
+        self.assertIsNone(cache.get("system_config:TEST_INVAL_FAIL"))

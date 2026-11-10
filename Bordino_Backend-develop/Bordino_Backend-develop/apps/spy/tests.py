@@ -60,3 +60,33 @@ class SpyTests(TestCase):
         cache.clear()
         codes = [self.api.get(URL).status_code for _ in range(61)]
         self.assertEqual((codes[0], codes[-1]), (200, 429))
+
+
+@override_settings(CACHES=LOCMEM)
+class SpyConfigCostTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache  # pylint: disable=import-outside-toplevel
+
+        cache.clear()
+        self.api = APIClient()
+        self.api.force_authenticate(make_player("9120007302"))
+
+    def test_switched_off_it_answers_without_the_bank_and_changes_apply_at_once(self):
+        s = SpySettings.objects.get()
+        s.enabled = False
+        s.save()
+        self.assertEqual(body(self.api.get(URL)), {"enabled": False, "categories": [], "words": []})
+        s.enabled = True
+        s.save()  # (the cached answer goes with the change)
+        self.assertEqual(len(body(self.api.get(URL))["words"]), 14)
+        SpyWord.objects.filter(text="فرودگاه").first().delete()
+        self.assertEqual(len(body(self.api.get(URL))["words"]), 13)
+
+    def test_the_bank_sent_is_capped(self):
+        from unittest import mock  # pylint: disable=import-outside-toplevel
+
+        from apps.spy import services  # pylint: disable=import-outside-toplevel
+
+        with mock.patch.object(services, "MAX_WORDS", 5):
+            services._changed()  # pylint: disable=protected-access
+            self.assertEqual(len(body(self.api.get(URL))["words"]), 5)

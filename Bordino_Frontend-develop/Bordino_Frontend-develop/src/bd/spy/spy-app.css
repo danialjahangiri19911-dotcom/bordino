@@ -31,7 +31,7 @@
 /* Neumorphism, dark: soft light and shadow from the same dark surface. */
 :root[data-bd-scheme="dark"] #bordino-directions .sp.sp-neu {
 	--sp-bg: #292e37; --sp-panel: #2d323c; --sp-raised: #353b47; --sp-text: #f5f7fb; --sp-muted: #b9c0cf;
-	--sp-accent: #c0b2ff; --sp-solid: #8f7cf0; --sp-on: #fff; --sp-border: #414857; --sp-danger: #ff8fa6;
+	--sp-accent: #c0b2ff; --sp-solid: #6650cf; --sp-on: #fff; /* (white on it: 5.8:1) */ --sp-border: #414857; --sp-danger: #ff8fa6;
 	--sp-shadow: 7px 7px 16px #1d2128, -6px -6px 14px #363d49;
 	color-scheme: dark;
 }

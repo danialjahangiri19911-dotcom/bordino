@@ -1111,7 +1111,12 @@ export default function Editor({ id }: { id: string }) {
 		!server ||
 		server.status === "submitted" ||
 		server.status === "archived" ||
-		server.latest_version?.status === "submitted";
+		server.latest_version?.status === "submitted" ||
+		// (while an action runs: typing now would not be in what it sends)
+		!!action.busy;
+	// The game's status as last shown: a save that changes it (approved → draft) reloads the game.
+	const shownStatus = useRef<string | undefined>(undefined);
+	shownStatus.current = server?.status;
 
 	// Saves go out one after another (never two at once, never an older one last). An edit stays
 	// pending until the server has it: a failed save keeps it, and is tried again.
@@ -1125,6 +1130,7 @@ export default function Editor({ id }: { id: string }) {
 				const { game } = await saveDraft(id, d);
 				if (latest.current === d) latest.current = null; // (newer typing waits for its own save)
 				setProblems(game.problems);
+				if (game.status && game.status !== shownStatus.current) void refetch();
 				// Switching between public and private changes what there is to share.
 				const kind = share.data?.result?.kind;
 				if (kind && kind !== (d.access === "private" ? "invite" : "public")) void share.refetch();
@@ -1215,7 +1221,7 @@ export default function Editor({ id }: { id: string }) {
 			}
 			if (game) {
 				setProblems(game.problems);
-				if (a === "submit") setDraft(game.draft);
+				if (a === "submit" && !latest.current) setDraft(game.draft); // (never over newer typing)
 			}
 			const done: Record<GameAction, string> = {
 				submit: "برای بررسی فرستاده شد. نتیجه را خبر می‌دهیم.",

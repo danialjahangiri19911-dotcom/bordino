@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any
 
@@ -92,13 +93,24 @@ class SystemConfigurationManager(models.Manager):
         if not key:
             return
         gen_key = f"{self.GENERATION_PREFIX}{key}"
+        current = None
         try:
-            old = self._cache_key(key)
+            current = self._cache_key(key)
             # (no expiry: a generation that vanished would start again at 0 and could meet a late fill)
             cache.add(gen_key, 0, timeout=None)
             cache.incr(gen_key)
-            cache.delete(old)
-        except Exception:
+            cache.delete(current)
+        except Exception:  # pylint: disable=broad-except
+            # The generation could not move on (the cache refusing writes): at least the value cached
+            # now goes, so the next read is the database's; and it is said, not swallowed.
+            logging.getLogger(__name__).error("System setting %s: cache generation not moved on", key, exc_info=True)
+            try:
+                cache.delete(current or self._cache_key(key))
+            except Exception:  # pylint: disable=broad-except
+                logging.getLogger(__name__).error("System setting %s: cached value not cleared", key, exc_info=True)
+        try:
+            cache.delete(f"{self.CACHE_KEY_PREFIX}{key}")  # (the form before generations: older code in a deploy)
+        except Exception:  # pylint: disable=broad-except
             pass
 
     def invalidate_all(self) -> None:

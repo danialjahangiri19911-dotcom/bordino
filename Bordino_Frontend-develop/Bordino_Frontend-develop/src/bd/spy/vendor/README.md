@@ -1,7 +1,13 @@
 # «جاسوس» — the design's game module (vendored)
 
-`spy-engine.js`, `spy-ui.js`, `spy-ui.css` are copied **unchanged** from `Bordino-Spy-UI-Design` 1.0.6
-(`assets/`). They are loaded in this order by `../SpyGame.tsx`.
+`spy-engine.js`, `spy-ui.js`, `spy-ui.css` are copied from `Bordino-Spy-UI-Design` 1.0.6 (`assets/`),
+unchanged except for two one-line patches (Codex review 2026-11-10; re-apply them after an update):
+- `spy-ui.js` `opt()`: the option's `value` is escaped (`esc(v)`). An imported category name such as
+  `"></select><img onerror=…>` broke out of the attribute and ran a script.
+- `spy-engine.js` `Game.category()`: reads `SpyEngine.categories` (the server's topics) before its own
+  bundled list, so a renamed or new topic shows its name in the private hint.
+
+They are loaded in this order by `../SpyGame.tsx`.
 
 The app around them (do not edit the vendored files; change the wrapper instead):
 - topics and words come from the server (`/api/v1/games/spy/config/`) and replace the sample bank

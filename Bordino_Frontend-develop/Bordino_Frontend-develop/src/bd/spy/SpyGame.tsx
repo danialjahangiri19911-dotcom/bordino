@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
-import { useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { installLucideShim } from "../dowr/lucide";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type SpyConfig, useSpyConfig } from "./api";
@@ -60,6 +60,22 @@ function bankFrom(cfg: SpyConfig) {
 	return { categories, words };
 }
 
+/** Whether a new game may start: Bordino's switch is on and there are words to draw. */
+const playable = (cfg: SpyConfig | undefined) => !!cfg && cfg.enabled && cfg.words.length > 0;
+/** How old the settings may be when a new game starts (older: asked again first). */
+const FRESH_MS = 30_000;
+
+/** Whether the device can still save the game (a full storage would lose the round on leaving). */
+function canSave(): boolean {
+	try {
+		localStorage.setItem("bordino-spy-probe", "1");
+		localStorage.removeItem("bordino-spy-probe");
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** The app's style is the game's look (the module's own theme setting is hidden in the app). */
 function applyLook(root: HTMLElement, look: string) {
 	if (root.classList.contains(`sp-${look}`)) return;
@@ -67,12 +83,18 @@ function applyLook(root: HTMLElement, look: string) {
 	root.classList.add(`sp-${look}`);
 }
 
-/** The module keeps its preferences on the device: it starts in the app's look. */
+/** The module keeps its preferences on the device: it starts in the app's look. Saved own words
+ * whose topic carries markup characters (from an imported file) are cleaned on the way in. */
 function storeLook(look: string) {
 	try {
 		const saved = JSON.parse(localStorage.getItem(STORAGE) || "null");
 		if (saved && typeof saved === "object") {
 			saved.prefs = { ...(saved.prefs || {}), theme: look };
+			if (Array.isArray(saved.custom)) {
+				saved.custom = saved.custom.map((w: { category?: unknown }) =>
+					typeof w?.category === "string" ? { ...w, category: w.category.replace(/[<>"'`&]/g, "") } : w,
+				);
+			}
 			localStorage.setItem(STORAGE, JSON.stringify(saved));
 		}
 	} catch {
@@ -95,7 +117,13 @@ export default function SpyGame() {
 	const look = (LOOKS as readonly string[]).includes(style) ? style : "neon";
 	const lookRef = useRef(look);
 	lookRef.current = look;
-	const canPlay = !!cfg && cfg.enabled && cfg.words.length > 0;
+	const canPlay = playable(cfg);
+	// The latest settings and a way to ask for them now (a new game checks the switch first).
+	const cfgRef = useRef(cfg);
+	cfgRef.current = cfg;
+	const refetchRef = useRef(config.refetch);
+	refetchRef.current = config.refetch;
+	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		document.title = "جاسوس | بردینو";
@@ -113,7 +141,30 @@ export default function SpyGame() {
 				storeLook(lookRef.current);
 				const root = document.createElement("div");
 				host.current.replaceChildren(root);
+				// A NEW game (its «start») first makes sure Bordino has not switched the game off since the page
+				// opened: settings older than a moment are asked for again. (A round under way goes on.)
+				let checkedAt = Date.now();
+				let passing = false;
+				root.addEventListener(
+					"click",
+					(e) => {
+						const start = (e.target as Element | null)?.closest?.('[data-a="start"]') as HTMLElement | null;
+						if (!start || passing) return;
+						if (Date.now() - checkedAt < FRESH_MS && playable(cfgRef.current)) return;
+						e.stopPropagation();
+						e.preventDefault();
+						void refetchRef.current().then((r) => {
+							checkedAt = Date.now();
+							if (!playable(r.data?.data?.result)) return; // (the notice above says why; refetch gives the response still wrapped)
+							passing = true;
+							start.click();
+							passing = false;
+						});
+					},
+					true,
+				);
 				game.current = api.mount(root, { storageKey: STORAGE });
+				setMounted(true);
 				const polish = () => {
 					applyLook(root, lookRef.current);
 					// The design's note «this design version has N sample word pairs» is about the
@@ -194,7 +245,17 @@ export default function SpyGame() {
 			back.click();
 			return;
 		}
-		router.push(R.games);
+		const go = () => router.push(R.games);
+		// The device cannot save (its storage is full): leaving would lose the game, so it asks.
+		if (game.current && !canSave()) {
+			askLeave(
+				{ title: "بازی ذخیره نمی‌شود", text: "حافظهٔ این دستگاه پر است؛ با خروج، بازی فعلی از دست می‌رود.", yes: "خروج", no: "ماندن" },
+				go,
+				() => undefined,
+			);
+			return;
+		}
+		go();
 	};
 	leaveRef.current = leave;
 	useBackHandler(true, leave);
@@ -227,7 +288,9 @@ export default function SpyGame() {
 				</div>
 			) : null}
 			{/* The design's own game (kept outside .bd-product: the app's element styles never reach it). */}
-			<div ref={host} className="spy-host" hidden={!!cfg && !canPlay} />
+			{/* Once a game is on screen it stays (a round under way is never hidden mid-play); only a new
+			    game is refused while the switch is off. */}
+			<div ref={host} className="spy-host" hidden={!!cfg && !canPlay && !mounted} />
 		</div>
 	);
 }
