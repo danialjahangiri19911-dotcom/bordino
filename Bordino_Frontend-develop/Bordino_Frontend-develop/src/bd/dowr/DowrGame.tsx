@@ -82,11 +82,19 @@ function applyLimits(root: HTMLElement, limits: DowrConfig["limits"]) {
 }
 
 /** The vendor writes a topic's id, label and icon into its markup as they are; so they arrive here as
- * plain text: the label escaped, the id and icon kept to slug letters. */
+ * plain text: the label escaped, the id and icon kept to slug letters, and every id unique (a topic is
+ * selected and its cards filtered by id). */
 const escapeHtml = (s: string) => s.replace(/[&<>"'`]/g, (c) => `&#${c.charCodeAt(0)};`);
-const slug = (s: string, fallback: string) => (/^[a-z0-9_-]{1,40}$/.test(s) ? s : fallback);
+const SLUG = /^[A-Za-z0-9_-]{1,40}$/;
 function deckFrom(cfg: DowrConfig) {
-	const categories = cfg.categories.map((c, i) => ({ id: slug(c.id, `topic-${i}`), label: escapeHtml(String(c.label ?? "")), icon: slug(c.icon, "sparkles") }));
+	const used = new Set<string>();
+	const unique = (id: unknown, i: number) => {
+		let out = typeof id === "string" && SLUG.test(id) && !used.has(id) ? id : `t${i}`;
+		while (used.has(out)) out += "_";
+		used.add(out);
+		return out;
+	};
+	const categories = cfg.categories.map((c, i) => ({ id: unique(c.id, i), label: escapeHtml(String(c.label ?? "")), icon: SLUG.test(c.icon) ? c.icon : "sparkles" }));
 	const ids = new Map(cfg.categories.map((c, i) => [c.id, categories[i].id]));
 	const cards = cfg.cards.filter((c) => ids.has(c.category)).map((c) => ({ ...c, category: ids.get(c.category) as string }));
 	return { categories, cards };
@@ -100,6 +108,19 @@ const playable = (cfg: DowrConfig | undefined) => !!cfg && cfg.enabled && cfg.ca
 function blockStart(root: HTMLElement, blocked: boolean) {
 	for (const b of root.querySelectorAll<HTMLButtonElement>('[data-act="start"]')) b.disabled = blocked;
 }
+
+/** The topics a config offers (when they change, the setup is drawn again from them). */
+const topicsKey = (cfg: DowrConfig | undefined) => (cfg ? cfg.categories.map((c) => c.id).join("\u0001") : "");
+
+/** What the player chose on the setup page (its selects mirror the module's settings). */
+type Chosen = { rounds: number; seconds: number; bomb: boolean };
+function readChosen(root: HTMLElement): Chosen | null {
+	const rounds = root.querySelector<HTMLSelectElement>('select[data-setting="rounds"]');
+	const seconds = root.querySelector<HTMLSelectElement>('select[data-setting="seconds"]');
+	if (!rounds || !seconds) return null;
+	return { rounds: Number(rounds.value), seconds: Number(seconds.value), bomb: !!root.querySelector<HTMLInputElement>('input[data-setting="bombEnabled"]')?.checked };
+}
+const beyond = (c: Chosen, l: DowrConfig["limits"]) => c.rounds > l.max_rounds || c.seconds > l.max_seconds || (c.bomb && !l.bomb_allowed);
 
 const SEATING_NOTE = "نوبت‌ها از بالای دایره، ساعت‌گرد می‌چرخد. دایره‌های روبه‌رو و هم‌رنگ، یک تیم‌اند.";
 
@@ -158,6 +179,17 @@ export default function DowrGame() {
 		document.title = "دُور | بردینو";
 	}, []);
 
+	/** Ends the mounted game: its timers and sound, the observer, the poll, its DOM. */
+	const teardown = () => {
+		observer.current?.disconnect();
+		observer.current = null;
+		window.clearInterval(poll.current);
+		polish.current = null;
+		game.current?.destroy();
+		game.current = null;
+		if (host.current) host.current.innerHTML = "";
+	};
+
 	// The latest config and look for the module's callbacks (the game is mounted once and kept).
 	const cfgRef = useRef(cfg);
 	cfgRef.current = cfg;
@@ -166,6 +198,9 @@ export default function DowrGame() {
 	const canPlay = playable(cfg);
 	// One pass over the module's DOM: Bordino's limits, the start switch, the teams card, the commas.
 	const polish = useRef<(() => void) | null>(null);
+	// The topics the mounted game was drawn with; a new mount when they change between games.
+	const mountedTopics = useRef("");
+	const [mountKey, setMountKey] = useState(0);
 
 	// Mount once, when the game may first be played. Never again for this page (a refetched config or
 	// another style changes the running game, it never restarts it).
@@ -178,6 +213,7 @@ export default function DowrGame() {
 				if (cancelled || !host.current || game.current || !first) return;
 				const decks = (globalThis as Globals).BordinoDowrDecks;
 				if (decks) Object.assign(decks, deckFrom(first));
+				mountedTopics.current = topicsKey(first);
 				host.current.innerHTML = api.markup(lookRef.current);
 				const root = host.current.querySelector<HTMLElement>("[data-dowr]");
 				if (!root) return;
@@ -207,14 +243,37 @@ export default function DowrGame() {
 						void send(2);
 					},
 				});
+				// What the player last chose on the setup page: «یک دست دیگر» on the results starts again
+				// with it, without the setup page, so it is checked against the limits there.
+				let chosen: Chosen | null = null;
+				const livePhase = () => game.current?.getState()?.phase ?? "setup";
 				polish.current = () => {
 					const now = cfgRef.current;
 					if (now) applyLimits(root, now.limits);
+					chosen = readChosen(root) ?? chosen;
 					blockStart(root, !playable(now));
 					polishTeams(root);
 					persianSeparators(root);
+					setPhase(livePhase());
 				};
 				polish.current();
+				root.addEventListener(
+					"click",
+					(e) => {
+						const start = (e.target as Element | null)?.closest?.('[data-act="start"]');
+						const now = cfgRef.current;
+						if (!start || !now || readChosen(root) || !chosen || !beyond(chosen, now.limits)) return;
+						// Bordino lowered the limits since that choice: back to the setup page with them applied.
+						e.stopPropagation();
+						e.preventDefault();
+						root.querySelector<HTMLButtonElement>('[data-act="settings"]')?.click();
+						root.querySelector<HTMLButtonElement>('[data-act="rules"]')?.click();
+						polish.current?.();
+					},
+					true,
+				);
+				// (after the module's own handler: the back guard knows a game started at once)
+				root.addEventListener("click", () => setPhase(livePhase()));
 				// (the clock re-renders ~20×/s: one pass per frame at most)
 				let queued = false;
 				observer.current = new MutationObserver(() => {
@@ -232,7 +291,7 @@ export default function DowrGame() {
 		return () => {
 			cancelled = true;
 		};
-	}, [allowed, canPlay]);
+	}, [allowed, canPlay, mountKey]);
 
 	// A newer config (Bordino edited the cards, the limits or the switch): the next game uses it.
 	useEffect(() => {
@@ -241,6 +300,15 @@ export default function DowrGame() {
 		if (decks && cfg.cards.length) Object.assign(decks, deckFrom(cfg));
 		polish.current?.();
 	}, [cfg]);
+
+	// Other topics than the setup page was drawn with: the module keeps its own topic choice, so between
+	// games (never during one, nor over its results) the game is mounted again from the new deck.
+	useEffect(() => {
+		if (!cfg || !game.current || !playable(cfg) || topicsKey(cfg) === mountedTopics.current) return;
+		if ((game.current.getState()?.phase ?? "setup") !== "setup") return;
+		teardown();
+		setMountKey((k) => k + 1);
+	}, [cfg, phase]);
 
 	// The app's style changes while the page is open: the same game, another look (never a restart).
 	useEffect(() => {
@@ -251,16 +319,7 @@ export default function DowrGame() {
 	}, [look]);
 
 	// Leaving the page ends the game (its timers and sound) and stops watching it.
-	useEffect(
-		() => () => {
-			observer.current?.disconnect();
-			window.clearInterval(poll.current);
-			polish.current = null;
-			game.current?.destroy();
-			game.current = null;
-		},
-		[],
-	);
+	useEffect(() => teardown, []);
 
 	const running = RUNNING.includes(phase);
 	const leave = () => {
