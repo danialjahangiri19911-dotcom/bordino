@@ -1,4 +1,5 @@
 from apps.wallet.admin.ad_reward_session import AdRewardSessionAdmin
+from apps.wallet.admin.adivery_callback_attempt import AdiveryCallbackAttemptAdmin
 from apps.wallet.admin.bank import BankAdmin
 from apps.wallet.admin.bank_account import BankAccountAdmin
 from apps.wallet.admin.currency import CurrencyAdmin

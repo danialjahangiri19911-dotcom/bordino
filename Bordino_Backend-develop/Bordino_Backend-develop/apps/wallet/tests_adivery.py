@@ -168,3 +168,46 @@ class AdiveryTests(TestCase):
         self.assertEqual(ad_reward.provider().name, "demo")
         row.delete()
         self.assertEqual(ad_reward.provider().name, "demo")  # the built-in default again
+
+
+@override_settings(CACHES=LOCMEM)
+class AdiveryCallbackAttemptTests(AdiveryTests):
+    """Every call to the confirmation address is recorded, whatever it says (and never its secret)."""
+
+    def test_each_call_is_recorded_with_what_it_sent_and_how_it_was_answered(self):
+        from apps.wallet.models import AdiveryCallbackAttempt  # pylint: disable=import-outside-toplevel
+
+        session = self.start()
+        self.callback(session["session_id"], secret="x" * 40)
+        self.callback(session["session_id"], pid="other")
+        self.callback(session["session_id"])
+        self.callback(session["session_id"])
+        # A caller using other parameter names (and a body): the names are what tells.
+        APIClient().post(f"/api/v1/wallet/ad-reward/adivery/{self.secret}/?user_id=abc", {"event_id": "e9", "placement": "p"}, format="json")
+        rows = list(AdiveryCallbackAttempt.objects.order_by("create_time").values_list("method", "secret_ok", "outcome", "http_status", "message"))
+        self.assertEqual(
+            rows,
+            [
+                ("GET", False, "refused", 404, "not found"),
+                ("GET", True, "refused", 400, "unknown placement"),
+                ("GET", True, "paid", 200, ""),
+                ("GET", True, "already", 200, ""),
+                ("POST", True, "refused", 400, "bad event id"),
+            ],
+        )
+        last = AdiveryCallbackAttempt.objects.order_by("-create_time").first()
+        self.assertEqual(last.params, {"user_id": "abc", "event_id": "e9", "placement": "p"})
+        paid = AdiveryCallbackAttempt.objects.get(outcome="paid")
+        self.assertEqual((paid.session_ref, paid.params["eid"], paid.params["pid"]), (session["session_id"], "ev-1", PLACEMENT))
+        # The address's secret is never stored.
+        for row in AdiveryCallbackAttempt.objects.all():
+            self.assertNotIn(self.secret, str(row.params) + row.message + row.session_ref)
+
+    def test_a_failure_to_record_never_breaks_the_callback(self):
+        from apps.wallet.models import AdiveryCallbackAttempt  # pylint: disable=import-outside-toplevel
+
+        session = self.start()
+        with mock.patch.object(AdiveryCallbackAttempt.objects, "create", side_effect=RuntimeError("db full")):
+            ok = self.callback(session["session_id"])
+        self.assertEqual((ok.status_code, ok.json()["result"]["paid"]), (200, True))
+        self.assertEqual(self.points(), 5)
