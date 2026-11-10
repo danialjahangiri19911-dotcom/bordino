@@ -59,6 +59,9 @@ urlpatterns = [
     ),
     path("api/v1/wallet/ad-reward/offer/", AdRewardOfferView.as_view(), name="ad_reward_offer"),
     path("api/v1/wallet/ad-reward/adivery/<str:secret>/", AdiveryCallbackView.as_view(), name="ad_reward_adivery"),
+    # The same address without its last «/»: answered directly (a redirect could be dropped by
+    # Adivery's server, and a POST cannot be redirected at all).
+    path("api/v1/wallet/ad-reward/adivery/<str:secret>", AdiveryCallbackView.as_view(), name="ad_reward_adivery_no_slash"),
     path("api/v1/wallet/ad-reward/sessions/", AdRewardStartView.as_view(), name="ad_reward_start"),
     path(
         "api/v1/wallet/ad-reward/sessions/<uuid:session_id>/complete/",

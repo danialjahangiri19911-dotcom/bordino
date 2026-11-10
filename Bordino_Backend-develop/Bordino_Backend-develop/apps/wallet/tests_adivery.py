@@ -211,3 +211,17 @@ class AdiveryCallbackAttemptTests(AdiveryTests):
             ok = self.callback(session["session_id"])
         self.assertEqual((ok.status_code, ok.json()["result"]["paid"]), (200, True))
         self.assertEqual(self.points(), 5)
+
+    def test_the_address_works_without_its_last_slash_too(self):
+        from apps.wallet.models import AdiveryCallbackAttempt  # pylint: disable=import-outside-toplevel
+
+        first, second = self.start(), self.start()
+        url = f"/api/v1/wallet/ad-reward/adivery/{self.secret}"
+        got = APIClient().get(url, {"uid": first["session_id"], "pid": PLACEMENT, "eid": "ns-1"})
+        self.assertEqual((got.status_code, got.json()["result"]["paid"]), (200, True))
+        posted = APIClient().post(f"{url}?uid={second['session_id']}&pid={PLACEMENT}&eid=ns-2")
+        self.assertEqual((posted.status_code, posted.json()["result"]["paid"]), (200, True))
+        self.assertEqual(self.points(), 10)
+        self.assertEqual(APIClient().get("/api/v1/wallet/ad-reward/adivery/" + "x" * 40).status_code, 404)
+        self.assertEqual(AdiveryCallbackAttempt.objects.filter(outcome="paid").count(), 2)
+
