@@ -1,0 +1,37 @@
+/* «جاسوس» inside the app (the design's own stylesheet is vendor/spy-ui.css, unchanged).
+   The game sits outside .bd-product on purpose: the app's element styles (buttons, svg, headings)
+   never reach the design. Here: the page frame, the app's style as the game's look (the module's own
+   theme setting is hidden), and the dark versions of the two looks that have one in the app
+   (neobrutalism and neumorphism; the design ships them light only; neon is always dark). */
+
+#bordino-directions .spy-page { max-width: 760px; margin: 0 auto; padding: 16px 12px 32px; display: grid; gap: 12px; }
+#bordino-directions .spy-bar { border-radius: 16px; padding: 8px 12px; }
+#bordino-directions .spy-host .sp { margin: 0 auto; }
+/* The design's tilted «case file» card (.sp-case:before) reaches past its box: on a full-width phone
+   screen that would scroll the page sideways. Clipped (clip, not hidden: no scroll box is made). */
+#bordino-directions .spy-host { overflow-x: clip; }
+/* On a phone the game fills the screen, as the other party games do. */
+@media (max-width: 600px) {
+	#bordino-directions .spy-page { padding: 0 0 24px; gap: 10px; }
+	#bordino-directions .spy-host .sp { min-height: 100dvh; border-radius: 0; padding-inline: 16px; }
+	#bordino-directions .spy-host .sp.sp-brutal { border-width: 0 0 3px; }
+	#bordino-directions .spy-page > .spy-bar { margin: 0 12px; }
+}
+/* The look follows the app's style picker. */
+#bordino-directions .spy-host .sp-field:has(select[data-pref="theme"]) { display: none; }
+
+/* Neobrutalism, dark: the app's dark palette, light ink and lines, the design's yellow kept (with dark
+   ink on it). */
+:root[data-bd-scheme="dark"] #bordino-directions .sp.sp-brutal {
+	--sp-bg: #18191d; --sp-panel: #24252c; --sp-raised: #3a3420; --sp-text: #f5f2f0; --sp-muted: #b7b3be;
+	--sp-accent: #c9b5ff; --sp-solid: #ffe332; --sp-on: #211a2e; --sp-border: #e8e4e2; --sp-danger: #ff718c;
+	--sp-shadow: 5px 5px 0 #000;
+	color-scheme: dark;
+}
+/* Neumorphism, dark: soft light and shadow from the same dark surface. */
+:root[data-bd-scheme="dark"] #bordino-directions .sp.sp-neu {
+	--sp-bg: #292e37; --sp-panel: #2d323c; --sp-raised: #353b47; --sp-text: #f5f7fb; --sp-muted: #b9c0cf;
+	--sp-accent: #c0b2ff; --sp-solid: #8f7cf0; --sp-on: #fff; --sp-border: #414857; --sp-danger: #ff8fa6;
+	--sp-shadow: 7px 7px 16px #1d2128, -6px -6px 14px #363d49;
+	color-scheme: dark;
+}

@@ -54,6 +54,7 @@ LOCAL_APPS = [
     "apps.gamemaster.apps.GameMasterConfig",
     "apps.ops.apps.OpsConfig",
     "apps.dowr.apps.DowrConfig",
+    "apps.spy.apps.SpyConfig",
 ]
 
 THIRD_PARTY_APPS = [

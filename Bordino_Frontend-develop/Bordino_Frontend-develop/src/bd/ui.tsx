@@ -56,6 +56,7 @@ export const R = {
 	chicken: "/pwa/chicken",
 	pantomime: "/pwa/pantomime",
 	dowr: "/pwa/dowr",
+	spy: "/pwa/spy",
 	hafez: "/pwa/hafez",
 	tarot: "/pwa/tarot",
 } as const;

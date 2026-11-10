@@ -28,6 +28,8 @@ export default [
 			"public/service-worker.js",
 			// «دُور»: the design's own game module, kept exactly as delivered (src/bd/dowr/vendor/README.md).
 			"src/bd/dowr/vendor/**",
+			// «جاسوس»: the design's own game module, kept exactly as delivered (src/bd/spy/vendor/README.md).
+			"src/bd/spy/vendor/**",
 		],
 	},
 	{
