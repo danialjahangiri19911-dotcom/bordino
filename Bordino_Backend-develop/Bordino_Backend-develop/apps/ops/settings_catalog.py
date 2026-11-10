@@ -51,7 +51,7 @@ CATALOG = [
     _e("AD_REWARD_DAILY_LIMIT", "ads", "int", "سقف تبلیغ جایزه‌دار در روز", "", AD["AD_REWARD_DAILY_LIMIT"], 0, 100),
     _e("AD_DEMO_SECONDS", "ads", "int", "مدت تبلیغ نمایشی (ثانیه)", "", AD["AD_DEMO_SECONDS"], 3, 120),
     _e("ADIVERY_TRUST_APP", "ads", "bool", "پذیرفتن «دیدم» از خود اپ (ادیوری)", "تا وقتی ادیوری به سرور خبر نمی‌دهد.", AD["ADIVERY_TRUST_APP"]),
-    _e("ADIVERY_TRUST_SECONDS", "ads", "int", "حداقل ثانیه برای پذیرفتن «دیدم»", "", AD["ADIVERY_TRUST_SECONDS"], 1, 120),
+    _e("ADIVERY_TRUST_SECONDS", "ads", "int", "حداقل ثانیه برای پذیرفتن «دیدم»", "", AD["ADIVERY_TRUST_SECONDS"], 1, 20),  # (the app asks again for ~28 s: longer would never pay)
     _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "امتیاز تکمیل پروفایل", "یک بار برای هر کاربر.", 25, 0, 10_000),
     # Wallet
     _e("WALLET_TOKEN_EXPIRATION_DAYS", "wallet", "int", "اعتبار امتیازها (روز)", "", 365, 1, 3650),

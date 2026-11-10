@@ -334,3 +334,29 @@ class AdiveryCallbackAttemptTests(AdiveryTests):
         self.assertEqual(APIClient().get("/api/v1/wallet/ad-reward/adivery/" + "x" * 40).status_code, 404)
         self.assertEqual(AdiveryCallbackAttempt.objects.filter(outcome="paid").count(), 2)
 
+
+
+class AdiverySecretTests(TestCase):
+    def test_the_secret_in_the_address_never_reaches_a_log(self):
+        import logging  # pylint: disable=import-outside-toplevel
+
+        from main_app.log_redaction import RedactSecrets, install  # pylint: disable=import-outside-toplevel
+
+        install()
+        secret = "0123456789abcdef0123456789abcdef01234567"
+        for name in ("uvicorn.access", "django.request"):
+            record = logging.LogRecord(name, logging.INFO, __file__, 1, '%s - "GET %s HTTP/1.1" %d', ("1.2.3.4:5", f"/api/v1/wallet/ad-reward/adivery/{secret}/?uid=x", 200), None)
+            self.assertTrue(RedactSecrets().filter(record))
+            self.assertNotIn(secret, record.getMessage())
+            self.assertIn("adivery/<secret>/", record.getMessage())
+        self.assertTrue(any(isinstance(f, RedactSecrets) for f in logging.getLogger("uvicorn.access").filters))
+
+    def test_the_secret_can_be_rotated_by_the_environment(self):
+        import os  # pylint: disable=import-outside-toplevel
+        from unittest import mock  # pylint: disable=import-outside-toplevel
+
+        derived = ad_reward.adivery_callback_secret()
+        with mock.patch.dict(os.environ, {"ADIVERY_CALLBACK_SECRET": "r" * 40}):
+            self.assertEqual(ad_reward.adivery_callback_secret(), "r" * 40)
+        with mock.patch.dict(os.environ, {"ADIVERY_CALLBACK_SECRET": "short"}):
+            self.assertEqual(ad_reward.adivery_callback_secret(), derived)  # (too weak: the derived one stays)

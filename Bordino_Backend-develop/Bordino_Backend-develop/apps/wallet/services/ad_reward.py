@@ -275,10 +275,16 @@ def _player_from_ref(ref: str) -> Customer | None:
 
 
 def adivery_callback_secret() -> str:
-    """The secret part of the callback address entered in the Adivery panel (derived from the
-    site's SECRET_KEY: nothing to store, the same on every server process)."""
+    """The secret part of the callback address entered in the Adivery panel. ADIVERY_CALLBACK_SECRET
+    (environment) replaces it, so it can be rotated on its own; otherwise it is derived from the site's
+    SECRET_KEY (nothing to store, the same on every server process)."""
+    import os  # pylint: disable=import-outside-toplevel
+
     from django.conf import settings  # pylint: disable=import-outside-toplevel
 
+    own = (os.environ.get("ADIVERY_CALLBACK_SECRET") or "").strip()
+    if len(own) >= 32 and own.replace("-", "").replace("_", "").isalnum():
+        return own
     return hmac.new(settings.SECRET_KEY.encode(), b"adivery-reward-callback", hashlib.sha256).hexdigest()[:40]
 
 

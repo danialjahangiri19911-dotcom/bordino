@@ -255,11 +255,16 @@ LOGGING = {
         },
         "simple": {"format": "[{levelname}] {message}", "style": "{"},
     },
+    "filters": {
+        # (the Adivery confirmation address carries a secret: never printed; main_app/log_redaction.py)
+        "redact_secrets": {"()": "main_app.log_redaction.RedactSecrets"},
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "simple",
             "level": "DEBUG",
+            "filters": ["redact_secrets"],
         }
     },
     "loggers": {
