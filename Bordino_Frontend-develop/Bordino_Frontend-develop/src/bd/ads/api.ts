@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { inAndroidApp, useAdsPlugin } from "./native";
+import { inAndroidApp, sdkHoldsUser, useAdsPlugin } from "./native";
 import axios from "axios";
 
 import { call } from "@/api/games/request";
@@ -16,6 +16,9 @@ export interface AdCreative {
 	/** Adivery: the app id and the rewarded placement the Android app shows. */
 	app_id?: string;
 	placement_id?: string;
+	/** Adivery: the player's signed reference, given to the SDK as its user id (sent back by
+	 * Adivery's server with each confirmed view). */
+	user_ref?: string;
 }
 
 export interface AdOffer {
@@ -60,12 +63,14 @@ export function usePlayableAdOffer() {
 	const native = offer?.provider === "adivery";
 	const plugin = useAdsPlugin();
 	const playable = !native || !!plugin;
-	const { app_id, placement_id } = offer?.creative ?? {};
+	const { app_id, placement_id, user_ref } = offer?.creative ?? {};
 	useEffect(() => {
-		if (native && plugin && offer?.available && app_id && placement_id) {
+		// Loaded ahead only when the SDK already holds this player's reference (it goes with the
+		// load request); the first video of an app session loads when it is shown.
+		if (native && plugin && offer?.available && app_id && placement_id && sdkHoldsUser(user_ref)) {
 			plugin.prepare({ appId: app_id, placementId: placement_id }).catch(() => undefined);
 		}
-	}, [native, plugin, offer?.available, app_id, placement_id]);
+	}, [native, plugin, offer?.available, app_id, placement_id, user_ref]);
 	return {
 		...query,
 		offer: offer && !playable ? { ...offer, available: false } : offer,

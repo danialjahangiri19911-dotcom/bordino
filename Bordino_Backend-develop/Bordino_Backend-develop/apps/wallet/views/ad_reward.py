@@ -72,7 +72,7 @@ class AdRewardStartView(APIView):
                 "reward_points": session.reward_points,
                 "min_watch_seconds": session.min_watch_seconds,
                 "provider": session.provider,
-                "creative": ad_reward.PROVIDERS[session.provider].creative(),
+                "creative": ad_reward.PROVIDERS[session.provider].creative(session.customer),
             },
             status=status.HTTP_201_CREATED,
         )

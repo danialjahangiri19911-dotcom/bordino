@@ -69,7 +69,7 @@ class AdRewardError(Exception):
 class AdProvider:
     name = ""
 
-    def creative(self) -> dict:
+    def creative(self, customer: Customer | None = None) -> dict:  # pylint: disable=unused-argument
         """What the app needs to show the ad (a video address, or the SDK's placement id)."""
         raise NotImplementedError
 
@@ -90,7 +90,7 @@ class DemoVideoProvider(AdProvider):
     def watch_seconds(self) -> int:
         return max(1, int(setting("AD_DEMO_SECONDS")))
 
-    def creative(self) -> dict:
+    def creative(self, customer: Customer | None = None) -> dict:  # pylint: disable=unused-argument
         return {"video_url": setting("AD_DEMO_VIDEO_URL"), "seconds": self.watch_seconds(), "demo": True}
 
     def verify(self, session, evidence):
@@ -109,8 +109,13 @@ class AdiveryProvider(AdProvider):
     def watch_seconds(self) -> int:
         return 1
 
-    def creative(self) -> dict:
-        return {"app_id": setting("ADIVERY_APP_ID"), "placement_id": setting("ADIVERY_REWARDED_PLACEMENT_ID")}
+    def creative(self, customer: Customer | None = None) -> dict:
+        out = {"app_id": setting("ADIVERY_APP_ID"), "placement_id": setting("ADIVERY_REWARDED_PLACEMENT_ID")}
+        if customer is not None:
+            # What the app gives the SDK as its user id (see player_ref): Adivery's server sends it
+            # back with each confirmed view.
+            out["user_ref"] = player_ref(customer)
+        return out
 
     def ready(self) -> bool:
         return bool(setting("ADIVERY_APP_ID")) and bool(setting("ADIVERY_REWARDED_PLACEMENT_ID"))
@@ -168,7 +173,7 @@ def offer(customer: Customer) -> Offer:
     remaining = max(0, limit - _rewarded_today(customer))
     points = max(0, int(setting("AD_REWARD_POINTS")))
     available = bool(setting("AD_REWARD_ENABLED")) and remaining > 0 and points > 0
-    return Offer(available, points, remaining, p.name, p.creative() if available else {})
+    return Offer(available, points, remaining, p.name, p.creative(customer) if available else {})
 
 
 def start(customer: Customer, placement: str, points: int | None = None) -> AdRewardSession:
@@ -238,6 +243,36 @@ def complete(customer: Customer, session_id, evidence: dict | None = None, missi
 
 # ── Adivery's server-to-server confirmation (docs.adivery.com/server) ──
 
+# Which id Adivery sends back: the SDK puts the id set by setUserId into the request that LOADS an ad
+# (fetch.adivery.com/api/v1/ads, read from SDK 4.9.0), not into the showing of it. The app loads the
+# next ad ahead of the tap (and the SDK reloads after each view), so a per-view id would always be the
+# previous view's, or none. The id is therefore the PLAYER's (signed, opaque): a confirmation pays
+# that player's latest view still waiting for it.
+
+
+def _player_mac(hex_pk: str) -> str:
+    from django.conf import settings  # pylint: disable=import-outside-toplevel
+
+    return hmac.new(settings.SECRET_KEY.encode(), f"adivery-player:{hex_pk}".encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def player_ref(customer: Customer) -> str:
+    """The player's id for Adivery: «<customer id hex>-<signature>» (only [0-9a-f-]: nothing Adivery
+    could mangle; it says nothing about the player without our key)."""
+    hex_pk = uuid.UUID(str(customer.pk)).hex
+    return f"{hex_pk}-{_player_mac(hex_pk)}"
+
+
+def _player_from_ref(ref: str) -> Customer | None:
+    hex_pk, _sep, mac = str(ref or "").partition("-")
+    if len(hex_pk) != 32 or len(mac) != 16 or not hmac.compare_digest(mac, _player_mac(hex_pk)):
+        return None
+    try:
+        return Customer.objects.filter(pk=uuid.UUID(hex_pk)).first()
+    except ValueError:
+        return None
+
+
 
 def adivery_callback_secret() -> str:
     """The secret part of the callback address entered in the Adivery panel (derived from the
@@ -264,16 +299,44 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         raise AdRewardError("bad event id")
     if str(pid or "") != str(setting("ADIVERY_REWARDED_PLACEMENT_ID") or "-"):
         raise AdRewardError("unknown placement")
-    try:
-        session_id = uuid.UUID(str(uid))
-    except ValueError as exc:
-        raise AdRewardError("bad user id") from exc
+    player = _player_from_ref(uid)
+    session_id = None
+    if player is None:
+        # (the earlier form: the view's own id)
+        try:
+            session_id = uuid.UUID(str(uid))
+        except ValueError as exc:
+            raise AdRewardError("bad user id") from exc
     with transaction.atomic():
-        session = (
-            AdRewardSession.objects.select_for_update()
-            .filter(pk=session_id, provider=AdiveryProvider.name)
-            .first()
-        )
+        if player is not None:
+            # One match at a time per player (two confirmations must not pick the same view).
+            Customer.objects.select_for_update(no_key=True).filter(pk=player.pk).first()
+            # A repeat of a confirmation already applied: the same view.
+            session = AdRewardSession.objects.select_for_update().filter(external_event_id=eid, provider=AdiveryProvider.name).first()
+            if session is not None and session.customer_id != player.pk:
+                raise AdRewardError("event already used", "conflict")
+            if session is None:
+                # The player's latest view still waiting for Adivery (one ad shows at a time; older
+                # unfinished ones were left).
+                session = (
+                    AdRewardSession.objects.select_for_update()
+                    .filter(
+                        customer=player,
+                        provider=AdiveryProvider.name,
+                        verified_at__isnull=True,
+                        create_time__gte=timezone.now() - SESSION_TTL,
+                    )
+                    .order_by("-create_time")
+                    .first()
+                )
+            if session is None:
+                raise AdRewardError("no view of this player is waiting", "not_found")
+        else:
+            session = (
+                AdRewardSession.objects.select_for_update()
+                .filter(pk=session_id, provider=AdiveryProvider.name)
+                .first()
+            )
         if session is None:
             raise AdRewardError("unknown session", "not_found")
         if session.external_event_id and session.external_event_id != eid:

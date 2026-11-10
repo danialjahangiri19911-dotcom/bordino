@@ -86,6 +86,20 @@ describe("AdiveryAd", () => {
 		root = createRoot(host); // for afterEach
 	});
 
+	it("gives Adivery the player's reference when there is one, and then lets the next ad load ahead", async () => {
+		const show = jest.fn().mockResolvedValue({ rewarded: true });
+		plugin(show);
+		const withRef = { ...session, creative: { ...session.creative, user_ref: "abc-123" } };
+		const { sdkHoldsUser } = await import("./native");
+		sessionStorage.clear();
+		expect(sdkHoldsUser("abc-123")).toBe(false);
+		await act(async () => root.render(<AdiveryAd session={withRef} onWatched={jest.fn()} onAbort={jest.fn()} />));
+		expect(show).toHaveBeenCalledWith({ appId: "app", placementId: "pl", userId: "abc-123" });
+		expect(sdkHoldsUser("abc-123")).toBe(true);
+		expect(sdkHoldsUser("someone-else")).toBe(false);
+		expect(sdkHoldsUser(undefined)).toBe(false);
+	});
+
 	it("outside the app: says where it plays", async () => {
 		await act(async () => root.render(<AdiveryAd session={session} onWatched={jest.fn()} onAbort={jest.fn()} />));
 		expect(host.textContent).toContain("فقط در اپ اندروید");

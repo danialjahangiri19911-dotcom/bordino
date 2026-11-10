@@ -90,7 +90,7 @@ def attempt_payload(attempt: MissionAttempt | None) -> dict | None:
                 "reward_points": session.reward_points,
                 "min_watch_seconds": session.min_watch_seconds,
                 "provider": session.provider,
-                "creative": ad_reward.PROVIDERS[session.provider].creative() if session.provider in ad_reward.PROVIDERS else {},
+                "creative": ad_reward.PROVIDERS[session.provider].creative(session.customer) if session.provider in ad_reward.PROVIDERS else {},
             }
     return body
 

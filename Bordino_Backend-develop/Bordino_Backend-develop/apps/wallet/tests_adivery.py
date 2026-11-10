@@ -60,7 +60,10 @@ class AdiveryTests(TestCase):
     def test_the_app_alone_cannot_claim_only_adiverys_server_confirms(self):
         session = self.start()
         self.assertEqual(session["provider"], "adivery")
-        self.assertEqual(session["creative"], {"app_id": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee", "placement_id": PLACEMENT})
+        self.assertEqual(
+            session["creative"],
+            {"app_id": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee", "placement_id": PLACEMENT, "user_ref": ad_reward.player_ref(self.customer)},
+        )
         early = self.api.post(f"/api/v1/wallet/ad-reward/sessions/{session['session_id']}/complete/", {}, format="json")
         self.assertEqual((early.status_code, early.json()["errors"]["code"]), (409, "pending"))
         self.assertEqual(self.points(), 0)
@@ -168,6 +171,112 @@ class AdiveryTests(TestCase):
         self.assertEqual(ad_reward.provider().name, "demo")
         row.delete()
         self.assertEqual(ad_reward.provider().name, "demo")  # the built-in default again
+
+
+@override_settings(CACHES=LOCMEM)
+class AdiveryPlayerRefTests(TestCase):
+    """The SDK sends the id it held when the ad was LOADED (ahead of the tap): the player's signed
+    reference, matched to their latest view still waiting for Adivery."""
+
+    def setUp(self):
+        cache.clear()
+        setting("AD_REWARD_PROVIDER", "adivery")
+        setting("ADIVERY_REWARDED_PLACEMENT_ID", PLACEMENT)
+        setting("AD_REWARD_POINTS", "5")
+        self.secret = ad_reward.adivery_callback_secret()
+        self.customer, self.user = self.player("9120009101")
+
+    def player(self, phone):
+        user = get_user_model().objects.create_user(phone_number=phone)
+        service = UserRegistrationService()
+        service._create_customer_for_user(user)  # pylint: disable=protected-access
+        service._create_wallet_for_user(user)  # pylint: disable=protected-access
+        return user.customer, user
+
+    def points(self, user=None):
+        return TokenWalletAccount.objects.get(wallet__owner=user or self.user).amount
+
+    def callback(self, uid, eid, pid=PLACEMENT):
+        return APIClient().get(f"/api/v1/wallet/ad-reward/adivery/{self.secret}/", {"uid": uid, "pid": pid, "eid": eid})
+
+    def test_the_offer_and_the_view_carry_the_players_reference(self):
+        ref = ad_reward.player_ref(self.customer)
+        self.assertRegex(ref, r"^[0-9a-f]{32}-[0-9a-f]{16}$")
+        self.assertEqual(ad_reward.offer(self.customer).creative["user_ref"], ref)
+        other, _ = self.player("9120009102")
+        self.assertNotEqual(ad_reward.player_ref(other), ref)
+
+    def test_a_confirmation_pays_the_players_latest_waiting_view_once(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        left = ad_reward.start(self.customer, "sudoku")  # opened, never watched
+        AdRewardSession.objects.filter(pk=left.pk).update(create_time=timezone.now() - timedelta(minutes=5))
+        watched = ad_reward.start(self.customer, "game2048")
+        ref = ad_reward.player_ref(self.customer)
+        ok = self.callback(ref, "ev-p1")
+        self.assertEqual((ok.status_code, ok.json()["result"]["paid"]), (200, True))
+        watched.refresh_from_db()
+        self.assertEqual((watched.status, watched.external_event_id), (AdRewardSession.Status.REWARDED, "ev-p1"))
+        self.assertIsNone(AdRewardSession.objects.get(pk=left.pk).verified_at)
+        again = self.callback(ref, "ev-p1")  # Adivery repeats it: the same view, nothing more
+        self.assertTrue(again.json()["result"]["already"])
+        self.assertEqual(self.points(), 5)
+        # Another event pays the next waiting view (the left one, still within its time) — once.
+        self.assertEqual(self.callback(ref, "ev-p2").json()["result"]["paid"], True)
+        self.assertEqual(self.points(), 10)
+        self.assertEqual(self.callback(ref, "ev-p3").status_code, 404)  # nothing waits any more
+        self.assertEqual(self.points(), 10)
+
+    def test_an_expired_view_is_not_matched(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        old = ad_reward.start(self.customer, "sudoku")
+        AdRewardSession.objects.filter(pk=old.pk).update(create_time=timezone.now() - ad_reward.SESSION_TTL - timedelta(seconds=1))
+        self.assertEqual(self.callback(ad_reward.player_ref(self.customer), "ev-old").status_code, 404)
+        self.assertEqual(self.points(), 0)
+
+    def test_a_forged_or_borrowed_reference_pays_nobody(self):
+        ad_reward.start(self.customer, "sudoku")
+        ref = ad_reward.player_ref(self.customer)
+        forged = ref[:-1] + ("0" if ref[-1] != "0" else "1")
+        self.assertEqual(self.callback(forged, "ev-f").status_code, 400)
+        other, other_user = self.player("9120009103")
+        ad_reward.start(other, "sudoku")
+        self.assertEqual(self.callback(ref, "ev-shared").status_code, 200)
+        # The same event cannot be used for another player's view.
+        self.assertEqual(self.callback(ad_reward.player_ref(other), "ev-shared").status_code, 409)
+        self.assertEqual((self.points(), self.points(other_user)), (5, 0))
+
+    def test_a_view_the_app_was_trusted_for_is_confirmed_without_paying_again(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        setting("ADIVERY_TRUST_APP", "true")
+        session = ad_reward.start(self.customer, "sudoku")
+        AdRewardSession.objects.filter(pk=session.pk).update(create_time=timezone.now() - timedelta(seconds=6))
+        ad_reward.complete(self.customer, session.pk)
+        self.assertEqual(self.points(), 5)
+        late = self.callback(ad_reward.player_ref(self.customer), "ev-t")
+        self.assertEqual((late.status_code, late.json()["result"]["already"]), (200, True))
+        session.refresh_from_db()
+        self.assertEqual(session.external_event_id, "ev-t")
+        self.assertEqual(self.points(), 5)
+
+    def test_a_video_mission_is_paid_by_the_players_reference(self):
+        category = MissionCategory.objects.create(name="ویدیو")
+        mission = Mission.objects.create(
+            title="ویدیو", category=category, kind=Mission.Kind.VIDEO, points=12, repeat=Mission.Repeat.DAILY, daily_limit=3
+        )
+        attempt = missions.start(self.customer, mission.pk)
+        self.assertEqual(self.callback(ad_reward.player_ref(self.customer), "m-ref").status_code, 200)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.status, MissionAttempt.Status.COMPLETED)
+        self.assertEqual(self.points(), 12)
 
 
 @override_settings(CACHES=LOCMEM)

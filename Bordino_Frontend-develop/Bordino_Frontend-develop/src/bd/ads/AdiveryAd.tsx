@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
-import { adsPlugin } from "./native";
+import { adsPlugin, markSdkUser } from "./native";
 import type { AdPlayerProps } from "./players";
 
 /**
- * An Adivery rewarded video, played by the Android app's SDK (it covers the screen). The view's
- * session id goes to Adivery as its user id; Adivery's server confirms the view to ours with it,
- * which is what pays. «rewarded» from the SDK only means: ask the server now.
+ * An Adivery rewarded video, played by the Android app's SDK (it covers the screen). The player's
+ * signed reference goes to Adivery as its user id (the SDK sends it with the request that loads the
+ * ad); Adivery's server confirms the view to ours with it, which is what pays. «rewarded» from the
+ * SDK only means: ask the server now.
  */
 export default function AdiveryAd({ session, onWatched, onAbort }: Readonly<AdPlayerProps>) {
 	const [failed, setFailed] = useState<string | null>(null);
@@ -30,13 +31,18 @@ export default function AdiveryAd({ session, onWatched, onAbort }: Readonly<AdPl
 		if (started.current) return;
 		started.current = true;
 		const plugin = adsPlugin();
-		const { app_id, placement_id } = session.creative;
+		const { app_id, placement_id, user_ref } = session.creative;
 		if (!plugin || !app_id || !placement_id) {
 			setFailed("این ویدیو فقط در اپ اندروید بردینو پخش می‌شود.");
 			return;
 		}
-		plugin
-			.show({ appId: app_id, placementId: placement_id, userId: session.session_id })
+		// (a server without player references: the view's own id, as before)
+		const userId = user_ref || session.session_id;
+		const shown = plugin.show({ appId: app_id, placementId: placement_id, userId });
+		// The plugin gives the SDK this id at once: the next ad (the SDK loads one after this view)
+		// is requested with it, so it may be loaded ahead from now on.
+		if (user_ref) markSdkUser(user_ref);
+		shown
 			.then(({ rewarded }) => {
 				if (!alive.current) return;
 				if (rewarded) onWatched();
