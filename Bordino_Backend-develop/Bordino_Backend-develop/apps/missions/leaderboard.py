@@ -372,10 +372,13 @@ def board(mystery: Mystery, customer=None, offset: int = 0, limit: int | None = 
         count = len(ranked)
         end = count if cap is None else min(count, cap)
         page = ranked[offset : min(offset + limit, end)]
-        rows = [_snap_row(r, me_id, cfg) for r in page]
         mine = next((r for r in ranked if me_id is not None and r["customer"] == str(me_id)), None)
+        # The ranking stays as frozen; who shows their name is asked now (a player may have
+        # withdrawn it since).
+        shown = consenting([r.get("run") for r in page + ([mine] if mine else [])])
+        rows = [_snap_row(r, me_id, cfg, shown) for r in page]
         out.update(final=True, finalized_at=snap.create_time.isoformat())
-        out["me"] = _snap_row(mine, me_id, cfg) if mine else None
+        out["me"] = _snap_row(mine, me_id, cfg, shown) if mine else None
     else:
         ranked_ids = _ordered_ids(cur, cfg)
         count = len(ranked_ids)
@@ -398,10 +401,19 @@ def board(mystery: Mystery, customer=None, offset: int = 0, limit: int | None = 
     return out
 
 
-def _snap_row(r: dict, me_id, cfg: dict) -> dict:
+def consenting(run_ids) -> set[str]:
+    """Of these runs, those whose players show their name and picture NOW."""
+    ids = [r for r in run_ids if r]
+    if not ids:
+        return set()
+    return {str(pk) for pk in MysteryRun.objects.filter(pk__in=ids, show_identity=True).values_list("pk", flat=True)}
+
+
+def _snap_row(r: dict, me_id, cfg: dict, shown: set[str] | None = None) -> dict:
     mine = me_id is not None and r["customer"] == str(me_id)
     show = cfg["show"]
-    public = mine or r.get("public")
+    # Shown only while the player still agrees (frozen «public» and their consent now).
+    public = mine or (r.get("public") and (shown is None or str(r.get("run")) in shown))
     name = r.get("name") or ""
     return {
         "position": r["position"],

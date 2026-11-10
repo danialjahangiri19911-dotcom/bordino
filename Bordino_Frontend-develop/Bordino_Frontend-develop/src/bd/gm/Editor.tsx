@@ -1113,21 +1113,38 @@ export default function Editor({ id }: { id: string }) {
 		server.status === "archived" ||
 		server.latest_version?.status === "submitted";
 
-	const flush = async () => {
-		const d = latest.current;
-		if (!d) return;
-		latest.current = null;
-		setSave({ state: "saving" });
-		try {
-			const { game } = await saveDraft(id, d);
-			setProblems(game.problems);
-			// Switching between public and private changes what there is to share.
-			const kind = share.data?.result?.kind;
-			if (kind && kind !== (d.access === "private" ? "invite" : "public")) void share.refetch();
-			setSave({ state: "saved", at: new Date().toISOString() });
-		} catch (e) {
-			setSave({ state: "failed", error: gameErrorMessage(e) });
+	// Saves go out one after another (never two at once, never an older one last). An edit stays
+	// pending until the server has it: a failed save keeps it, and is tried again.
+	const saving = useRef<Promise<boolean>>(Promise.resolve(true));
+	const flush = (): Promise<boolean> => {
+		saving.current = saving.current.then(async () => {
+			const d = latest.current;
+			if (!d) return true;
+			setSave({ state: "saving" });
+			try {
+				const { game } = await saveDraft(id, d);
+				if (latest.current === d) latest.current = null; // (newer typing waits for its own save)
+				setProblems(game.problems);
+				// Switching between public and private changes what there is to share.
+				const kind = share.data?.result?.kind;
+				if (kind && kind !== (d.access === "private" ? "invite" : "public")) void share.refetch();
+				setSave(latest.current ? { state: "pending" } : { state: "saved", at: new Date().toISOString() });
+				return true;
+			} catch (e) {
+				setSave({ state: "failed", error: gameErrorMessage(e) });
+				return false;
+			}
+		});
+		return saving.current;
+	};
+	/** Everything typed is on the server (false: a save failed, the edits are still here). */
+	const saveAll = async (): Promise<boolean> => {
+		window.clearTimeout(timer.current);
+		for (let i = 0; i < 3; i++) {
+			if (!(await flush())) return false;
+			if (!latest.current) return true;
 		}
+		return !latest.current;
 	};
 
 	const update = (next: Definition) => {
@@ -1184,7 +1201,11 @@ export default function Editor({ id }: { id: string }) {
 
 	const act = async (a: GameAction) => {
 		setAsking(null);
-		await flush();
+		// The action works on what the server has: never on an older draft than the one on screen.
+		if (!(await saveAll())) {
+			setAction({ busy: null, message: "آخرین تغییرات ذخیره نشد؛ اول ذخیره را دوباره امتحان کن.", ok: false });
+			return;
+		}
 		setAction({ busy: a, message: null });
 		try {
 			const { game } = await gameAction(id, a, a === "publish" ? { new_edition: edition === "new" } : {});
@@ -1224,6 +1245,8 @@ export default function Editor({ id }: { id: string }) {
 	};
 
 	const v = server.latest_version;
+	// The approved version is what «انتشار» publishes; the draft was changed after it was approved.
+	const editedAfterApproval = v?.status === "approved" && server.status === "draft";
 	const saveText =
 		save.state === "pending" || save.state === "saving"
 			? "در حال ذخیره…"
@@ -1673,7 +1696,7 @@ export default function Editor({ id }: { id: string }) {
 					) : null}
 					{!locked &&
 					server.status !== "archived" &&
-					!(v?.status === "approved") ? (
+					(v?.status !== "approved" || editedAfterApproval) ? (
 						<button
 							type="button"
 							className="bd-action"
@@ -1681,9 +1704,11 @@ export default function Editor({ id }: { id: string }) {
 							onClick={() => void act("submit")}
 						>
 							<Icon name="shield-check" />{" "}
-							{live
-								? "فرستادن نسخهٔ تازه برای بررسی"
-								: "فرستادن برای بررسی بردینو"}
+							{editedAfterApproval
+								? "فرستادن تغییرات برای بررسی"
+								: live
+									? "فرستادن نسخهٔ تازه برای بررسی"
+									: "فرستادن برای بررسی بردینو"}
 						</button>
 					) : null}
 					{v?.status === "approved" ? (
@@ -1693,10 +1718,16 @@ export default function Editor({ id }: { id: string }) {
 								{v.fee_toman
 									? ` هزینهٔ انتشار: ${fa(v.fee_toman)} تومان${v.fee_paid ? " (پرداخت شد)" : ""}.`
 									: " انتشار هزینه‌ای ندارد."}
-								{d.budget_points
-									? ` با انتشار، ${fa(d.budget_points)} امتیاز برای جایزه‌ها از کیف امتیازت کنار گذاشته می‌شود.`
+								{v.budget_points
+									? ` با انتشار، ${fa(v.budget_points)} امتیاز برای جایزه‌ها از کیف امتیازت کنار گذاشته می‌شود.`
 									: ""}
 							</p>
+							{editedAfterApproval ? (
+								<Notice tone="warn">
+									بعد از تأیید، بازی را تغییر داده‌ای. «انتشار» همان نسخهٔ تأییدشده (نسخهٔ {fa(v.number)}) را منتشر
+									می‌کند، نه تغییرات تازه را؛ برای انتشار تغییرات، اول آن‌ها را برای بررسی بفرست.
+								</Notice>
+							) : null}
 							{server.next_publish === "continue" ? (
 								<div className="gm-choice-grid" role="radiogroup" aria-label="دورهٔ بازی">
 									<button type="button" role="radio" aria-checked={edition === "continue"} className="gm-choice" onClick={() => setEdition("continue")}>
@@ -1727,8 +1758,8 @@ export default function Editor({ id }: { id: string }) {
 								<div className="my-hint-ask">
 									<span>
 										مطمئنی؟ بازی برای بازیکنان باز می‌شود
-										{d.budget_points
-											? ` و ${fa(d.budget_points)} امتیاز کنار گذاشته می‌شود`
+										{v.budget_points
+											? ` و ${fa(v.budget_points)} امتیاز کنار گذاشته می‌شود`
 											: ""}
 										.
 									</span>

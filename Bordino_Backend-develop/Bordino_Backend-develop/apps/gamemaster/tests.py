@@ -930,3 +930,175 @@ class GameMasterLeaderboardTests(TestCase):
 
     def points(self, user):
         return TokenWalletAccount.objects.get(wallet__owner=user).amount
+
+
+@override_settings(CACHES=LOCMEM)
+class GameMasterCodexAuditTests(TestCase):
+    """The Codex Game Master audit of 2026-11-10: budget refunds never meet still-winnable points."""
+
+    setUp = GameMasterLeaderboardTests.setUp
+    player = GameMasterLeaderboardTests.player
+    publish = GameMasterLeaderboardTests.publish
+    play = GameMasterLeaderboardTests.play
+    board = GameMasterLeaderboardTests.board
+
+    def points(self, user):
+        return TokenWalletAccount.objects.get(wallet__owner=user).amount
+
+    def move(self, api, m, i, answer):
+        step = engine.steps_of(m)[i]
+        return api.post(f"/api/v1/missions/mysteries/{m.pk}/steps/{step.pk}/checkin/", answer, format="json")
+
+    def never_over(self, version):
+        s = budget.summary(version)
+        self.assertLessEqual(s["spent"] + s["released"], s["reserved"], s)
+
+    # 1
+    def test_publishing_after_the_end_never_reopens_and_refunds_what_can_still_be_won(self):
+        gid, m1 = self.publish(quiz())
+        v1 = Game.objects.get(pk=gid).live_version
+        a = self.player()
+        self.play(a, m1, upto=1)
+        Mystery.objects.filter(pk=m1.pk).update(ends_at=timezone.now() - timedelta(seconds=1))  # no timer ran yet
+        self.assertEqual(Game.objects.get(pk=gid).status, "published")
+        _gid, m2 = self.publish(quiz(), gid=gid)
+        self.assertEqual(Game.objects.get(pk=gid).edition, 2)  # a new edition: the ended one is not reopened
+        self.assertLess(Mystery.objects.get(pk=m1.pk).ends_at, timezone.now())  # not extended
+        self.assertEqual(body(self.move(a, m1, 1, {"answer": "ب"}))["code"], "expired")  # its player wins nothing more
+        self.never_over(v1)
+        self.assertEqual(budget.summary(v1)["left"], 0)  # and what nobody can win went back, once
+
+    # 2
+    def test_a_stale_timer_run_never_ends_or_refunds_a_newly_published_edition(self):
+        gid, m1 = self.publish(quiz())
+        Mystery.objects.filter(pk=m1.pk).update(ends_at=timezone.now() - timedelta(seconds=1))
+        stale = Game.objects.select_related("live_version").get(pk=gid)  # the timer loaded it…
+        _gid, m2 = self.publish(quiz(), gid=gid)  # …then the creator published a new edition
+        services.settle(stale)
+        game = Game.objects.get(pk=gid)
+        self.assertEqual((game.status, game.live_version.mystery.pk), ("published", m2.pk))
+        v2 = game.live_version
+        self.assertFalse(GameBudgetLedger.objects.filter(version=v2, kind=GameBudgetLedger.Kind.RELEASE).exists())
+        self.assertEqual(budget.summary(v2)["left"], budget.summary(v2)["reserved"])
+        self.assertEqual(self.player().post(f"/api/v1/missions/mysteries/{m2.pk}/start/", {}, format="json").status_code, 201)
+
+    # 3
+    def test_an_archived_game_cannot_pay_even_if_its_runtime_is_switched_back_on(self):
+        gid, m = self.publish(quiz())
+        a = self.player()
+        self.play(a, m, upto=1)
+        services.archive(self.creator, gid)
+        Mystery.objects.filter(pk=m.pk).update(is_active=True)  # (as the old admin switch could)
+        before = budget.summary(Game.objects.get(pk=gid).live_version)
+        self.assertEqual(body(self.move(a, m, 1, {"answer": "ب"}))["code"], "inactive")
+        self.assertEqual(budget.summary(Game.objects.get(pk=gid).live_version), before)
+
+    def test_the_admin_cannot_switch_a_creator_game_on_or_off(self):
+        from django.contrib import admin as django_admin  # pylint: disable=import-outside-toplevel
+
+        gid, m = self.publish(quiz())
+        services.archive(self.creator, gid)
+        model_admin = django_admin.site._registry[Mystery]  # pylint: disable=protected-access
+        self.assertIn("is_active", model_admin.get_readonly_fields(None, Mystery.objects.get(pk=m.pk)))
+        self.client.force_login(self.reviewer)
+        changelist = "/admin/missions/mystery/"
+        data = {"form-TOTAL_FORMS": "1", "form-INITIAL_FORMS": "1", "form-0-id": str(m.pk), "form-0-is_active": "on", "form-0-is_visible": "on", "form-0-order": "0", "_save": "Save"}
+        self.client.post(changelist, data)
+        self.assertFalse(Mystery.objects.get(pk=m.pk).is_active)
+
+    # 4
+    def test_a_failed_wrap_up_is_finished_by_the_next_run(self):
+        gid, m = self.publish(quiz())
+        v = Game.objects.get(pk=gid).live_version
+        Mystery.objects.filter(pk=m.pk).update(ends_at=timezone.now() - timedelta(seconds=1))
+        real = budget.release
+        with mock.patch.object(budget, "release", side_effect=RuntimeError("db hiccup")):
+            services.tick()  # (the timer logs it and goes on)
+        self.assertGreater(budget.summary(v)["left"], 0)
+        with mock.patch.object(budget, "release", side_effect=real):
+            services.tick()
+        self.assertEqual(budget.summary(v)["left"], 0)
+        services.tick()
+        self.assertEqual(GameBudgetLedger.objects.filter(version=v, kind=GameBudgetLedger.Kind.RELEASE).count(), 1)
+
+    def test_a_failed_archive_refund_is_finished_later(self):
+        gid, m = self.publish(quiz())
+        v = Game.objects.get(pk=gid).live_version
+        with mock.patch.object(budget, "release", side_effect=RuntimeError("db hiccup")):
+            with self.assertRaises(RuntimeError):
+                services.archive(self.creator, gid)
+        self.assertEqual(Game.objects.get(pk=gid).status, "archived")
+        self.assertGreater(budget.summary(v)["left"], 0)
+        services.tick()  # (the timer finishes it)
+        self.assertEqual(budget.summary(v)["left"], 0)
+        services.archive(self.creator, gid)  # (and calling archive again changes nothing)
+        self.assertEqual(GameBudgetLedger.objects.filter(version=v, kind=GameBudgetLedger.Kind.RELEASE).count(), 1)
+
+    # 5
+    def test_a_pause_stops_players_of_every_version(self):
+        gid, m1 = self.publish(quiz())
+        a = self.player()
+        self.play(a, m1, upto=1)
+        _gid, m2 = self.publish(quiz(points=20), gid=gid)  # the same edition goes on: m1's player may finish
+        self.assertEqual(Game.objects.get(pk=gid).edition, 1)
+        services.set_paused(self.reviewer, gid, True, by_admin=True)
+        self.assertEqual(body(self.move(a, m1, 1, {"answer": "ب"}))["code"], "inactive")
+        services.set_paused(self.reviewer, gid, False, by_admin=True)
+        self.assertEqual(self.move(a, m1, 1, {"answer": "ب"}).status_code, 200)
+
+    # 6
+    def test_withdrawing_the_name_hides_it_on_a_frozen_board_too(self):
+        from apps.missions import leaderboard as boards  # pylint: disable=import-outside-toplevel
+
+        gid, m = self.publish(quiz(leaderboard={"preset": "score"}))
+        ali, sara = self.player("ali"), self.player("sara")
+        self.play(ali, m, upto=2)
+        self.play(sara, m, upto=1)
+        ali.post(f"/api/v1/missions/mysteries/{m.pk}/leaderboard/identity/", {"show": True}, format="json")
+        boards.finalize(m)
+        self.assertEqual(self.board(sara, m)["rows"][0]["name"], "ali")
+        ali.post(f"/api/v1/missions/mysteries/{m.pk}/leaderboard/identity/", {"show": False}, format="json")
+        row = self.board(sara, m)["rows"][0]
+        self.assertEqual((row["name"], row["avatar"]), ("a***", None))
+        self.assertEqual(body(self.api.get(f"/api/v1/gm/games/{gid}/leaderboard/"))["board"]["rows"][0]["name"], "a***")
+        self.assertEqual(self.board(ali, m)["rows"][0]["name"], "ali")  # their own row: still theirs
+
+    # 7
+    def test_an_earlier_edition_is_settled_on_its_own(self):
+        gid, m1 = self.publish(quiz(leaderboard={"preset": "score"}, availability={"expiry": "duration", "duration_value": 1, "duration_unit": "days", "after": "finish", "grace_hours": 24}))
+        v1 = Game.objects.get(pk=gid).live_version
+        a = self.player()
+        self.play(a, m1, upto=1)
+        _gid, m2 = self.publish(quiz(), gid=gid, new_edition=True)  # edition 2, no end
+        Mystery.objects.filter(pk=m1.pk).update(ends_at=timezone.now() - timedelta(days=2), grace_ends_at=timezone.now() - timedelta(days=1))
+        services.tick()
+        services.tick()
+        from apps.missions import leaderboard as boards  # pylint: disable=import-outside-toplevel
+
+        self.assertEqual(budget.summary(v1)["left"], 0)
+        self.never_over(v1)
+        # (what was free at the new edition went back then, the rest when its grace ended: no more)
+        releases = GameBudgetLedger.objects.filter(version=v1, kind=GameBudgetLedger.Kind.RELEASE).count()
+        services.tick()
+        self.assertEqual(GameBudgetLedger.objects.filter(version=v1, kind=GameBudgetLedger.Kind.RELEASE).count(), releases)
+        self.assertIsNotNone(boards.snapshot_of(Mystery.objects.get(pk=m1.pk)))
+        self.assertEqual(Game.objects.get(pk=gid).status, "published")  # edition 2 goes on
+
+    # 10
+    def test_a_live_payment_without_a_verified_amount_is_not_a_payment(self):
+        from apps.gamemaster import zibal  # pylint: disable=import-outside-toplevel
+        from apps.gamemaster.models import GamePayment  # pylint: disable=import-outside-toplevel
+
+        gid = body(self.api.post("/api/v1/gm/games/", {"category": "pro"}, format="json"))["game"]["id"]
+        self.api.patch(f"/api/v1/gm/games/{gid}/", {"draft": quiz()}, format="json")
+        self.api.post(f"/api/v1/gm/games/{gid}/submit/", {}, format="json")
+        version = GameVersion.objects.filter(game_id=gid).order_by("-number").first()
+        services.review(self.reviewer, version.pk, "approve")
+        GameVersion.objects.filter(pk=version.pk).update(fee_toman=70_000)
+        with mock.patch.dict(services.DEFAULTS, {"GM_ZIBAL_MODE": "live", "GM_ZIBAL_MERCHANT": "m-1"}), mock.patch.object(zibal, "_post") as post:
+            post.return_value = {"result": 100, "trackId": 901}
+            self.api.post(f"/api/v1/gm/games/{gid}/pay/", {}, format="json")
+            post.return_value = {"result": 201}  # «paid» with no amount
+            self.assertEqual(body(self.api.post("/api/v1/gm/payments/verify/", {"trackId": "901", "success": "1"}, format="json"))["status"], "failed")
+        self.assertFalse(GameVersion.objects.get(pk=version.pk).fee_paid)
+        self.assertEqual(GamePayment.objects.get(track_id="901").status, GamePayment.Status.FAILED)

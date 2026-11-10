@@ -382,11 +382,22 @@ class MysteryAdmin(admin.ModelAdmin):
     )
 
     def get_readonly_fields(self, request, obj=None):
-        # A creator's game: as approved (only Bordino's pause — «فعال» — and listing stay editable;
-        # pausing is better done from «بازی‌های سازندگان»).
+        # A creator's game: as approved, its switch and listing too. Pausing, resuming and ending go
+        # through «بازی‌های سازندگان» / «بردینو ادمین», which keep its budget right (switching an
+        # archived game back on here would let its players earn points already given back).
         if obj is not None and obj.is_creator_game:
-            return self.CREATOR_LOCKED
+            return self.CREATOR_LOCKED + ("is_active", "is_visible")
         return ("owner", "source_version")
+
+    def save_model(self, request, obj, form, change):
+        # (also the list page's editable columns, which skip the read-only fields above)
+        if change and obj.is_creator_game:
+            locked = {"is_active", "is_visible"} & set(form.changed_data)
+            if locked:
+                for name in locked:
+                    setattr(obj, name, form.initial.get(name, getattr(type(obj).objects.get(pk=obj.pk), name)))
+                messages.warning(request, f"«{obj.title}»: روشن و خاموش کردن بازی سازنده فقط از «بازی‌های سازندگان» انجام می‌شود.")
+        super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
         from django.db.models import Count  # pylint: disable=import-outside-toplevel

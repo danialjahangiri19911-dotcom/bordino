@@ -297,6 +297,14 @@ def _check_open(mystery: Mystery):
     now = timezone.now()
     if not mystery.is_active:
         raise MissionError(UNAVAILABLE["inactive"], "inactive")
+    if mystery.source_version_id:
+        # A creator's game paused (by its creator or by Bordino) or archived: closed for every
+        # version still being played, whatever its own runtime says (its budget may be refunded).
+        from apps.gamemaster.models import Game  # pylint: disable=import-outside-toplevel
+
+        status = Game.objects.filter(versions__pk=mystery.source_version_id).values_list("status", flat=True).first()
+        if status in (Game.Status.PAUSED, Game.Status.ARCHIVED):
+            raise MissionError(UNAVAILABLE["inactive"], "inactive")
     if mystery.ends_at and now >= mystery.ends_at and not (mystery.grace_ends_at and now < mystery.grace_ends_at):
         raise MissionError(UNAVAILABLE["expired"], "expired")
     if mystery.starts_at and now < mystery.starts_at:

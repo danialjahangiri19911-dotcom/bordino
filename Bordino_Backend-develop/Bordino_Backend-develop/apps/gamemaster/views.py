@@ -68,6 +68,8 @@ def version_payload(v: GameVersion | None) -> dict | None:
         "fee_toman": v.fee_toman,
         "fee_paid": v.fee_paid,
         "published_at": v.published_at.isoformat() if v.published_at else None,
+        # What publishing THIS version reserves (the draft may have changed since it was sent).
+        "budget_points": int((v.definition or {}).get("budget_points") or 0),
     }
 
 

@@ -171,6 +171,8 @@ export interface VersionInfo {
 	review_note: string;
 	fee_toman: number;
 	fee_paid: boolean;
+	/** What publishing this version reserves (its own budget; the draft may differ). */
+	budget_points?: number;
 	published_at: string | null;
 }
 

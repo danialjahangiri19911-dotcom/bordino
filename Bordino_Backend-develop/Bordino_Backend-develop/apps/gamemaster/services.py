@@ -443,8 +443,10 @@ def confirm_payment(user, track_id: str, success: bool) -> GamePayment:
             result = zibal.verify(payment.track_id, sandbox_success=success)
         except zibal.ZibalError as exc:
             raise GameMasterError(str(exc), "gateway") from exc
-        if result.ok and result.amount_rial is not None and result.amount_rial != payment.amount_toman * 10:
-            result.ok = False  # paid a different amount: not this fee
+        if result.ok and payment.mode != "sandbox" and result.amount_rial != payment.amount_toman * 10:
+            result.ok = False  # no verified amount, or a different one: not this fee (live mode)
+        elif result.ok and result.amount_rial is not None and result.amount_rial != payment.amount_toman * 10:
+            result.ok = False
         payment.status = GamePayment.Status.PAID if result.ok else GamePayment.Status.FAILED
         payment.ref_number, payment.card = result.ref_number[:64], result.card[:32]
         payment.verified_at = timezone.now()
@@ -567,7 +569,11 @@ def publish(user, game_id, new_edition: bool = False) -> Game:
         if new_edition and not played_before:
             new_edition = False  # (the first publication is the first edition)
         previous_m = getattr(game.live_version, "mystery", None) if game.live_version else None
-        if played_before and not new_edition and previous_m is not None and game.status == Status.EXPIRED:
+        # (by its dates, not only the stored status: the timer may not have marked it yet)
+        previous_over = previous_m is not None and (
+            game.status == Status.EXPIRED or (previous_m.ends_at is not None and previous_m.ends_at <= now)
+        )
+        if played_before and not new_edition and previous_over:
             # An edition whose end passed for good (its result frozen) is not reopened: this
             # publication is its next edition, and the final result stays as it was.
             if boards.snapshot_of(previous_m) is not None or (boards.ended_at(previous_m) and boards.ended_at(previous_m) <= now):
@@ -643,22 +649,38 @@ def archive(actor, game_id, by_admin: bool = False) -> Game:
         else:
             game = owned(actor, game_id, lock=True)
         if game.status == Status.ARCHIVED:
-            return game
-        if game.versions.filter(status=VStatus.SUBMITTED).exists() and not by_admin:
+            # Already archived: only its settlement is finished (a refund may have failed before).
+            already = True
+        else:
+            already = False
+        if not already and game.versions.filter(status=VStatus.SUBMITTED).exists() and not by_admin:
             raise GameMasterError("این بازی در بررسی است؛ بعد از بررسی بایگانی کن.", "locked")
         # Every version players got (the live one and any it replaced): closed to everyone.
         played = list(game.versions.filter(mystery__isnull=False).select_related("mystery"))
-        for v in played:
-            _close(v.mystery, keep_players=False)
-        game.status = Status.ARCHIVED
-        game.save(update_fields=["status", "update_time"])
-        audit(game, actor, "admin_archive" if by_admin else "archive")
+        if not already:
+            for v in played:
+                _close(v.mystery, keep_players=False)
+            game.status = Status.ARCHIVED
+            game.save(update_fields=["status", "update_time"])
+            audit(game, actor, "admin_archive" if by_admin else "archive")
+    settle_archived(game, played)
+    return game
+
+
+def settle_archived(game: Game, played=None):
+    """An archived game's refunds and frozen result; repeatable (each release gives back only what is
+    still left, the board freezes once), marked done only after it all went through."""
+    key = f"settled-archive:{game.pk}"
+    if _done(key):
+        return
+    if played is None:
+        played = list(game.versions.filter(mystery__isnull=False).select_related("mystery"))
     for v in played:
         budget.release(v, "archived")  # (its own transaction; only what is still left)
     live = game.live_version
     if live is not None and getattr(live, "mystery", None) is not None:
         boards.finalize(live.mystery)  # (once; the history stays)
-    return game
+    once(game, key)
 
 
 def once(game: Game, key: str) -> bool:
@@ -706,38 +728,79 @@ def settle(game: Game, now=None) -> Game:
     - a live game whose end came is EXPIRED (not archived: its history stays, a new version or a
       new edition may open it again after review);
     - once nobody can make progress any more (its end, or the end of its grace), what is left of
-      the budget goes back to the creator and the leaderboard is frozen — once."""
-    live = game.live_version
-    mystery = getattr(live, "mystery", None) if live else None
-    if mystery is None:
-        return game
+      the budget goes back to the creator and the leaderboard is frozen — once, and again until it
+      succeeded (a failure half-way is finished by the next run);
+    - an earlier edition whose time is over is settled on its own, whatever the current one does.
+    Works on the game as it is now (read again under its lock), never on a copy loaded earlier: a
+    publication in between changes which version is live."""
     now = now or timezone.now()
-    if game.status in LIVE and mystery.ends_at and mystery.ends_at <= now:
-        if Game.objects.filter(pk=game.pk, status__in=LIVE).update(status=Status.EXPIRED, update_time=now):
-            audit(game, None, "expired", edition=game.edition, ends_at=mystery.ends_at.isoformat())
-            if once(game, f"expired:{mystery.pk}"):
-                grace = f" بازیکنانی که شروع کرده‌اند تا {_when_text(mystery.grace_ends_at)} وقت دارند تمامش کنند." if mystery.grace_ends_at else ""
-                _notify(game, "زمان بازی تو تمام شد", f"«{game.title}» دیگر بازیکن تازه نمی‌پذیرد.{grace}")
-                if mystery.grace_ends_at and mystery.grace_ends_at > now:
-                    _tell_players(mystery, "وقت تمام کردن بازی", f"«{game.title}»: تا {_when_text(mystery.grace_ends_at)} وقت داری تمامش کنی.", only_playing=True)
-        game.status = Status.EXPIRED
+    with transaction.atomic():
+        fresh = Game.objects.select_for_update(of=("self",)).select_related("live_version").filter(pk=game.pk).first()
+        if fresh is None:
+            return game
+        game = fresh
+        live = game.live_version
+        mystery = Mystery.objects.filter(source_version_id=live.pk).first() if live else None
+        if mystery is not None and game.status in LIVE and mystery.ends_at and mystery.ends_at <= now:
+            if Game.objects.filter(pk=game.pk, status__in=LIVE, live_version_id=live.pk).update(status=Status.EXPIRED, update_time=now):
+                game.status = Status.EXPIRED
+                audit(game, None, "expired", edition=game.edition, ends_at=mystery.ends_at.isoformat())
+                expired_now = True
+            else:
+                expired_now = False
+        else:
+            expired_now = False
+        if mystery is not None and game.status == Status.SCHEDULED and (not mystery.starts_at or mystery.starts_at <= now):
+            Game.objects.filter(pk=game.pk, status=Status.SCHEDULED, live_version_id=live.pk).update(status=Status.PUBLISHED)
+            game.status = Status.PUBLISHED
+    if mystery is None:
+        _settle_earlier_editions(game, now)
+        return game
+    if expired_now and once(game, f"expired:{mystery.pk}"):
+        grace = f" بازیکنانی که شروع کرده‌اند تا {_when_text(mystery.grace_ends_at)} وقت دارند تمامش کنند." if mystery.grace_ends_at else ""
+        _notify(game, "زمان بازی تو تمام شد", f"«{game.title}» دیگر بازیکن تازه نمی‌پذیرد.{grace}")
+        if mystery.grace_ends_at and mystery.grace_ends_at > now:
+            _tell_players(mystery, "وقت تمام کردن بازی", f"«{game.title}»: تا {_when_text(mystery.grace_ends_at)} وقت داری تمامش کنی.", only_playing=True)
     if game.status == Status.EXPIRED:
         over = boards.ended_at(mystery)
-        if over is not None and over <= now and once(game, f"wrapped:{game.pk}:{game.edition}:{mystery.pk}"):
-            _wrap_up(game, mystery)
-    if game.status == Status.SCHEDULED and (not mystery.starts_at or mystery.starts_at <= now):
-        Game.objects.filter(pk=game.pk, status=Status.SCHEDULED).update(status=Status.PUBLISHED)
-        game.status = Status.PUBLISHED
+        key = f"wrapped:{game.pk}:{game.edition}:{mystery.pk}"
+        if over is not None and over <= now and not _done(key):
+            _wrap_up(game, mystery)  # (repeatable: releases only what is still left; the board freezes once)
+            once(game, key)  # (only after it all went through)
+    _settle_earlier_editions(game, now)
     return game
+
+
+def _done(key: str) -> bool:
+    from apps.gamemaster.models import GameNotice  # pylint: disable=import-outside-toplevel
+
+    return GameNotice.objects.filter(key=key[:120]).exists()
+
+
+def _settle_earlier_editions(game: Game, now):
+    """An earlier edition (not the live version's) whose time is over: what its players can no longer
+    win goes back, and its result is frozen — once (retried until it went through)."""
+    live_id = game.live_version_id
+    for version in game.versions.filter(mystery__isnull=False).exclude(pk=live_id).select_related("mystery"):
+        m = version.mystery
+        if m.edition == game.edition:
+            continue  # (the current edition's earlier versions end with it: _wrap_up)
+        over = boards.ended_at(m)
+        key = f"wrapped-edition:{game.pk}:{m.edition}:{version.pk}"
+        if over is None or over > now or _done(key):
+            continue
+        budget.release(version, "expired")
+        boards.finalize(m)
+        once(game, key)
 
 
 def _wrap_up(game: Game, mystery: Mystery):
     """After the last possible move: the budget left goes back, the leaderboard is frozen, and its
-    players (if the board is theirs to see) and the creator are told."""
+    players (if the board is theirs to see) and the creator are told. Safe to run again."""
     for v in game.versions.filter(mystery__isnull=False):
         budget.release(v, "expired")
     snap = boards.finalize(mystery)
-    if snap is not None:
+    if snap is not None and once(game, f"final-notice:{game.pk}:{game.edition}:{mystery.pk}"):
         cfg = boards.clean(mystery.leaderboard)
         _notify(game, "نتیجهٔ نهایی جدول", f"جدول رده‌بندی «{game.title}» نهایی شد.")
         if cfg.get("after") not in ("hide", "creator") and cfg.get("visibility") != "creator":
@@ -769,15 +832,21 @@ def tick(now=None) -> int:
     """The timer (every few minutes): every played game settled and warned. Returns how many."""
     now = now or timezone.now()
     n = 0
+    import logging  # pylint: disable=import-outside-toplevel
+
     for game in Game.objects.filter(status__in=PLAYED, live_version__isnull=False).select_related("live_version", "owner__user"):
         try:
             settle(game, now)
             warn_soon(game, now)
             n += 1
         except Exception:  # pylint: disable=broad-except
-            import logging  # pylint: disable=import-outside-toplevel
-
             logging.getLogger(__name__).exception("Game Master tick failed for %s", game.pk)
+    # Archived games whose refunds did not all go through when they were archived.
+    for game in Game.objects.filter(status=Status.ARCHIVED, live_version__isnull=False).exclude(notices__key__startswith="settled-archive:"):
+        try:
+            settle_archived(game)
+        except Exception:  # pylint: disable=broad-except
+            logging.getLogger(__name__).exception("Game Master archive settlement failed for %s", game.pk)
     return n
 
 

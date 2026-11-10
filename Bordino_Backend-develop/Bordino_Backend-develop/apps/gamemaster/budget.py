@@ -91,15 +91,24 @@ def summary(version: GameVersion) -> dict:
     return {"reserved": reserved, "spent": spent, "released": released, "left": reserved - spent - released}
 
 
-def outstanding(version: GameVersion) -> int:
-    """What the players still playing can still win (kept back from a release)."""
-    mystery = getattr(version, "mystery", None)
+def outstanding(version: GameVersion) -> int | None:
+    """What the players can still win from this version (kept back from a release); None while its
+    game still takes new players (then nothing is free yet). Always read fresh from the database: a
+    publication may have just moved its dates (an extension), and a cached copy would see it ended."""
+    from apps.missions.models import Mystery  # pylint: disable=import-outside-toplevel
+
+    mystery = Mystery.objects.filter(source_version_id=version.pk).first()
     if mystery is None or not mystery.is_active:
         return 0
+    now = timezone.now()
     # Ended for good (its end, and the end of its grace, passed): nobody can win anything more.
     last = max(mystery.ends_at, mystery.grace_ends_at or mystery.ends_at) if mystery.ends_at else None
-    if last is not None and last <= timezone.now():
+    if last is not None and last <= now:
         return 0
+    started = MysteryRun.objects.filter(mystery=mystery).count()
+    taking_new = (mystery.ends_at is None or mystery.ends_at > now) and (mystery.capacity is None or started < mystery.capacity)
+    if taking_new:
+        return None
     from apps.missions.mystery import max_run_points  # pylint: disable=import-outside-toplevel
 
     full = max_run_points(mystery)
@@ -112,8 +121,13 @@ def release(version: GameVersion, reason: str = "end"):
     replaced). May run again later: each time only what became free since (players who were still
     playing a replaced version and finished or stopped), under the version's lock."""
     with transaction.atomic():
-        GameVersion.objects.select_for_update().filter(pk=version.pk).first()
-        left = summary(version)["left"] - outstanding(version)
+        version = GameVersion.objects.select_for_update().select_related("game__owner__user").filter(pk=version.pk).first()
+        if version is None:
+            return None
+        held = outstanding(version)
+        if held is None:
+            return None  # (still taking new players: its whole budget may still be won)
+        left = summary(version)["left"] - held
         if left <= 0:
             return None
         n = GameBudgetLedger.objects.filter(version=version, kind=Kind.RELEASE).count() + 1
