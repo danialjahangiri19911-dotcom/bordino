@@ -803,7 +803,7 @@ class AccountingThirdCheckTests(TestCase):
 
         with self.captureOnCommitCallbacks() as callbacks:
             SystemConfiguration.objects.create(key="TEST_COMMIT_CLEAR", value="9", value_type="int")
-            cache.set("system_config:TEST_COMMIT_CLEAR", 5)  # a read between the save and its commit
+            cache.set(SystemConfiguration.objects._cache_key("TEST_COMMIT_CLEAR"), 5)  # a read between the save and its commit  # pylint: disable=protected-access
         self.assertEqual(SystemConfiguration.objects.get("TEST_COMMIT_CLEAR"), 5)
         for callback in callbacks:
             callback()

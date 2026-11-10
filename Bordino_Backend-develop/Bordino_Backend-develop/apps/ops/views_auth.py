@@ -23,6 +23,14 @@ class OpsAuthThrottle(AnonRateThrottle):
     rate = "20/min"
 
 
+class OpsLogoutThrottle(AnonRateThrottle):
+    """Ending a session has its own, much wider allowance: a crowded sign-in bucket (anyone's failed
+    codes from the same address) must never keep a staff member's session alive."""
+
+    scope = "ops_logout"
+    rate = "300/min"
+
+
 SEND_TEXT = {
     "sent": "اگر این شماره عضو اپ ادمین باشد، کد ورود پیامک شد.",
     "wait": "کمی صبر کن؛ هر دقیقه فقط یک کد فرستاده می‌شود.",
@@ -42,17 +50,9 @@ class SendCodeView(APIView):
         phone = admin_otp.normalize_phone((request.data or {}).get("phone"))
         if not phone:
             return err("شمارهٔ موبایل معتبر نیست.")
+        # (the SMS itself goes out in the background: a staff number's answer takes no longer than
+        # anyone else's, and its failure looks the same)
         result = admin_otp.send_code(phone, who=roles.user_for_phone, scope="ops")
-        if result == "sms_failed":
-            # Only a staff number reaches the SMS: its failure must look like any other number's
-            # answer (and keep the same one-minute gap), or it would tell who is staff.
-            import logging  # pylint: disable=import-outside-toplevel
-
-            from django.core.cache import cache  # pylint: disable=import-outside-toplevel
-
-            logging.getLogger(__name__).warning("ops sign-in SMS failed for a staff number")
-            cache.set(admin_otp._keys(phone, "ops")[2], 1, admin_otp.RESEND_GAP)  # pylint: disable=protected-access
-            result = "sent"
         if result != "sent":
             return err(SEND_TEXT[result], result, 429)
         return Response({"message": SEND_TEXT["sent"]})
@@ -92,7 +92,7 @@ class LogoutView(APIView):
 
     authentication_classes = ()
     permission_classes = (AllowAny,)
-    throttle_classes = (OpsAuthThrottle,)
+    throttle_classes = (OpsLogoutThrottle,)
 
     def post(self, request):
         from django.contrib.auth import get_user_model  # pylint: disable=import-outside-toplevel

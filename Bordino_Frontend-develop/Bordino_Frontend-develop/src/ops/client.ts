@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 /**
@@ -150,22 +152,78 @@ export function sessionUser(): string {
 	return session()?.me?.id ?? "";
 }
 
+/** Session changes: this tab's own (ops-session) and any other tab's (storage). */
+export function subscribeSession(cb: () => void) {
+	window.addEventListener("ops-session", cb);
+	window.addEventListener("storage", cb);
+	return () => {
+		window.removeEventListener("ops-session", cb);
+		window.removeEventListener("storage", cb);
+	};
+}
+
+/** Who is signed in now ("" nobody; null before the page has read the device's storage): a
+ * component using it renders again when another tab signs in as someone else. */
+export function useSessionUser(): string | null {
+	return useSyncExternalStore(subscribeSession, sessionUser, () => null);
+}
+
+const REVOKE = "ops-revoke";
+const pendingRevokes = (): string[] => {
+	try {
+		const list = JSON.parse(localStorage.getItem(REVOKE) || "[]");
+		return Array.isArray(list) ? list.filter((x) => typeof x === "string").slice(-5) : [];
+	} catch {
+		return [];
+	}
+};
+const keepRevokes = (list: string[]) => {
+	try {
+		if (list.length) localStorage.setItem(REVOKE, JSON.stringify(list.slice(-5)));
+		else localStorage.removeItem(REVOKE);
+	} catch {
+		// storage blocked: nothing to keep
+	}
+};
+
+/** Asks the server to end one session; true once it has (or it was already over / not ours). */
+async function revoke(refresh: string): Promise<boolean> {
+	try {
+		const r = await fetch(API + "auth/logout/", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Accept-Language": "fa" },
+			body: JSON.stringify({ refresh }),
+		});
+		return r.ok || r.status === 400;
+	} catch {
+		return false;
+	}
+}
+
+/** Sign-outs the server did not confirm (offline, busy): tried again whenever the admin app opens. */
+export async function retryRevokes() {
+	const list = pendingRevokes();
+	if (!list.length) return;
+	const left: string[] = [];
+	for (const refresh of list) if (!(await revoke(refresh))) left.push(refresh);
+	keepRevokes(left);
+}
+
 /** Ends the session on the server (by its refresh token: works after the access token expired),
  * then forgets it here, with every cached admin answer. */
 export async function signOut(clear: () => void) {
 	const s = session();
-	try {
-		if (s?.refresh) await ops("auth/logout/", "POST", { refresh: s.refresh });
-	} catch {
-		// forgotten here anyway; the server refuses the session once its refresh expires
-	}
+	// Not confirmed by the server: kept aside and sent again next time (never just forgotten while it
+	// still works there).
+	if (s?.refresh && !(await revoke(s.refresh))) keepRevokes([...pendingRevokes(), s.refresh]);
 	saveSession(null);
 	clear();
 }
 
 /** A GET that refreshes with the page (and after each action that invalidates "ops"). */
 export function useOps<T>(path: string | null, refetchInterval?: number) {
-	const who = typeof window === "undefined" ? "" : sessionUser();
+	// (a hook: another tab signing in as someone else renders this again, under their key)
+	const who = useSessionUser() ?? "";
 	return useQuery<T, OpsError>({
 		queryKey: ["ops", who, path],
 		// The answer is stored under `who`: fetched only while `who` is still the signed-in staff member

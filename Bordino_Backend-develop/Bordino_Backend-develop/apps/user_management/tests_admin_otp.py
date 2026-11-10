@@ -1,3 +1,4 @@
+import unittest
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -5,6 +6,13 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from apps.user_management import admin_otp
+
+def setUpModule():
+    # The SMS goes out in the background in production; here it runs at once, inside the request.
+    patcher = mock.patch.object(admin_otp, "_deliver", side_effect=lambda job: job())
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+
 
 LOGIN = "/admin/login/"
 ADMIN_PHONE = "9128007728"
@@ -89,13 +97,43 @@ class AdminOTPLoginTests(TestCase):
         self.send_sms.assert_called_once()
         self.assertIn("کمی صبر کنید", resp.content.decode())
 
-    def test_sms_failure_is_reported_and_leaves_no_code(self):
+    def test_sms_failure_looks_like_any_answer_and_leaves_no_code(self):
         self.send_sms.return_value = None
         resp = self.request_code()
-        self.assertIn("ارسال پیامک ناموفق", resp.content.decode())
+        self.assertIn("اگر این شماره مجاز باشد", resp.content.decode())  # (a failure would tell who is listed)
         code = self.sent_code()
         self.client.post(LOGIN, {"action": "verify", "code": code})
         self.assertIsNone(self.logged_in_as())
+
+    def test_the_sms_is_not_waited_for(self):
+        jobs = []
+        with mock.patch.object(admin_otp, "_deliver", side_effect=jobs.append):
+            self.assertEqual(admin_otp.send_code(ADMIN_PHONE), "sent")
+            self.assertEqual(admin_otp.send_code("9120009999"), "sent")
+        # The listed number's SMS is a background job (the answer never waits for the gateway); the
+        # other number did the same work up front (a code record) and has no job.
+        self.send_sms.assert_not_called()
+        self.assertEqual(len(jobs), 1)
+        self.assertTrue(cache.get(admin_otp._keys("9120009999")[0]))  # pylint: disable=protected-access
+        jobs[0]()
+        self.send_sms.assert_called_once()
+
+    def test_an_old_code_check_racing_a_resend_never_logs_in_twice(self):
+        code_key = admin_otp._keys(ADMIN_PHONE)[0]  # pylint: disable=protected-access
+        admin_otp.send_code(ADMIN_PHONE)
+        first = self.sent_code()
+        old_record = cache.get(code_key)
+        self.assertIsNotNone(admin_otp.verify_code(ADMIN_PHONE, first))  # B uses the code
+        cache.delete(admin_otp._keys(ADMIN_PHONE)[2])  # pylint: disable=protected-access
+        admin_otp.send_code(ADMIN_PHONE)  # a resend: a new code
+        second = self.sent_code()
+        # A read the old record before B finished, and checks the same code now.
+        real_get = admin_otp.cache.get
+        reads = iter([old_record])
+        with mock.patch.object(admin_otp.cache, "get", side_effect=lambda k, *a: next(reads, None) or real_get(k, *a) if k == code_key else real_get(k, *a)):
+            self.assertIsNone(admin_otp.verify_code(ADMIN_PHONE, first))
+        # …and the new code was not removed by it.
+        self.assertIsNotNone(admin_otp.verify_code(ADMIN_PHONE, second))
 
     def test_offsite_next_is_ignored(self):
         self.client.post(LOGIN, {"action": "send", "phone": "09128007728", "next": "https://evil.example/"})

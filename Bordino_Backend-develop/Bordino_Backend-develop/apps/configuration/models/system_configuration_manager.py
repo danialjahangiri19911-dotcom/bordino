@@ -7,20 +7,32 @@ from django.db import models
 
 class SystemConfigurationManager(models.Manager):
     CACHE_KEY_PREFIX = "system_config:"
+    GENERATION_PREFIX = "system_config_gen:"
     CACHE_TIMEOUT = 3600
 
-    def _cache_key(self, key: str) -> str:
-        return f"{self.CACHE_KEY_PREFIX}{key}"
-
-    def _get_from_cache(self, key: str) -> Any | None:
+    # Each key's cached value lives under its current generation, and every change moves the
+    # generation on. A read that fetched the old value from the database just before a change, and
+    # caches it just after, writes it under the old generation, which nobody reads any more (deleting
+    # the key alone let such a late fill bring the old value back for an hour).
+    def _generation(self, key: str) -> int:
         try:
-            return cache.get(self._cache_key(key))
+            return int(cache.get(f"{self.GENERATION_PREFIX}{key}") or 0)
+        except Exception:
+            return 0
+
+    def _cache_key(self, key: str, generation: int | None = None) -> str:
+        gen = self._generation(key) if generation is None else generation
+        return f"{self.CACHE_KEY_PREFIX}{key}:{gen}"
+
+    def _get_from_cache(self, key: str, generation: int) -> Any | None:
+        try:
+            return cache.get(self._cache_key(key, generation))
         except Exception:
             return None
 
-    def _set_cache(self, key: str, value: Any) -> Any:
+    def _set_cache(self, key: str, value: Any, generation: int) -> Any:
         try:
-            cache.set(self._cache_key(key), value, timeout=self.CACHE_TIMEOUT)
+            cache.set(self._cache_key(key, generation), value, timeout=self.CACHE_TIMEOUT)
         except Exception:
             pass
         return value
@@ -57,15 +69,16 @@ class SystemConfigurationManager(models.Manager):
 
     def get(self, key: str, default: Any = None) -> Any:
         """Config: Redis cache → DB → env → default."""
-        val = self._get_from_cache(key)
+        generation = self._generation(key)  # (read BEFORE the database: a fill is filed under it)
+        val = self._get_from_cache(key, generation)
         if val is not None:
             return val
         val = self._get_from_db(key)
         if val is not None:
-            return self._set_cache(key, val)
+            return self._set_cache(key, val, generation)
         val = os.environ.get(key)
         if val is not None and str(val).strip():
-            return self._set_cache(key, self._cast_env(val, default))
+            return self._set_cache(key, self._cast_env(val, default), generation)
         return default
 
     def invalidate(
@@ -78,8 +91,13 @@ class SystemConfigurationManager(models.Manager):
             key = getattr(instance, "key", None)
         if not key:
             return
+        gen_key = f"{self.GENERATION_PREFIX}{key}"
         try:
-            cache.delete(self._cache_key(key))
+            old = self._cache_key(key)
+            # (no expiry: a generation that vanished would start again at 0 and could meet a late fill)
+            cache.add(gen_key, 0, timeout=None)
+            cache.incr(gen_key)
+            cache.delete(old)
         except Exception:
             pass
 

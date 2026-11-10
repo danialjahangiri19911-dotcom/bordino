@@ -9,7 +9,9 @@ the stock password form back (break-glass; see main_app/urls.py).
 
 import hashlib
 import hmac
+import logging
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 
 from django.conf import settings
 from django.contrib import admin
@@ -66,50 +68,83 @@ def _keys(phone, scope="admin"):
     return f"{base}:code", f"{base}:tries", f"{base}:gap", f"{base}:hour"
 
 
+# Each code is its own challenge: the stored record is "<challenge id>:<digest>", and its guesses and
+# its single use are counted under that id (a resend is a new id: never touched by an older check).
+def _challenge_keys(phone, scope, challenge):
+    base = f"{scope}_otp:{phone}"
+    return f"{base}:tries:{challenge}", f"{base}:used:{challenge}"
+
+
+_SMS_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="otp-sms")
+
+
+def _deliver(job):
+    """Runs the SMS in the background: how long the gateway takes (or whether it fails) never shows
+    in the answer, which would tell a listed number from any other."""
+    _SMS_POOL.submit(job)
+
+
 def send_code(phone, who=None, scope="admin"):
-    """Returns "sent", "wait", "limit" or "sms_failed". An unlisted number also gets
-    "sent" (nothing is sent) so the answer reveals nothing about the list.
+    """Returns "sent", "wait" or "limit". Every number gets "sent" after the same work (a code
+    record is kept for it); only a listed number is actually sent its code, in the background.
 
     `who(phone)` is the user allowed to log in with this number, or None (default: the Django
     admin's allowlist); `scope` keeps each login's codes and limits apart (the admin app: "ops")."""
     who = who or _admin_user
-    code_key, tries_key, gap_key, hour_key = _keys(phone, scope)
+    code_key, _tries, gap_key, hour_key = _keys(phone, scope)  # pylint: disable=unused-variable
     # Throttle before the list check so listed and unlisted numbers behave alike.
     if not cache.add(gap_key, 1, RESEND_GAP):
         return "wait"
     cache.add(hour_key, 0, 3600)
     if cache.incr(hour_key) > MAX_SENDS_PER_HOUR:
         return "limit"
-    if who(phone) is None:
-        return "sent"
-
+    allowed = who(phone) is not None
     code = "".join(secrets.choice("0123456789") for _ in range(CODE_LENGTH))
-    cache.set(code_key, _digest(phone, code, scope), CODE_TTL)
-    cache.set(tries_key, 0, CODE_TTL)
-    if SMSService().send_sms(phone, code) is None:
-        cache.delete_many([code_key, tries_key, gap_key])
-        return "sms_failed"
+    record = f"{secrets.token_hex(8)}:{_digest(phone, code, scope)}"
+    cache.set(code_key, record, CODE_TTL)
+    if not allowed:
+        return "sent"  # (nobody knows this code; checking it still finds no user)
+
+    def job():
+        try:
+            ok = SMSService().send_sms(phone, code) is not None
+        except Exception:  # pylint: disable=broad-except
+            ok = False
+        if not ok:
+            logging.getLogger(__name__).warning("%s sign-in SMS failed", scope)
+            # The code never arrived: it is burned. (The one-minute gap stays, as for any other
+            # number: a quicker second try would tell that this one is listed.)
+            if cache.get(code_key) == record:
+                cache.delete(code_key)
+
+    _deliver(job)
     return "sent"
 
 
 def verify_code(phone, code, who=None, scope="admin"):
     """The allowed user if `code` is the live code for `phone`, else None. Single use."""
     who = who or _admin_user
-    code_key, tries_key, _gap, _hour = _keys(phone, scope)
-    expected = cache.get(code_key)
-    if not expected:
+    code_key, _tries, _gap, _hour = _keys(phone, scope)
+    record = cache.get(code_key)
+    if not record:
         return None
+    challenge, _sep, expected = str(record).rpartition(":")
+    challenge = challenge or expected  # (a record from before challenge ids)
+    tries_key, used_key = _challenge_keys(phone, scope, challenge)
     cache.add(tries_key, 0, CODE_TTL)
     if cache.incr(tries_key) > MAX_ATTEMPTS:
-        cache.delete(code_key)
+        if cache.get(code_key) == record:
+            cache.delete(code_key)
         return None
     given = "".join(str(int(ch)) for ch in str(code or "") if ch.isdecimal())
     if not hmac.compare_digest(expected, _digest(phone, given, scope)):
         return None
-    # delete() is True only for the request that actually removed the key.
-    if not cache.delete(code_key):
+    # Single use: only the first request to mark THIS challenge used goes on (atomic add), however
+    # its check interleaves with others or with a resend.
+    if not cache.add(used_key, 1, CODE_TTL):
         return None
-    cache.delete(tries_key)
+    if cache.get(code_key) == record:
+        cache.delete(code_key)
     return who(phone)
 
 
@@ -121,7 +156,6 @@ SEND_MESSAGES = {
     "sent": ("info", "اگر این شماره مجاز باشد، کد ورود پیامک شد."),
     "wait": ("error", "کمی صبر کنید؛ هر دقیقه فقط یک کد فرستاده می‌شود."),
     "limit": ("error", "تعداد درخواست کد در این ساعت زیاد بوده است؛ بعداً دوباره تلاش کنید."),
-    "sms_failed": ("error", "ارسال پیامک ناموفق بود؛ دوباره تلاش کنید."),
 }
 
 

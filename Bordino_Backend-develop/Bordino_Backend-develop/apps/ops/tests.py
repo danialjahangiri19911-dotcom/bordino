@@ -1,3 +1,4 @@
+import unittest
 import uuid
 from unittest import mock
 
@@ -18,6 +19,17 @@ from apps.wallet.models import Bank, BankAccount, CurrencyTransaction
 from apps.wallet.tests import make_customer, rial
 
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+
+def setUpModule():
+    # The sign-in SMS goes out in the background in production; here it runs at once.
+    from apps.user_management import admin_otp  # pylint: disable=import-outside-toplevel
+
+    patcher = mock.patch.object(admin_otp, "_deliver", side_effect=lambda job: job())
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+
+
 SMS = "apps.user_management.services.sms.sms.SMSService.send_sms"
 O = "/api/v1/ops/"
 
@@ -448,3 +460,33 @@ class ConcurrentDecisionTests(TransactionTestCase):
         tx.refresh_from_db()
         expected = 40_000 if tx.status == "completed" else 100_000
         self.assertEqual(rial(player), expected)
+
+
+@override_settings(CACHES=LOCMEM, OPS_OWNERS=["9128007728"])
+class CodexPass4Tests(OpsTestCase):
+    """The ops re-check of 2026-11-10."""
+
+    def test_logout_works_when_the_sign_in_bucket_is_full(self):
+        tokens = tokens_for(self.finance)
+        anon = APIClient()
+        for _ in range(25):  # anyone's failed codes from this address fill the sign-in allowance
+            anon.post(O + "auth/verify/", {"phone": "09120001009", "code": "000000"}, format="json")
+        self.assertEqual(anon.post(O + "auth/verify/", {"phone": "09120001009", "code": "000000"}, format="json").status_code, 429)
+        r = anon.post(O + "auth/logout/", {"refresh": tokens["refresh"]}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        cache.clear()  # (the throttle again; the revocation must hold on its own)
+        self.assertEqual(APIClient().post(O + "auth/refresh/", {"refresh": tokens["refresh"]}, format="json").status_code, 401)
+
+    def test_a_late_cache_fill_never_brings_an_old_setting_back(self):
+        mgr = SystemConfiguration.objects
+        SystemConfiguration.objects.update_or_create(key="TEST_STALE_FILL", defaults={"value": "5", "value_type": "int"})
+        self.assertEqual(mgr.get("TEST_STALE_FILL"), 5)
+        mgr.invalidate("TEST_STALE_FILL")
+        generation = mgr._generation("TEST_STALE_FILL")  # pylint: disable=protected-access
+        old = mgr._get_from_db("TEST_STALE_FILL")  # a reader fetched 5 …  # pylint: disable=protected-access
+        row = SystemConfiguration.objects.filter(key="TEST_STALE_FILL").first()
+        row.value = "7"
+        row.save()  # … the admin app saves 7 (its signal clears the cache) …
+        mgr.invalidate("TEST_STALE_FILL")
+        mgr._set_cache("TEST_STALE_FILL", old, generation)  # … and the reader caches 5 late  # pylint: disable=protected-access
+        self.assertEqual(mgr.get("TEST_STALE_FILL"), 7)

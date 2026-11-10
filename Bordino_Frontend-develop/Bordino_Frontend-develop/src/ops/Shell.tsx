@@ -10,7 +10,7 @@ import Icon, { type IconName } from "@/bd/Icon";
 import { styleClass, useBdStyle } from "@/bd/appearance";
 import { LoadState } from "@/bd/ui";
 
-import { type OpsMe, type OpsRole, ROLE_NAME, session, signOut, useOps } from "./client";
+import { type OpsMe, type OpsRole, ROLE_NAME, retryRevokes, session, signOut, subscribeSession, useOps, useSessionUser } from "./client";
 
 export const OPS = {
 	home: "/ops",
@@ -50,19 +50,10 @@ export function allowed(me: OpsMe | undefined, roles: (OpsRole | "owner" | "any"
 	return roles.some((r) => r !== "owner" && r !== "any" && me.roles.includes(r));
 }
 
-function subscribe(cb: () => void) {
-	window.addEventListener("ops-session", cb);
-	window.addEventListener("storage", cb);
-	return () => {
-		window.removeEventListener("ops-session", cb);
-		window.removeEventListener("storage", cb);
-	};
-}
-
 /** Signed in to the admin app? (null while the page has not read the device's storage yet.) */
 export function useSignedIn(): boolean | null {
 	return useSyncExternalStore(
-		subscribe,
+		subscribeSession,
 		() => !!session()?.access,
 		() => null,
 	);
@@ -123,6 +114,19 @@ export default function OpsShell({
 	useEffect(() => {
 		if (signedIn === false) router.replace(OPS.login);
 	}, [signedIn, router]);
+	// Another tab signed in as someone else: a full page load, so nothing the previous staff member
+	// saw (lists, IBANs, settings) stays on this screen, not even until the next fetch.
+	const who = useSessionUser();
+	const seen = useRef<string | null>(null);
+	useEffect(() => {
+		if (who === null) return;
+		if (seen.current && who !== seen.current) location.reload();
+		else seen.current = who;
+	}, [who]);
+	// Sign-outs the server did not confirm earlier: sent again.
+	useEffect(() => {
+		void retryRevokes();
+	}, []);
 	if (!signedIn) return null;
 	const logout = async () => {
 		await signOut(() => queryClient.removeQueries({ queryKey: ["ops"] }));

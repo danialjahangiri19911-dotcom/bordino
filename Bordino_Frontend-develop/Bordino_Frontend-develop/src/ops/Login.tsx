@@ -9,7 +9,7 @@ import Icon from "@/bd/Icon";
 import { styleClass, useBdStyle } from "@/bd/appearance";
 import { Notice } from "@/bd/ui";
 
-import { type OpsMe, errorText, ops, saveSession, session } from "./client";
+import { type OpsMe, errorText, ops, retryRevokes, saveSession, session } from "./client";
 import { OPS } from "./Shell";
 
 const DIGITS: Record<string, string> = { "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4", "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9" };
@@ -29,6 +29,7 @@ export default function OpsLogin() {
 	useEffect(() => {
 		document.title = "ورود | بردینو ادمین";
 		if (session()?.access) router.replace(OPS.home);
+		void retryRevokes(); // (a sign-out the server did not confirm yet)
 	}, [router]);
 	const send = async (e?: FormEvent) => {
 		e?.preventDefault();
