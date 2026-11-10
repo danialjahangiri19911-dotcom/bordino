@@ -10,6 +10,28 @@
 
 :80 {
 	encode zstd gzip
+
+	# Calls to the Adivery reward-confirmation address (and anything else with "adivery" in its path):
+	# written to data/logs/adivery-access.log with the secret in the address masked, kept 90 days.
+	# Every other request is not logged.
+	log adivery {
+		output file /var/log/caddy/adivery-access.log {
+			roll_size 5MiB
+			roll_keep 10
+			roll_keep_for 2160h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "adivery/[A-Za-z0-9_-]{16,}" "adivery/<secret>"
+				resp_headers>Location regexp "adivery/[A-Za-z0-9_-]{16,}" "adivery/<secret>"
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+			}
+		}
+	}
+	@not_adivery not path_regexp (?i)adivery
+	log_skip @not_adivery
 	request_body {
 		max_size 50MB
 	}

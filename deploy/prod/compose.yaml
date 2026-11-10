@@ -127,6 +127,8 @@ services:
       - ./data/media:/srv/media:ro
       # The app's scripts/styles with their .br/.gz, copied by sync-next-static.sh at each front deploy.
       - ./data/next:/srv/next:ro
+      # The proxy access log of Adivery reward-confirmation calls only (see the Caddyfile).
+      - ./data/logs:/var/log/caddy
     depends_on:
       - web
       - front
