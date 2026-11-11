@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
-import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import GameSettings from "../GameSettings";
 import { fa } from "../format";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
@@ -342,7 +342,7 @@ export default function DowrGame() {
 		// (the game's phase now, not the last poll's: a game may have started a moment ago)
 		const now = game.current?.getState()?.phase ?? "setup";
 		if (!RUNNING.includes(now)) {
-			go();
+			askLeave(PLAIN_LEAVE, go);
 			return;
 		}
 		// Pause while asking; resume on «stay» only if this question is what paused it.

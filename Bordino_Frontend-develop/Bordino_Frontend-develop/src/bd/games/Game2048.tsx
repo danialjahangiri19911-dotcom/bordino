@@ -9,7 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { inertIf } from "./SudokuGame";
@@ -72,7 +72,12 @@ function View() {
 				push(R.games);
 			},
 		);
-	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? askExit() : push(R.games)));
+	const quit = () =>
+		askLeave(PLAIN_LEAVE, () => {
+			music.current?.stop();
+			push(R.games);
+		});
+	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? askExit() : quit()));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 	// A tap outside a question answers «stay» (its second button); start, win and loss need a choice.
 	useDismissOutside(!!confirm, dialogRef, () => setConfirm(""));
@@ -217,7 +222,7 @@ function View() {
 						<button type="button" className="g48-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? askExit() : push(R.games))}>
+						<button type="button" className="g48-icon" aria-label="خروج از بازی" disabled={game.isCharging} onClick={() => (playing ? askExit() : quit())}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>

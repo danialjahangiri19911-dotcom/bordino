@@ -9,7 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -110,7 +110,12 @@ export default function SudokuGame() {
 			},
 		);
 	};
-	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? askExit() : push(R.games)));
+	const quit = () =>
+		askLeave(PLAIN_LEAVE, () => {
+			music.current?.stop();
+			push(R.games);
+		});
+	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? askExit() : quit()));
 	// A tap outside the box: a question is answered «stay» (as its second button), a pause ends.
 	// The start, win and loss boxes stay: each needs a choice.
 	// The top bar is out of the way while a board is in play (GameBar: handle / pull at the top).
@@ -357,7 +362,7 @@ export default function SudokuGame() {
 						<button type="button" className="sd-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? askExit() : push(R.games))}>
+						<button type="button" className="sd-icon" aria-label="خروج از بازی" disabled={paying} onClick={() => (playing ? askExit() : quit())}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>

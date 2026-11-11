@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
@@ -343,7 +343,7 @@ export default function CrashGame() {
 			},
 			leave,
 		);
-	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? askExit() : leave()));
+	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? askExit() : askLeave(PLAIN_LEAVE, leave)));
 	useBrowserBackGuard(inPlay, askExit);
 	const panelBox = useRef<HTMLElement>(null);
 	useDismissOutside(!!panel, panelBox, () => setPanel(""));
@@ -434,7 +434,7 @@ export default function CrashGame() {
 						<button type="button" className="cr-icon" aria-label="اطلاعات بازی" aria-expanded={panel === "help"} onClick={() => setPanel(panel === "help" ? "" : "help")}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? askExit() : leave())}>
+						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? askExit() : askLeave(PLAIN_LEAVE, leave))}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>

@@ -8,7 +8,7 @@ import Icon, { type IconName } from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import { fa, faDate } from "../format";
 import { ICONS } from "../icons";
 import { R, useRequireLogin } from "../ui";
@@ -302,7 +302,7 @@ export default function PantomimeGame() {
 	const leave = () => {
 		const g = gameRef.current;
 		if (!g || g.phase === "finished") {
-			go();
+			askLeave(PLAIN_LEAVE, go);
 			return;
 		}
 		const wasPlaying = g.phase === "playing";

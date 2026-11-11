@@ -9,7 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import "./chicken.css";
@@ -296,7 +296,7 @@ export default function ChickenGame() {
 	// Android Back: closes the open panel, asks before leaving a round in play, else leaves (as the
 	// header's exit button does).
 	const inRound = (round?.status === "active" && round.id !== acknowledged.current) || view.phase === "jumping" || view.phase === "colliding" || game.busy;
-	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? askLeave(LEAVE, leave) : leave()));
+	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? askLeave(LEAVE, leave) : askLeave(PLAIN_LEAVE, leave)));
 	const dialogBox = useRef<HTMLDivElement>(null);
 	useDismissOutside(!!dialog, dialogBox, () => setDialog(""));
 	// The top bar is out of the way while a round is in play (GameBar: handle / pull at the top).
@@ -378,7 +378,7 @@ export default function ChickenGame() {
 						<button className="ck-icon-button" type="button" aria-label="راهنمای بازی" aria-expanded={dialog === "fair"} onClick={() => setDialog(dialog === "fair" ? "" : "fair")}>
 							<Icon name="circle-help" />
 						</button>
-						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : leave())}>
+						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : askLeave(PLAIN_LEAVE, leave))}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>

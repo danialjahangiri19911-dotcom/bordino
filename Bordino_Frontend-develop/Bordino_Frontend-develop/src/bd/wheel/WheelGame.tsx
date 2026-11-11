@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { useBackHandler } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { fa } from "../format";
 import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 import { R, usePoints, useRequireLogin } from "../ui";
@@ -291,7 +291,8 @@ export default function WheelGame() {
 		music.current?.stop();
 		push(R.home);
 	};
-	useBackHandler(true, () => (help ? setHelp(false) : spinning ? undefined : leave()));
+	const quit = () => askLeave(PLAIN_LEAVE, leave);
+	useBackHandler(true, () => (help ? setHelp(false) : spinning ? undefined : quit()));
 
 	if (!allowed) return null;
 
@@ -358,7 +359,7 @@ export default function WheelGame() {
 							<button type="button" className="wh-icon" aria-label="راهنمای گردونه" aria-expanded={help} onClick={() => setHelp(!help)}>
 								<Icon name="circle-help" />
 							</button>
-							<button type="button" className="wh-icon" aria-label="خروج از گردونه" disabled={spinning} onClick={leave}>
+							<button type="button" className="wh-icon" aria-label="خروج از گردونه" disabled={spinning} onClick={quit}>
 								<Icon name="arrow-left" />
 							</button>
 						</div>

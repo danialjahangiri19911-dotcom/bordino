@@ -75,6 +75,14 @@ export function useLeaveGuard(active: boolean, question: LeaveQuestion) {
  * A game's «leave now?» (its exit button, Back during a round): the one question sheet every game
  * shows, the same look and place. `stay` runs when the player stays (a paused timer resumes).
  */
+/** Leaving when nothing is at stake (no round running): still asked, the same in every game. */
+export const PLAIN_LEAVE: LeaveQuestion = {
+	title: "از بازی خارج می‌شوی؟",
+	text: "هر وقت خواستی، دوباره برگرد و بازی کن.",
+	yes: "خروج",
+	no: "ماندن",
+};
+
 export function askLeave(q: LeaveQuestion, go: () => void, stay?: () => void) {
 	if (ask) ask(q, go, stay);
 	else go();

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
-import { askLeave, useBackHandler } from "../back";
+import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { installLucideShim } from "../dowr/lucide";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type SpyConfig, useSpyConfig } from "./api";
@@ -269,7 +269,7 @@ export default function SpyGame() {
 
 	// Back / exit: on one of the game's inner screens, first to the game's own home (its «back home»
 	// pauses and keeps a round under way: card hidden, time stopped); from its home, back to the games.
-	// Nothing is lost, so nothing is asked.
+	// Leaving the game itself is always asked (as in every game).
 	const leave = () => {
 		const back = host.current?.querySelector<HTMLButtonElement>('.sp-header-back[data-a="home-confirm"]');
 		if (back && game.current?.getState().screen !== "home") {
@@ -286,7 +286,7 @@ export default function SpyGame() {
 			);
 			return;
 		}
-		go();
+		askLeave(PLAIN_LEAVE, go);
 	};
 	leaveRef.current = leave;
 	useBackHandler(true, leave);
