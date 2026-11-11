@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -65,6 +66,7 @@ export default function SudokuGame() {
 	const [noteMode, setNoteMode] = useState(false);
 	const [help, setHelp] = useState(false);
 	const [sound, setSound] = useState(true);
+	const [showSettings, setShowSettings] = useState(false);
 	const [problem, setProblem] = useState<string | null>(null);
 	const [live, setLive] = useState("");
 	const [hidden, setHidden] = useState(false);
@@ -328,6 +330,10 @@ export default function SudokuGame() {
 	return (
 		<div className="bd-game-page">
 			<article className={`sd ${gameStyleClass("sd", bdStyle)} ${scheme === "dark" ? "sd-dark" : ""} ${game.paused ? "sd-paused" : ""}`} dir="rtl" aria-label="بازی سودوکو" onKeyDown={onKey}>
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="سودوکو" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => { interacted.current = true; setSound(on); } },
+					{ kind: "choice", id: "level", label: "سطح بازی", hint: playing ? "بعد از پایان این بازی عوض می‌شود." : "سطح قفل با برد در سطح قبلی باز می‌شود.", value: level, options: LEVELS.map(([key, name]) => ({ value: key, label: name, disabled: !unlockedLevel(key) })), onChange: (v) => setLevel(v as Difficulty), disabled: playing },
+				]} />
 				<GameBar playing={barPlaying}>
 				<header className="sd-header" {...inertIf(!!modal && modal !== "pause")}>
 					<div className="sd-brand">
@@ -347,6 +353,7 @@ export default function SudokuGame() {
 						<button type="button" className="sd-icon" aria-label={sound ? "قطع موسیقی و افکت‌ها" : "پخش موسیقی و افکت‌ها"} aria-pressed={sound} onClick={() => { interacted.current = true; setSound(!sound); }}>
 							<Icon name={sound ? "volume-2" : "volume-x"} />
 						</button>
+						<GameSettingsButton className="sd-icon" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 						<button type="button" className="sd-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>

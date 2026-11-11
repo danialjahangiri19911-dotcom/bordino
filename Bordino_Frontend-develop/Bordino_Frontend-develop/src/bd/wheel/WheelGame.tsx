@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
@@ -65,6 +66,7 @@ export default function WheelGame() {
 	const [error, setError] = useState<string | null>(null);
 	const [help, setHelp] = useState(false);
 	const [sound, setSound] = useState(true);
+	const [showSettings, setShowSettings] = useState(false);
 	const [celebrate, setCelebrate] = useState(false);
 	// The wheel as it was when the spin began: a refetch (new odds, new prizes) never moves the
 	// slices under a spin or under its shown result; the live wheel returns at the next change.
@@ -321,6 +323,9 @@ export default function WheelGame() {
 				dir="rtl"
 				aria-label="گردونه شانس"
 			>
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="گردونه" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => { setSound(on); unlocked.current = true; syncMusic(on); try { localStorage.setItem(SOUND_KEY, on ? "on" : "off"); } catch { /* not remembered */ } } },
+				]} />
 				<GameBar playing={phase === "spinning" && !paused}>
 					<header className="wh-header">
 						<div>
@@ -349,6 +354,7 @@ export default function WheelGame() {
 							>
 								<Icon name={sound ? "volume-2" : "volume-x"} />
 							</button>
+							<GameSettingsButton className="wh-icon" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 							<button type="button" className="wh-icon" aria-label="راهنمای گردونه" aria-expanded={help} onClick={() => setHelp(!help)}>
 								<Icon name="circle-help" />
 							</button>

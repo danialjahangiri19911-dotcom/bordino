@@ -745,3 +745,104 @@ body { margin: 0; }
 	#bordino-directions .bd-make-row { grid-template-columns: 1fr; }
 	#bordino-directions .bd-make-video { max-width: 320px; margin-inline: auto; }
 }
+
+/* ── Game headers: the exit, help and sound buttons of every game look like «دُور»'s (2026-11-11) ──
+   Same size (44 px), icon (20 px), spacing (6 px) and, per style, the same corners, border, fill, ink and
+   shadow as Dowr's buttons (measured from it in every style and mode). The games keep their own markup;
+   these rules only restyle the three header buttons (and Spy's own back button). */
+#bordino-directions :is(.sd-header-tools, .g48-tools, .cr-tools, .ck-tools, .wh-tools, .sp-tools) { gap: 6px; }
+#bordino-directions :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon, .sp-tools > .sp-icon, .sp-header > .sp-header-back) {
+	width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; margin: 0;
+	display: inline-grid; place-items: center; box-sizing: border-box;
+	--gh-r: 50%; --gh-border: 0 none transparent; --gh-bg: #e9edf3; --gh-ink: #25334b;
+	--gh-shadow: 7px 7px 17px #cbd2de, -7px -7px 17px #fff;
+	border-radius: var(--gh-r); border: var(--gh-border); background: var(--gh-bg); color: var(--gh-ink); box-shadow: var(--gh-shadow);
+}
+#bordino-directions :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon, .sp-tools > .sp-icon, .sp-header > .sp-header-back) svg { width: 20px; height: 20px; }
+/* (Spy's back button is a pill with a word in the design: an icon square here, like the others) */
+#bordino-directions .sp-header > .sp-header-back { font-size: 0; gap: 0; }
+
+/* Neobrutalism, light */
+#bordino-directions :is(.sd-brutal, .g48-brutal, .cr-brutal, .ck-brutal, .wh-brutal, .sp-brutal) :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon, .sp-tools > .sp-icon, .sp-header > .sp-header-back) {
+	--gh-r: 4px; --gh-border: 2px solid #211a2e; --gh-bg: #fff7e5; --gh-ink: #211a2e; --gh-shadow: 4px 4px 0 #211a2e;
+}
+/* Neobrutalism, dark */
+#bordino-directions :is(.sd-brutal.sd-dark, .g48-brutal.g48-dark, .cr-brutal.cr-dark, .ck-brutal.ck-dark, .wh-brutal.wh-dark) :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon),
+:root[data-bd-scheme="dark"] #bordino-directions .sp-brutal :is(.sp-tools > .sp-icon, .sp-header > .sp-header-back) {
+	--gh-border: 2px solid #f5f2f0; --gh-bg: #18191d; --gh-ink: #f5f2f0; --gh-shadow: 4px 4px 0 #000;
+}
+#bordino-directions :is(.sd-brutal, .g48-brutal, .cr-brutal, .ck-brutal, .wh-brutal, .sp-brutal) :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon, .sp-tools > .sp-icon, .sp-header > .sp-header-back):active {
+	transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--gh-ink);
+}
+/* Neon (always dark) */
+#bordino-directions :is(.sd-neon, .g48-neon, .cr-neon, .ck-neon, .wh-neon, .sp-neon) :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon, .sp-tools > .sp-icon, .sp-header > .sp-header-back) {
+	--gh-r: 50%; --gh-border: 0 none transparent; --gh-bg: #0d1021; --gh-ink: #f4f6ff; --gh-shadow: 0 0 0 1px #334567, 0 8px 25px #0004;
+}
+/* Neumorphism, dark (light is the default above) */
+#bordino-directions :is(.sd-neu.sd-dark, .g48-neu.g48-dark, .cr-neu.cr-dark, .ck-neu.ck-dark, .wh-neu.wh-dark) :is(.sd-header-tools > .sd-icon, .g48-tools > .g48-icon, .cr-tools > .cr-icon, .ck-tools > .ck-icon-button, .wh-tools > .wh-icon),
+:root[data-bd-scheme="dark"] #bordino-directions .sp-neu :is(.sp-tools > .sp-icon, .sp-header > .sp-header-back) {
+	--gh-bg: #292e37; --gh-ink: #f5f7fb; --gh-shadow: 7px 7px 17px #1b1e25, -7px -7px 17px #3c4350;
+}
+/* Spy: the buttons in the title's row, as in Dowr (the design moved them to a second row below 360 px). */
+#bordino-directions .spy-host .sp .sp-header { grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "back tools brand"; row-gap: 0; column-gap: 6px; }
+/* The same place on a phone as «دُور»'s (its leftmost button at 16 px from the edge, 27 px from the top), measured
+   per game and look: each game's own frame and padding differ by a few pixels. `translate` moves only the buttons. */
+#bordino-directions .spy-host .sp .sp-header:not(:has(> .sp-header-back)) { column-gap: 0; }
+#bordino-directions .spy-host .sp .sp-tools { translate: 0 3px; }
+#bordino-directions .sd-brutal .sd-header-tools { translate: 0 -1px; }
+#bordino-directions .sd-neon .sd-header-tools { translate: 2px 1px; }
+#bordino-directions .sd-neu .sd-header-tools { translate: 3px 2px; }
+#bordino-directions .g48-brutal .g48-tools { translate: -1px -3px; }
+#bordino-directions .g48-neon .g48-tools { translate: 1px -1px; }
+#bordino-directions .g48-neu .g48-tools { translate: 2px 0; }
+#bordino-directions .cr .cr-tools { translate: 3px 1px; }
+#bordino-directions .wh .wh-tools { translate: 2px -1px; }
+#bordino-directions .ck-game .ck-tools { translate: 4px 0; }
+#bordino-directions .ck-brutal .ck-tools { translate: 1px 0; }
+#bordino-directions .ck-game .ck-top { margin-top: 15px; }
+#bordino-directions .ck-brutal .ck-top { margin-top: 12px; }
+
+/* ── The games' settings dialog (src/bd/GameSettings.tsx): one look in every game, per style ── */
+#bordino-directions .gs-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; align-items: end; justify-items: center; padding: 12px; background: #0007; direction: rtl; font-family: inherit; }
+@media (min-width: 600px) { #bordino-directions .gs-backdrop { align-items: center; } }
+#bordino-directions .gs-panel {
+	--gs-bg: #e9edf3; --gs-panel: #edf1f6; --gs-ink: #25334b; --gs-muted: #55617a; --gs-accent: #6650cf; --gs-on: #fff;
+	--gs-line: #c2cbda; --gs-r: 22px; --gs-shadow: 9px 9px 22px #b9c2d0, -9px -9px 22px #fff; --gs-control-r: 999px;
+	width: min(100%, 440px); max-height: min(86dvh, 640px); overflow: auto; box-sizing: border-box; padding: 18px 18px 16px;
+	background: var(--gs-bg); color: var(--gs-ink); border-radius: var(--gs-r); box-shadow: var(--gs-shadow); display: grid; gap: 14px;
+}
+#bordino-directions .gs-brutal .gs-panel { --gs-bg: #fff7e5; --gs-panel: #fffdf4; --gs-ink: #211a2e; --gs-muted: #5d5069; --gs-accent: #ffe332; --gs-on: #211a2e; --gs-line: #211a2e; --gs-r: 6px; --gs-shadow: 6px 6px 0 #211a2e; --gs-control-r: 4px; border: 3px solid var(--gs-line); }
+#bordino-directions .gs-brutal.gs-dark .gs-panel { --gs-bg: #18191d; --gs-panel: #24252c; --gs-ink: #f5f2f0; --gs-muted: #b7b3be; --gs-accent: #ffe332; --gs-on: #211a2e; --gs-line: #e8e4e2; --gs-shadow: 6px 6px 0 #000; }
+#bordino-directions .gs-neon .gs-panel { --gs-bg: #111427; --gs-panel: #191b30; --gs-ink: #f4f6ff; --gs-muted: #b1aec5; --gs-accent: #b593ff; --gs-on: #150c28; --gs-line: #334567; --gs-r: 22px; --gs-shadow: 0 0 0 1px #334567, 0 18px 50px #0008; }
+#bordino-directions .gs-neu.gs-dark .gs-panel { --gs-bg: #292e37; --gs-panel: #2d323c; --gs-ink: #f5f7fb; --gs-muted: #b9c0cf; --gs-accent: #c0b2ff; --gs-on: #221d29; --gs-line: #414857; --gs-shadow: 9px 9px 22px #1b1e25, -9px -9px 22px #3c4350; }
+#bordino-directions .gs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#bordino-directions .gs-head h2 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px; color: var(--gs-ink); }
+#bordino-directions .gs-close { width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--gs-control-r); border: 1px solid var(--gs-line); background: var(--gs-panel); color: var(--gs-ink); cursor: pointer; }
+#bordino-directions .gs-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+#bordino-directions .gs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px; border-radius: calc(var(--gs-r) / 2); background: var(--gs-panel); border: 1px solid var(--gs-line); }
+#bordino-directions .gs-brutal .gs-row { border-width: 2px; }
+#bordino-directions .gs-text { display: grid; gap: 2px; min-width: 0; flex: 1 1 160px; }
+#bordino-directions .gs-text b { font-size: 14px; color: var(--gs-ink); }
+#bordino-directions .gs-text small { font-size: 12px; line-height: 1.7; color: var(--gs-muted); }
+#bordino-directions .gs-switch { position: relative; width: 52px; height: 30px; flex: 0 0 auto; border-radius: 999px; border: 2px solid var(--gs-line); background: var(--gs-bg); cursor: pointer; padding: 0; }
+#bordino-directions .gs-brutal .gs-switch { border-radius: 4px; }
+#bordino-directions .gs-switch span { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: inherit; background: var(--gs-muted); transition: right .15s ease, background .15s ease; }
+#bordino-directions .gs-switch[aria-checked="true"] { background: var(--gs-accent); }
+#bordino-directions .gs-switch[aria-checked="true"] span { right: 25px; background: var(--gs-on); }
+#bordino-directions .gs-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+#bordino-directions .gs-choices button, #bordino-directions .gs-button { min-height: 40px; padding: 6px 14px; border-radius: var(--gs-control-r); border: 1px solid var(--gs-line); background: var(--gs-bg); color: var(--gs-ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+#bordino-directions .gs-brutal :is(.gs-choices button, .gs-button, .gs-close) { border-width: 2px; box-shadow: 3px 3px 0 var(--gs-line); }
+#bordino-directions .gs-choices button[aria-checked="true"] { background: var(--gs-accent); color: var(--gs-on); border-color: var(--gs-accent); }
+#bordino-directions .gs-brutal .gs-choices button[aria-checked="true"] { border-color: var(--gs-line); }
+#bordino-directions :is(.gs-choices button, .gs-button, .gs-switch):disabled { opacity: .45; cursor: not-allowed; }
+#bordino-directions .gs-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+#bordino-directions .gs-danger { color: #fff; background: #c33d59; border-color: #c33d59; }
+#bordino-directions .gs-done { width: 100%; background: var(--gs-accent); color: var(--gs-on); border-color: var(--gs-accent); }
+#bordino-directions .gs-brutal .gs-done { border-color: var(--gs-line); }
+/* The dialog sits inside each game's root, whose own rules size icons and pad buttons: these win over them. */
+#bordino-directions .gs-backdrop .gs-panel svg { width: 20px; height: 20px; min-width: 20px; flex: none; margin: 0; }
+#bordino-directions .gs-backdrop .gs-head h2 svg { width: 22px; height: 22px; }
+#bordino-directions .gs-backdrop .gs-close { padding: 0; min-width: 40px; flex: none; font-size: 0; }
+#bordino-directions .gs-backdrop .gs-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; line-height: 1.4; }
+#bordino-directions .gs-backdrop .gs-head h2 { flex: 1 1 auto; min-width: 0; line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { #bordino-directions .gs-switch span { transition: none; } }

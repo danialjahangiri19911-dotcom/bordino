@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { useDismissOutside } from "../dismiss";
@@ -87,6 +88,7 @@ export default function CrashGame() {
 	const [form, setForm] = useState<CrashForm>(DEFAULT_FORM);
 	const [panel, setPanel] = useState<"" | "help" | "fair">("");
 	const [sound, setSound] = useState(true);
+	const [showSettings, setShowSettings] = useState(false);
 	const [unlocked, setUnlocked] = useState(false);
 	const [hidden, setHidden] = useState(false);
 	const [online, setOnline] = useState(true);
@@ -392,6 +394,11 @@ export default function CrashGame() {
 			}}
 		>
 			<article className={`cr ${gameStyleClass("cr", bdStyle)} ${scheme === "dark" ? "cr-dark" : ""}`} data-style-name={bdStyle} dir="rtl" aria-label="بازی انفجار">
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="انفجار" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => { setSound(on); try { localStorage.setItem(SOUND_KEY, on ? "on" : "off"); } catch { /* not remembered */ } } },
+					{ kind: "choice", id: "mode", label: "روش بازی", hint: locked ? "بعد از پایان این دور عوض می‌شود." : "دستی: خودت برداشت می‌کنی؛ خودکار: در ضریب انتخابی برداشت می‌شود.", value: mode, options: [{ value: "manual", label: "دستی" }, { value: "auto", label: "خودکار" }], onChange: (v) => setMode(v as "manual" | "auto"), disabled: locked },
+					{ kind: "action", id: "reset", label: "تنظیمات شرط", hint: "مبلغ و ضریب‌های ذخیره‌شده به حالت اول برمی‌گردند.", button: "بازنشانی", confirm: "تنظیمات شرط بازنشانی شود؟", disabled: locked, onClick: () => { try { localStorage.removeItem(SETTINGS_KEY); } catch { /* not remembered */ } setForm(DEFAULT_FORM); } },
+				]} />
 				<GameBar playing={barPlaying}>
 				<header className="cr-header">
 					<div className="cr-brand">
@@ -423,6 +430,7 @@ export default function CrashGame() {
 						>
 							<Icon name={sound ? "volume-2" : "volume-x"} />
 						</button>
+						<GameSettingsButton className="cr-icon" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 						<button type="button" className="cr-icon" aria-label="اطلاعات بازی" aria-expanded={panel === "help"} onClick={() => setPanel(panel === "help" ? "" : "help")}>
 							<Icon name="circle-help" />
 						</button>

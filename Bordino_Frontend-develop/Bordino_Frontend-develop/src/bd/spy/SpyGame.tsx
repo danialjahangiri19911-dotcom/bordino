@@ -206,6 +206,19 @@ export default function SpyGame() {
 						tools.appendChild(exit);
 						(globalThis as { lucide?: { createIcons?: () => void } }).lucide?.createIcons?.();
 					}
+					// The guide, as in the other games' headers (the module opens it from any screen).
+					if (tools && !tools.querySelector(".spy-info")) {
+						const info = document.createElement("button");
+						info.type = "button";
+						info.className = "sp-icon spy-info";
+						info.dataset.a = "tutorial";
+						info.setAttribute("aria-label", "راهنمای بازی");
+						info.innerHTML = '<i data-lucide="circle-help" aria-hidden="true"></i>';
+						const exit = tools.querySelector(".spy-exit");
+						if (exit) tools.insertBefore(info, exit);
+						else tools.appendChild(info);
+						(globalThis as { lucide?: { createIcons?: () => void } }).lucide?.createIcons?.();
+					}
 					// One arrow at a time: on the game's own inner screens its «back to the game's home»
 					// arrow; on its home, the app's exit.
 					const exitButton = root.querySelector<HTMLElement>(".spy-exit");

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -97,6 +98,7 @@ export default function ChickenGame() {
 	const [amountText, setAmountText] = useState("");
 	const [dialog, setDialog] = useState<"" | "fair">("");
 	const [sound, setSound] = useState(false);
+	const [showSettings, setShowSettings] = useState(false);
 	const [motion, setMotion] = useState(true);
 	const [online, setOnline] = useState(true);
 	const [hidden, setHidden] = useState(false);
@@ -355,6 +357,10 @@ export default function ChickenGame() {
 					if (e.key === "Escape" && dialog) setDialog("");
 				}}
 			>
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="مرغ فراری" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => setSound(on) },
+					{ kind: "choice", id: "level", label: "سختی مسیر", hint: locked ? "بعد از پایان این دور عوض می‌شود." : "مسیر سخت‌تر، ضریب بیشتر و خطر بیشتر.", value: level, options: LEVELS.map(([key, name]) => ({ value: key, label: name })), onChange: (v) => setLevel(v as ChickenDifficulty), disabled: locked },
+				]} />
 				<GameBar playing={barPlaying}>
 				<header className="ck-top">
 					<div className="ck-heading">
@@ -368,6 +374,7 @@ export default function ChickenGame() {
 						<button className="ck-icon-button" type="button" aria-label={sound ? "قطع موسیقی و افکت‌ها" : "پخش موسیقی و افکت‌ها"} aria-pressed={sound} onClick={() => setSound(!sound)}>
 							<Icon name={sound ? "volume-2" : "volume-x"} />
 						</button>
+						<GameSettingsButton className="ck-icon-button" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 						<button className="ck-icon-button" type="button" aria-label="راهنمای بازی" aria-expanded={dialog === "fair"} onClick={() => setDialog(dialog === "fair" ? "" : "fair")}>
 							<Icon name="circle-help" />
 						</button>

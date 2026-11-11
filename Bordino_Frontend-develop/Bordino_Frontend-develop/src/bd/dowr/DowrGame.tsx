@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
+import GameSettings from "../GameSettings";
 import { fa } from "../format";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type DowrConfig, type DowrResult, report, saveGame, useDowrConfig, useDowrHistory } from "./api";
@@ -170,6 +171,8 @@ export default function DowrGame() {
 	const [phase, setPhase] = useState<string>("setup");
 	const [saved, setSaved] = useState<{ ok: boolean; text: string } | null>(null);
 	const [failed, setFailed] = useState<string | null>(null);
+	const [showSettings, setShowSettings] = useState(false);
+	const [soundOn, setSoundOn] = useState(false);
 	const cfg = config.data?.result;
 	const refetchHistory = useRef(history.refetch);
 	refetchHistory.current = history.refetch;
@@ -227,6 +230,18 @@ export default function DowrGame() {
 				exit.innerHTML = '<i data-lucide="arrow-left" aria-hidden="true"></i>';
 				exit.addEventListener("click", () => leaveRef.current());
 				root.querySelector(".dr-tools")?.appendChild(exit);
+				// Settings, as in the other games: a Bordino dialog in front of the module's own buttons.
+				const gear = document.createElement("button");
+				gear.type = "button";
+				gear.className = "dr-icon dowr-settings";
+				gear.setAttribute("aria-label", "تنظیمات بازی");
+				gear.setAttribute("aria-haspopup", "dialog");
+				gear.innerHTML = '<i data-lucide="settings-2" aria-hidden="true"></i>';
+				gear.addEventListener("click", () => {
+					setSoundOn(root.querySelector('[data-act="sound"]')?.getAttribute("aria-pressed") === "true");
+					setShowSettings((v) => !v);
+				});
+				root.querySelector('.dr-tools [data-act="help"]')?.before(gear);
 				// (one id per finished game, the same for its resends; also where crypto.randomUUID is missing)
 				const requestId = () =>
 					typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -341,6 +356,13 @@ export default function DowrGame() {
 	useBackHandler(true, leave);
 	useBrowserBackGuard(running, leave);
 
+	/** Clicks the module's own buttons, in order (the setup steps only exist between games). */
+	const act = (...names: string[]) => {
+		setShowSettings(false);
+		for (const n of names) host.current?.querySelector<HTMLButtonElement>(`[data-act="${n}"]`)?.click();
+		polish.current?.();
+	};
+
 	if (!allowed) return null;
 	const recent = history.data?.result?.games ?? [];
 	return (
@@ -367,6 +389,29 @@ export default function DowrGame() {
 			) : null}
 			{/* The design's own game (kept outside .bd-product: the app's element styles never reach it). */}
 			<div ref={host} className="dowr-host" hidden={!!cfg && !canPlay && !running} />
+			<GameSettings
+				open={showSettings}
+				onClose={() => setShowSettings(false)}
+				game="دُور"
+				look={look}
+				dark={scheme === "dark"}
+				rows={[
+					{
+						kind: "toggle",
+						id: "sound",
+						label: "موسیقی و افکت‌ها",
+						on: soundOn,
+						onChange: (on) => {
+							const b = host.current?.querySelector<HTMLButtonElement>('[data-act="sound"]');
+							if (b && (b.getAttribute("aria-pressed") === "true") !== on) b.click();
+							setSoundOn(on);
+							window.setTimeout(() => setSoundOn(b?.getAttribute("aria-pressed") === "true"), 400);
+						},
+					},
+					{ kind: "action", id: "teams", label: "تیم‌ها و بازیکن‌ها", hint: running ? "بعد از پایان این بازی عوض می‌شود." : undefined, button: "ویرایش", onClick: () => act("settings", "teams"), disabled: running },
+					{ kind: "action", id: "rules", label: "دورها، زمان و حالت بازی", hint: running ? "بعد از پایان این بازی عوض می‌شود." : undefined, button: "ویرایش", onClick: () => act("settings", "rules"), disabled: running },
+				]}
+			/>
 			{saved ? (
 				<div className={`bd-product dowr-bar ${styleClass(style)}`}>
 					<p className={saved.ok ? "dowr-saved" : "dowr-unsaved"} role="status">

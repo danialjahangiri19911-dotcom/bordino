@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler } from "../back";
@@ -38,6 +39,7 @@ function View() {
 	const [confirm, setConfirm] = useState<Confirm>("");
 	const [help, setHelp] = useState(false);
 	const [sound, setSound] = useState(true);
+	const [showSettings, setShowSettings] = useState(false);
 	const [hidden, setHidden] = useState(false);
 	const [best, setBest] = useState(0);
 	const [gain, setGain] = useState(0);
@@ -189,6 +191,10 @@ function View() {
 	return (
 		<div className="bd-game-page">
 			<article className={`g48 ${gameStyleClass("g48", bdStyle)} ${scheme === "dark" ? "g48-dark" : ""}`} dir="rtl" aria-label="بازی ۲۰۴۸" onKeyDown={onKey}>
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="۲۰۴۸" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => { interacted.current = true; setSound(on); } },
+					{ kind: "action", id: "best", label: "بهترین امتیاز", hint: `بهترین امتیاز تو روی این دستگاه: ${best.toLocaleString("fa-IR")}`, button: "صفر کردن", confirm: "بهترین امتیاز پاک شود؟", disabled: best === 0, onClick: () => { try { localStorage.setItem(bestKey(), "0"); } catch { /* not remembered */ } setBest(0); } },
+				]} />
 				<GameBar playing={barPlaying}>
 				<header className="g48-header" {...inertIf(!!modal)}>
 					<div className="g48-brand">
@@ -207,6 +213,7 @@ function View() {
 						<button type="button" className="g48-icon" aria-label={sound ? "قطع موسیقی و افکت‌ها" : "پخش موسیقی و افکت‌ها"} aria-pressed={sound} onClick={() => { interacted.current = true; setSound(!sound); }}>
 							<Icon name={sound ? "volume-2" : "volume-x"} />
 						</button>
+						<GameSettingsButton className="g48-icon" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 						<button type="button" className="g48-icon" aria-label="راهنمای بازی" aria-expanded={help} onClick={() => setHelp(!help)}>
 							<Icon name="circle-help" />
 						</button>

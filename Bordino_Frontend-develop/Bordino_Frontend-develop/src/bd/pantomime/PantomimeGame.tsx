@@ -5,7 +5,8 @@ import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from
 import { useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "../Icon";
-import { gameStyleClass, useBdStyle } from "../appearance";
+import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
+import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { fa, faDate } from "../format";
@@ -84,6 +85,7 @@ const limitsOf = (c: PantomimeConfig): Limits => ({
 export default function PantomimeGame() {
 	const allowed = useRequireLogin();
 	const bdStyle = useBdStyle();
+	const scheme = useResolvedScheme();
 	const { push } = useRouter();
 	const configQuery = usePantomimeConfig();
 	const config = configQuery.data?.result;
@@ -116,6 +118,7 @@ export default function PantomimeGame() {
 	const [proposalError, setProposalError] = useState("");
 	const [dialog, setDialog] = useState<Dialog>("");
 	const [muted, setMuted] = useState(false);
+	const [showSettings, setShowSettings] = useState(false);
 	const [announcement, setAnnouncement] = useState("");
 	const [save, setSave] = useState<Save>("");
 	const [, rerender] = useReducer((n: number) => n + 1, 0);
@@ -1311,6 +1314,12 @@ export default function PantomimeGame() {
 				onPointerDownCapture={unlockAudio}
 				onKeyDownCapture={unlockAudio}
 			>
+				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="پانتومیم" look={bdStyle} dark={scheme === "dark"} rows={[
+					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: !muted, onChange: () => void toggleSound() },
+					{ kind: "choice", id: "difficulty", label: "سختی مشترک", hint: game && game.phase !== "finished" ? "برای بازی بعدی؛ بازی فعلی تغییر نمی‌کند." : undefined, value: String(settings.difficulty), options: [0, 1, 2, 3].map((i) => ({ value: String(i), label: LEVELS[i] })), onChange: (v) => setSettings((s) => ({ ...s, difficulty: Number(v) })), disabled: !!game && game.phase !== "finished" },
+					{ kind: "choice", id: "seconds", label: "زمان هر نوبت", value: String(settings.seconds), options: (limits ? SECONDS.filter((n) => n >= limits.turnSeconds[0] && n <= limits.turnSeconds[1]) : SECONDS).map((n) => ({ value: String(n), label: timeLabel(n) })), onChange: (v) => setSettings((s) => ({ ...s, seconds: Number(v) })), disabled: !!game && game.phase !== "finished" },
+					{ kind: "choice", id: "rounds", label: "تعداد دورها", value: String(settings.rounds), options: range(1, limits?.maxRounds ?? 10).map((n) => ({ value: String(n), label: fa(n) })), onChange: (v) => setSettings((s) => ({ ...s, rounds: Number(v) })), disabled: !!game && game.phase !== "finished" },
+				]} />
 				<GameBar playing={game?.phase === "playing"}>
 					<header className="pm-header" ref={headerRef}>
 						<div className="pm-brand">
@@ -1335,6 +1344,7 @@ export default function PantomimeGame() {
 							>
 								<Icon name={muted ? "volume-x" : "volume-2"} />
 							</button>
+							<GameSettingsButton className="pm-icon" open={showSettings} onClick={() => setShowSettings((v) => !v)} />
 							<button type="button" className="pm-icon" data-act="help" aria-label="راهنمای بازی" onClick={() => openDialog("help")}>
 								<Icon name="circle-help" />
 							</button>
