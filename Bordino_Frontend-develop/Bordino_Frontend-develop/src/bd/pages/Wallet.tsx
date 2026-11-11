@@ -79,6 +79,8 @@ export default function Wallet() {
 				<LoadState loading={!lotteriesError} error={lotteriesError} onRetry={refetchLotteries} errorText="قرعه‌کشی‌ها بارگذاری نشد." />
 			) : (
 				<EmptyState
+					// A small icon, not the big illustration: this card sits right under the coin balance.
+					icon="ticket"
 					title={(points.account?.total_tickets ?? 0) > 0 ? "دورهٔ فعالی نیست" : "هنوز بلیتی نداری"}
 					text="بلیت‌های هر دوره در این بخش دیده می‌شوند."
 				/>
