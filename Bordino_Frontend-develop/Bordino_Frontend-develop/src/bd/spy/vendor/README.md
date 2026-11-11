@@ -6,6 +6,8 @@ unchanged except for two one-line patches (Codex review 2026-11-10; re-apply the
   `"></select><img onerror=…>` broke out of the attribute and ran a script.
 - `spy-engine.js` `Game.category()`: reads `SpyEngine.categories` (the server's topics) before its own
   bundled list, so a renamed or new topic shows its name in the private hint.
+- `spy-engine.js` `Game.card()`: a spy's private card reads «شما جاسوس هستید» instead of «کلمه را
+  نمی‌دانی» (Bordino's wording, 2026-11-11).
 
 They are loaded in this order by `../SpyGame.tsx`.
 

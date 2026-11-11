@@ -35,3 +35,8 @@
 	--sp-shadow: 7px 7px 16px #1d2128, -6px -6px 14px #363d49;
 	color-scheme: dark;
 }
+
+/* No «ایدهٔ سؤال» (question idea) during the discussion (Bordino's choice, 2026-11-11): the pause button
+   takes the row on its own. */
+#bordino-directions .spy-host .sp [data-a="hint"] { display: none; }
+#bordino-directions .spy-host .sp .sp-grid:has(> [data-a="hint"]) { grid-template-columns: 1fr; }

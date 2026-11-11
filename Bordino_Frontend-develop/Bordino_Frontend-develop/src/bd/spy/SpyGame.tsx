@@ -76,6 +76,16 @@ function canSave(): boolean {
 	}
 }
 
+/** «·» beside Persian digits reads as a zero («توزیع محرمانه · ۲ از ۶» looks like «۰ ۲ از ۶»): the
+ * design's separators become the Persian comma (text only; the module's markup is untouched). */
+function persianSeparators(root: HTMLElement) {
+	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+		const text = node.nodeValue ?? "";
+		if (text.includes("·")) node.nodeValue = text.replace(/\s*·\s*/g, "، ");
+	}
+}
+
 /** The app's style is the game's look (the module's own theme setting is hidden in the app). */
 function applyLook(root: HTMLElement, look: string) {
 	if (root.classList.contains(`sp-${look}`)) return;
@@ -174,6 +184,7 @@ export default function SpyGame() {
 				setMounted(true);
 				const polish = () => {
 					applyLook(root, lookRef.current);
+					persianSeparators(root);
 					// The design's note «this design version has N sample word pairs» is about the
 					// prototype, not the app (whose bank Bordino keeps growing): not shown.
 					for (const note of root.querySelectorAll<HTMLElement>(".sp-notice")) {
