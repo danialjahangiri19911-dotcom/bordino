@@ -218,3 +218,13 @@ class OpsCoinTests(TestCase):
         r = self.ops(self.owner).get("/api/v1/ops/settings/")
         keys = {s["key"] for s in result(r)["settings"]}
         self.assertTrue({"COIN_ZIBAL_MODE", "COIN_ZIBAL_MERCHANT"} <= keys)
+
+    def test_the_coin_settings_can_be_saved_and_reset(self):
+        api = self.ops(self.owner)
+        r = api.put("/api/v1/ops/settings/COIN_ZIBAL_MODE/", {"value": "test"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(services.pay_mode(), "test")
+        self.assertEqual(api.put("/api/v1/ops/settings/COIN_ZIBAL_MODE/", {"value": "nope"}, format="json").status_code, 400)
+        self.assertEqual(api.put("/api/v1/ops/settings/COIN_ZIBAL_MERCHANT/", {"value": "m-1"}, format="json").status_code, 200)
+        self.assertEqual(api.delete("/api/v1/ops/settings/COIN_ZIBAL_MODE/").status_code, 200)
+        self.assertEqual(services.pay_mode(), "sandbox")

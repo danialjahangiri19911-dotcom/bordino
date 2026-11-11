@@ -133,7 +133,8 @@ def put(key: str, raw) -> tuple[dict, object]:
         raise SettingError("این تنظیم شناخته‌شده نیست.")
     before = current(entry)["value"]
     stored, _value = parse(entry, raw)
-    group = {"gm": None, "ads": None, "wallet": "wallet", "files": "file_upload"}[entry["group"]]
+    # (the SystemConfiguration category of a new row; groups without one leave it empty)
+    group = {"gm": None, "ads": None, "coins": None, "wallet": "wallet", "files": "file_upload"}.get(entry["group"])
     row = SystemConfiguration.objects.filter(key=key).first() or SystemConfiguration(key=key)
     row.value = stored
     row.value_type = VALUE_TYPE[entry["type"]]
