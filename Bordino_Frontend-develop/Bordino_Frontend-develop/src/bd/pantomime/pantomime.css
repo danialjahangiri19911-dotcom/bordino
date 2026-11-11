@@ -13,8 +13,8 @@
 .pm-proposal-editor{display:grid;gap:16px;margin:18px 0}.pm-mode-options [data-format="challenge"]{grid-column:1/-1}.pm-challenge-summary .pm-stats{gap:12px;flex-wrap:wrap}.pm-challenge-summary .pm-stat{min-width:70px}.pm-challenge-summary .pm-stat strong{font-size:20px;white-space:nowrap}
 
 /* App additions: the page around the card (full screen on a phone, as the other games), the app's
-   own states (loading, switched off), the exit button's third tool, and «بازی‌های اخیر». Always the
-   design's light colours: the design has no dark version of this style. */
+   own states (loading, switched off), the exit button's third tool, and «بازی‌های اخیر». Dark versions
+   of neobrutalism and neumorphism are Bordino's own (the design has none): see the end of this file. */
 #bordino-directions .bd-pm-page { min-height: 100dvh; background: #fff8eb; padding: 16px 0; color-scheme: light; }
 @media (max-width: 600px) {
 	#bordino-directions .bd-pm-page { padding: 0; }
@@ -25,3 +25,28 @@
 .pm button.pm-inline { display: inline; min-height: 0; width: auto; padding: 0; margin: 0; }
 .pm .pm-recent { margin-top: 18px; }
 .pm .pm-recent summary svg:last-child { margin-inline-start: auto; }
+
+/* ── Dark mode (2026-11-11): the design ships neobrutalism and neumorphism in light only, so these are
+   Bordino's, the same palettes as «دُور»'s dark versions (dowr-app.css). Neon is dark already. ── */
+:root[data-bd-scheme="dark"] #bordino-directions .bd-pm-page { background: #111216; color-scheme: dark; }
+/* Neobrutalism, dark: the app's dark palette, light ink and lines, the design's yellow kept. */
+:root[data-bd-scheme="dark"] #bordino-directions .pm.pm-brutal {
+	--p-bg: #18191d; --p-panel: #24252c; --p-ink: #f5f2f0; --p-muted: #b7b3be;
+	--p-accent: #ffe332; --p-on: #211a2e; --p-line: #e8e4e2; --p-shadow: 4px 4px 0 #000;
+	border-color: #e8e4e2;
+}
+/* Neumorphism, dark: soft light and shadow from the same dark surface. */
+:root[data-bd-scheme="dark"] #bordino-directions .pm.pm-neu {
+	--p-bg: #292e37; --p-panel: #2d333d; --p-ink: #f5f7fb; --p-muted: #c2cad7;
+	--p-accent: #c0b2ff; --p-on: #221d29; --p-line: #56616f;
+	--p-shadow: 7px 7px 17px #1b1e25, -7px -7px 17px #3c4350;
+}
+/* Neobrutalism, dark: what sits on the yellow accent keeps the design's dark ink. */
+:root[data-bd-scheme="dark"] #bordino-directions .pm.pm-brutal :is(.pm-intro em, .pm-categories button[aria-pressed=true], .pm-team.pm-active, .pm-mode-options [aria-pressed=true], .pm-stage-icon) {
+	--p-ink: #211a2e; --p-muted: #3b3346; color: #211a2e;
+}
+:root[data-bd-scheme="dark"] #bordino-directions .pm.pm-brutal .pm-timer-bar { background: #b593ff; }
+/* The deep reds of errors and the last seconds read too dark on a dark surface: the neon pink. */
+:root[data-bd-scheme="dark"] #bordino-directions :is(.pm.pm-brutal, .pm.pm-neu) .pm-error { color: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.pm.pm-brutal, .pm.pm-neu).pm-urgent .pm-time { color: #ff718c; }
+:root[data-bd-scheme="dark"] #bordino-directions :is(.pm.pm-brutal, .pm.pm-neu).pm-urgent .pm-timer-bar { background: #ff718c; }
