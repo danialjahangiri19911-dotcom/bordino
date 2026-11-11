@@ -30,7 +30,7 @@ function iconFor(entry: Entry): IconName {
 }
 
 export function HistoryRow({ entry }: { entry: Entry }) {
-	const unit = entry.kind === "points" ? "امتیاز" : "تومان";
+	const unit = entry.kind === "points" ? "سکه" : "تومان";
 	const failed = entry.status === "failed" || entry.status === "cancelled";
 	return (
 		<div className="bd-row">

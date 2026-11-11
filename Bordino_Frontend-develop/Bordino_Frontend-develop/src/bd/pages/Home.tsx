@@ -139,7 +139,7 @@ export default function Home() {
 					<div className="bd-wheel" aria-hidden="true" />
 					<div className="bd-wheel-copy">
 						<h3>گردونهٔ بردینو</h3>
-						<small>یک انتخاب دیگر برای امتیازهایت</small>
+						<small>یک انتخاب دیگر برای سکه‌هایت</small>
 						<Link className="bd-text-btn" href={R.wheel}>
 							دیدن گردونه →
 						</Link>

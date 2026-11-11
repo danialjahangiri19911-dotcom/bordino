@@ -25,10 +25,10 @@ const PRESET_INFO: Record<Exclude<BoardPreset, "team">, { name: string; text: st
 		icon: "flag",
 	},
 	score: {
-		name: "بیشترین امتیاز",
-		text: "امتیازی که سرور برای هر جواب درست داده؛ راهنمایی و جواب غلط امتیاز را کم می‌کند.",
+		name: "بیشترین سکه",
+		text: "سکه‌ای که سرور برای هر جواب درست داده؛ راهنمایی و جواب غلط سکه را کم می‌کند.",
 		best: "مسابقه، پرسش و پاسخ، معمای مهارتی",
-		metric: "امتیاز",
+		metric: "سکه",
 		icon: "trophy",
 	},
 	speed: {
@@ -40,7 +40,7 @@ const PRESET_INFO: Record<Exclude<BoardPreset, "team">, { name: string; text: st
 	},
 	participation: {
 		name: "فعالیت و مشارکت",
-		text: "مأموریت‌های انجام‌شده (هر کدام فقط یک بار) و امتیاز فعالیت.",
+		text: "مأموریت‌های انجام‌شده (هر کدام فقط یک بار) و سکهٔ فعالیت.",
 		best: "کمپین تبلیغاتی، چالش گروهی، مأموریت‌های تکراری",
 		metric: "مأموریت‌های انجام‌شده",
 		icon: "users",
@@ -51,7 +51,7 @@ const ORDER: Exclude<BoardPreset, "team">[] = ["none", "progress", "score", "spe
 const METRIC_NAME: Record<string, string> = {
 	stages: "مرحله‌های انجام‌شده",
 	progress: "درصد پیشرفت",
-	score: "امتیاز",
+	score: "سکه",
 	duration: "زمان تمام کردن (کمتر بهتر)",
 };
 const SHOW_NAME: Record<BoardShow, string> = {
@@ -61,7 +61,7 @@ const SHOW_NAME: Record<BoardShow, string> = {
 	stages: "مرحله‌های انجام‌شده",
 	percent: "درصد پیشرفت",
 	bar: "نوار پیشرفت",
-	score: "امتیاز",
+	score: "سکه",
 	time: "زمان تمام کردن",
 	participants: "تعداد شرکت‌کنندگان",
 	finishers: "تعداد کسانی که تمام کردند",
@@ -179,7 +179,7 @@ export default function BoardSetup({
 					</div>
 					<p className="bd-muted">
 						جدول: <b>{PRESET_INFO[preset].name}</b>
-						{value.customized ? " (سفارشی)" : " (پیش‌فرض)"} · هر بازیکن یک بار بازی می‌کند · رتبه و امتیاز فقط با ثبت سرور.
+						{value.customized ? " (سفارشی)" : " (پیش‌فرض)"} · هر بازیکن یک بار بازی می‌کند · رتبه و سکه فقط با ثبت سرور.
 					</p>
 
 					{open ? (
@@ -201,7 +201,7 @@ export default function BoardSetup({
 												</option>
 											))}
 											<option value="team" disabled>
-												امتیاز تیم (به‌زودی)
+												سکهٔ تیم (به‌زودی)
 											</option>
 										</select>
 									</label>
@@ -303,9 +303,9 @@ export default function BoardSetup({
 								</label>
 								<ul className="gm-rules">
 									<li>هر بازیکن یک بار بازی می‌کند (اولین تلاش معتبر)؛ نسخهٔ تازهٔ بازی فرصت دوباره نیست.</li>
-									<li>جواب غلط در چندگزینه‌ای امتیاز آن مرحله را صفر می‌کند.</li>
-									<li>هر راهنمایی امتیاز مرحله را کم می‌کند (درصدش در «جایزه و بودجه»).</li>
-									<li>مرحله‌ای که مهلت دارد، بعد از مهلت امتیاز ندارد.</li>
+									<li>جواب غلط در چندگزینه‌ای سکهٔ آن مرحله را صفر می‌کند.</li>
+									<li>هر راهنمایی سکهٔ مرحله را کم می‌کند (درصدش در «جایزه و بودجه»).</li>
+									<li>مرحله‌ای که مهلت دارد، بعد از مهلت سکه ندارد.</li>
 								</ul>
 								<small className="bd-muted">این قوانین قبل از شروع به بازیکن نشان داده می‌شود. تغییرشان بعد از انتشار نسخهٔ تازه و بررسی بردینو لازم دارد.</small>
 							</details>

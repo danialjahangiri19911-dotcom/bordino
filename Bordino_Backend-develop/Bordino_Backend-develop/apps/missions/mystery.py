@@ -226,7 +226,7 @@ def _new_run(customer: Customer, mystery: Mystery) -> MysteryRun:
     """A new game, checked: open, not full (nor past its budget), for this audience, and not an
     edition this player already plays (a new version of a game is not a second chance at its points)."""
     if edition_run(customer, mystery) is not None:
-        raise MissionError("این بازی را قبلاً شروع کرده‌ای؛ از «دریافت امتیاز» همان را ادامه بده.", "played")
+        raise MissionError("این بازی را قبلاً شروع کرده‌ای؛ از «دریافت سکه» همان را ادامه بده.", "played")
     reason = unavailable(mystery)
     if reason:
         raise MissionError(UNAVAILABLE[reason], reason)
@@ -560,7 +560,7 @@ def checkin(customer: Customer, mystery_id, step_id, data: dict) -> Result:
         else:
             left = WRONG_LIMIT - run.wrong_tries
             if step.proof == Proof.CHOICE:
-                refusal = MissionError("این گزینه درست نیست؛ امتیاز این مرحله از دست رفت، ولی می‌توانی ادامه بدهی.", "wrong")
+                refusal = MissionError("این گزینه درست نیست؛ سکهٔ این مرحله از دست رفت، ولی می‌توانی ادامه بدهی.", "wrong")
             else:
                 refusal = MissionError(f"{noun} درست نیست؛ {left} بار دیگر می‌توانی امتحان کنی.", "wrong")
         run.save(update_fields=["wrong_tries", "locked_until", "update_time"])
@@ -583,7 +583,7 @@ def scan(customer: Customer, code: str) -> Result:
         run = _locked_run(customer, mystery)
         if run is None:
             if not steps or steps[0].pk != step.pk:
-                raise MissionError(f"این QR مال معمای «{mystery.title}» است؛ اول معما را از «دریافت امتیاز» شروع کن.", "not_started")
+                raise MissionError(f"این QR مال معمای «{mystery.title}» است؛ اول معما را از «دریافت سکه» شروع کن.", "not_started")
             # (A mystery hidden from the list starts this way too: a poster-only hunt; a private
             # game's first QR is as good as its invite.)
             run = _new_run(customer, mystery)

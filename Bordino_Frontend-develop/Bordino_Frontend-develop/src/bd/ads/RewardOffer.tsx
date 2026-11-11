@@ -31,7 +31,7 @@ type Step =
 	| { kind: "failed"; message: string };
 
 /**
- * Before a game: «تماشای ویدیو و دریافت X امتیاز» or «ادامه بدون تماشای ویدیو». The game opens only
+ * Before a game: «تماشای ویدیو و دریافت X سکه» or «ادامه بدون تماشای ویدیو». The game opens only
  * after this flow ends, never behind it. The points come from the server, after it accepts the view.
  */
 export default function RewardOffer({ offer, gameName, placement, onPlay, onCancel }: Readonly<Props>) {
@@ -82,9 +82,9 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 							<Icon name="check" />
 						</span>
 						<b id="reward-title">
-							<bdi dir="ltr">+{fa(step.points)}</bdi> امتیاز
+							<bdi dir="ltr">+{fa(step.points)}</bdi> سکه
 						</b>
-						<p>به کیف امتیازت اضافه شد. بریم سراغ {gameName}…</p>
+						<p>به کیفت اضافه شد. بریم سراغ {gameName}…</p>
 					</div>
 				) : step.kind === "failed" ? (
 					<>
@@ -102,10 +102,10 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 							<Icon name="coins" />
 						</span>
 						<p className="bd-reward-heading" id="reward-title">
-							قبل از {gameName}، امتیاز بگیر!
+							قبل از {gameName}، سکه بگیر!
 						</p>
 						<p className="bd-reward-text">
-							{seconds ? `یک ویدیوی کوتاه (${fa(seconds)} ثانیه) ببین` : "یک ویدیوی کوتاه ببین"} و {fa(offer.reward_points)} امتیاز بگیر.
+							{seconds ? `یک ویدیوی کوتاه (${fa(seconds)} ثانیه) ببین` : "یک ویدیوی کوتاه ببین"} و {fa(offer.reward_points)} سکه بگیر.
 						</p>
 						<button
 							type="button"
@@ -115,7 +115,7 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 							onClick={() => void watch()}
 						>
 							{step.kind === "offer" ? <Icon name="play" /> : <Icon name="loader-circle" className="bd-spin" />}
-							{step.kind === "claiming" ? "در حال ثبت جایزه…" : `تماشای ویدیو و دریافت ${fa(offer.reward_points)} امتیاز`}
+							{step.kind === "claiming" ? "در حال ثبت جایزه…" : `تماشای ویدیو و دریافت ${fa(offer.reward_points)} سکه`}
 						</button>
 						<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer"} onClick={onPlay}>
 							ادامه بدون تماشای ویدیو

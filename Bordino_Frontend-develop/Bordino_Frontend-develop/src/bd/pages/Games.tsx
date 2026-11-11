@@ -26,7 +26,7 @@ function mysteryTag(m: MysteryCard) {
 	};
 	if (closed[m.state]) return closed[m.state];
 	if (m.state === "in_progress") return `${fa(m.done)} از ${fa(m.steps)} مرحله`;
-	return `${fa(m.steps)} مرحله · تا ${fa(m.points)} امتیاز`;
+	return `${fa(m.steps)} مرحله · تا ${fa(m.points)} سکه`;
 }
 
 function Cover({ game }: { game: GameEntry }) {

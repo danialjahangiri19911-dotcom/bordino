@@ -129,7 +129,7 @@ function View() {
 		if (await game.startPaidGame()) {
 			void refetchCost();
 			setConfirm("");
-		} else setProblem("بازی شروع نشد؛ موجودی امتیاز یا اتصال را بررسی کن.");
+		} else setProblem("بازی شروع نشد؛ موجودی سکه یا اتصال را بررسی کن.");
 	};
 	const move = (dir: Direction) => {
 		if (!playing || modal) return;
@@ -187,10 +187,10 @@ function View() {
 	const maxTile = tiles.length ? Math.max(...tiles.map((t) => t.value)) : 0;
 
 	const dialog: Record<string, [string, string]> = {
-		ready: ["عددها را به هم برسان", playCost !== undefined ? `هر بازی ${fa(playCost)} امتیاز${points !== undefined ? ` · موجودی تو ${fa(points)} امتیاز` : ""}` : "هزینهٔ بازی در حال دریافت است…"],
+		ready: ["عددها را به هم برسان", playCost !== undefined ? `هر بازی ${fa(playCost)} سکه${points !== undefined ? ` · موجودی تو ${fa(points)} سکه` : ""}` : "هزینهٔ بازی در حال دریافت است…"],
 		win: ["۲۰۴۸ را ساختی!", `امتیاز این بازی: ${fa(game.score)}. یک رکورد بزرگ‌تر؟`],
 		lost: ["این دور تمام شد", `حرکتی باقی نمانده؛ امتیاز نهایی ${fa(game.score)}.`],
-		reset: ["از نو شروع کنیم؟", `صفحهٔ فعلی پاک می‌شود و بازی تازه${playCost !== undefined ? ` ${fa(playCost)} امتیاز` : ""} هزینه دارد؛ رکوردت می‌ماند.`],
+		reset: ["از نو شروع کنیم؟", `صفحهٔ فعلی پاک می‌شود و بازی تازه${playCost !== undefined ? ` ${fa(playCost)} سکه` : ""} هزینه دارد؛ رکوردت می‌ماند.`],
 	};
 
 	return (
@@ -231,7 +231,7 @@ function View() {
 				<section className="g48-help" hidden={!help}>
 					<b>یک حرکت، یک ترکیب</b>
 					<p>عددهای یکسان را با کشیدن روی صفحه یا کلیدهای جهت‌نما به هم برسان. هر ترکیب به امتیاز بازی اضافه می‌شود. هدف، ساختن کاشی ۲۰۴۸ است؛ زمان محدودی ندارد.</p>
-					<small>هر بازی امتیاز کیف‌پول می‌گیرد؛ امتیاز و رکورد خود بازی به کیف‌پول اضافه نمی‌شوند.</small>
+					<small>هر بازی از سکه‌های کیف کم می‌کند؛ امتیاز و رکورد خود بازی به کیف اضافه نمی‌شوند.</small>
 				</section>
 				<div className="g48-layout">
 					<section className="g48-play">
@@ -331,7 +331,7 @@ function View() {
 					<span>
 						<b>{fa(game.moveCount)}</b> حرکت
 					</span>
-					<span>{playCost !== undefined ? `هر بازی ${fa(playCost)} امتیاز` : ""}</span>
+					<span>{playCost !== undefined ? `هر بازی ${fa(playCost)} سکه` : ""}</span>
 				</footer>
 				<p className="g48-sr" aria-live="polite">
 					{game.status === "won" ? "۲۰۴۸ ساخته شد" : game.status === "lost" ? "بازی تمام شد" : `امتیاز ${fa(game.score)}`}

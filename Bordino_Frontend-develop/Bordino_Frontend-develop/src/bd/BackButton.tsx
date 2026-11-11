@@ -187,7 +187,7 @@ export default function BackButton() {
 					</p>
 					<p className="bd-leave-text">
 						در نسخه‌ای که نصب کرده‌ای، دکمهٔ برگشت گوشی برنامه را می‌بندد. نسخهٔ تازه را نصب کن؛ روی همین نسخه نصب می‌شود و حساب و
-						امتیازهایت سر جایشان می‌مانند. اگر دانلود شروع نشد، این نشانی را در مرورگر باز کن: lottery.bordino.co/download/bordino.apk
+						سکه‌هایت سر جایشان می‌مانند. اگر دانلود شروع نشد، این نشانی را در مرورگر باز کن: lottery.bordino.co/download/bordino.apk
 					</p>
 					<a className="bd-sheet-item bd-sheet-danger" href={APK_URL}>
 						دانلود نسخهٔ تازه

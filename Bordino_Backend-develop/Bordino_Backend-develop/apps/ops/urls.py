@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.ops import views_auth as a
+from apps.ops import views_coins as c
 from apps.ops import views_dash as d
 from apps.ops import views_games as g
 from apps.ops import views_money as m
@@ -31,6 +32,9 @@ urlpatterns = [
     path(P + "bank-accounts/", m.BankAccountsView.as_view(), name="ops_bank_accounts"),
     path(P + "bank-accounts/<uuid:account_id>/<str:decision>/", m.BankAccountDecideView.as_view(), name="ops_bank_account_decide"),
     # settings, dashboards, users
+    path(P + "coins/packages/", c.PackagesView.as_view(), name="ops_coin_packages"),
+    path(P + "coins/packages/<uuid:package_id>/", c.PackageView.as_view(), name="ops_coin_package"),
+    path(P + "coins/purchases/", c.PurchasesView.as_view(), name="ops_coin_purchases"),
     path(P + "settings/", d.SettingsView.as_view(), name="ops_settings"),
     path(P + "settings/<str:key>/", d.SettingView.as_view(), name="ops_setting"),
     path(P + "overview/", d.OverviewView.as_view(), name="ops_overview"),

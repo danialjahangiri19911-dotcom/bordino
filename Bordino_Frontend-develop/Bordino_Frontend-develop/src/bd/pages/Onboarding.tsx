@@ -29,9 +29,9 @@ const INTRO = [
 	},
 	{
 		art: "wallet",
-		tag: "امتیازهایت را ببین",
-		title: "همهٔ امتیازها، یک‌جا.",
-		text: "امتیازها، بلیت‌های قرعه‌کشی و تاریخچهٔ حسابت را در کیف‌پول ببین؛ هر جایزه را سرور ثبت می‌کند.",
+		tag: "سکه‌هایت را ببین",
+		title: "همهٔ سکه‌ها، یک‌جا.",
+		text: "سکه‌ها، بلیت‌های قرعه‌کشی و تاریخچهٔ حسابت را در کیف‌پول ببین؛ هر جایزه را سرور ثبت می‌کند.",
 		detail: "موجودی و گردش حساب همیشه در دسترس است.",
 	},
 	{
@@ -290,7 +290,7 @@ export default function Onboarding() {
 				<Intro
 					welcome={
 						welcome && points.points
-							? `${welcome} موجودی امتیاز تو: ${fa(points.points)}`
+							? `${welcome} موجودی سکهٔ تو: ${fa(points.points)}`
 							: welcome
 					}
 					onDone={() => replace(R.home)}

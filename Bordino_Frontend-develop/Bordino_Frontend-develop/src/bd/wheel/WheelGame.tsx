@@ -102,7 +102,7 @@ export default function WheelGame() {
 	const cost = free ? 0 : betOk ? bet : minBet;
 	const balance = points.points ?? 0;
 	const enough = points.points !== null && balance >= cost;
-	const betProblem = !free && betText !== null && !betOk ? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} امتیاز باشد.` : null;
+	const betProblem = !free && betText !== null && !betOk ? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} سکه باشد.` : null;
 	const setBet = (value: number | string) => {
 		setBetText(String(value));
 		setOutcome(null);
@@ -367,8 +367,8 @@ export default function WheelGame() {
 				</GameBar>
 				<section className="wh-help" hidden={!help}>
 					<b>یک چرخش، یک شانس تازه</b>
-					<p>شرط هر چرخش را خودت انتخاب می‌کن{minBet ? `ی (${fa(minBet)} تا ${fa(maxBet)} امتیاز)` : "ی"} و همان از کیف امتیاز کم می‌شود. جایزه را سرور انتخاب می‌کند و گردونه روی همان خانه می‌ایستد؛ اندازهٔ هر خانه همان شانس واقعی آن است.</p>
-					<p>جایزهٔ هر خانه به نسبت شرط بزرگ‌تر می‌شود{base ? `: شرط ${fa(base * 2)} یعنی دو برابرِ جایزه‌های شرط ${fa(base)}` : ""}؛ شانس‌ها ثابت می‌مانند. جایزهٔ امتیازی به کیف امتیاز و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود.</p>
+					<p>شرط هر چرخش را خودت انتخاب می‌کن{minBet ? `ی (${fa(minBet)} تا ${fa(maxBet)} سکه)` : "ی"} و همان از کیف کم می‌شود. جایزه را سرور انتخاب می‌کند و گردونه روی همان خانه می‌ایستد؛ اندازهٔ هر خانه همان شانس واقعی آن است.</p>
+					<p>جایزهٔ هر خانه به نسبت شرط بزرگ‌تر می‌شود{base ? `: شرط ${fa(base * 2)} یعنی دو برابرِ جایزه‌های شرط ${fa(base)}` : ""}؛ شانس‌ها ثابت می‌مانند. جایزهٔ سکه‌ای به کیف و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود.</p>
 				</section>
 				<main className="wh-main">
 					<div className="wh-topline">
@@ -378,7 +378,7 @@ export default function WheelGame() {
 								موجودی <b>{points.points === null ? "…" : fa(balance)}</b>
 							</span>
 						</span>
-						<span className="wh-demo">{free ? "چرخش رایگان" : cost ? `شرط ${fa(cost)} امتیاز` : "گردونهٔ بردینو"}</span>
+						<span className="wh-demo">{free ? "چرخش رایگان" : cost ? `شرط ${fa(cost)} سکه` : "گردونهٔ بردینو"}</span>
 					</div>
 					{!slices.length ? (
 						<div className="wh-state" role="status">
@@ -457,7 +457,7 @@ export default function WheelGame() {
 							<section className="wh-controls" aria-label="کنترل گردونه">
 								<div className="wh-cost" hidden={free}>
 									<span>
-										شرط هر چرخش <small>امتیاز</small>
+										شرط هر چرخش <small>سکه</small>
 									</span>
 									<div className="wh-stepper" dir="ltr">
 										<button
@@ -493,7 +493,7 @@ export default function WheelGame() {
 									<span>{spinning ? "داره می‌چرخه…" : "بگردون"}</span>
 								</button>
 								<p className="wh-error" role="alert" hidden={!error && !betProblem && (points.points === null || enough || spinning)}>
-									{error ?? betProblem ?? `امتیاز کافی نیست؛ شرط این چرخش ${fa(cost)} امتیاز است.`}
+									{error ?? betProblem ?? `سکهٔ کافی نیست؛ شرط این چرخش ${fa(cost)} سکه است.`}
 								</p>
 							</section>
 							<div className="wh-history">

@@ -100,7 +100,7 @@ def place_bet(user, bet: int, auto_cashout=None, now=None, request_id: str | Non
     if not config.enabled:
         raise CrashError("بازی انفجار فعلاً غیرفعال است.")
     if bet < config.min_bet or bet > config.max_bet:
-        raise CrashError(f"مبلغ شرط باید بین {config.min_bet} و {config.max_bet} امتیاز باشد.")
+        raise CrashError(f"مبلغ شرط باید بین {config.min_bet} و {config.max_bet} سکه باشد.")
 
     payout_cap = min(fair.floor_cents(Decimal(config.max_payout) / bet), config.max_multiplier)
     if payout_cap < MIN_TARGET:
@@ -113,7 +113,7 @@ def place_bet(user, bet: int, auto_cashout=None, now=None, request_id: str | Non
     customer = customer_for(user)
     account = points_account(user)
     if account is None:
-        raise CrashError("کیف امتیازی برای کاربر یافت نشد.")
+        raise CrashError("کیفی برای کاربر یافت نشد.")
 
     now = now or timezone.now()
     with transaction.atomic():
@@ -131,9 +131,9 @@ def place_bet(user, bet: int, auto_cashout=None, now=None, request_id: str | Non
         if CrashRound.objects.filter(customer=customer, status=CrashRound.Status.ACTIVE).exists():
             raise CrashError("یک دست هنوز در جریان است.")
         if account.status != TokenWalletAccount.WalletStatus.VALID:
-            raise CrashError("کیف امتیاز شما فعال نیست.")
+            raise CrashError("کیف شما فعال نیست.")
         if account.amount < bet:
-            raise CrashError("امتیاز کافی برای این شرط نداری.")
+            raise CrashError("سکهٔ کافی برای این شرط نداری.")
 
         seed = seed_for(customer)
         nonce = seed.next_nonce

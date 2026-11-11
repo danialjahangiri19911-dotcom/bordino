@@ -45,7 +45,7 @@ function nextStep(g: GameSummary): string {
 	return "";
 }
 
-const BOARD_NAME: Record<string, string> = { progress: "بیشترین مرحله", score: "بیشترین امتیاز", speed: "سریع‌ترین پایان", participation: "فعالیت", team: "تیمی" };
+const BOARD_NAME: Record<string, string> = { progress: "بیشترین مرحله", score: "بیشترین سکه", speed: "سریع‌ترین پایان", participation: "فعالیت", team: "تیمی" };
 
 /** A published game's life at a glance: days left / end date, players, the leaderboard. */
 function lifeLine(g: GameSummary): string {

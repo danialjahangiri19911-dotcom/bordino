@@ -152,7 +152,7 @@ function StageTimer({ step }: { step: Current }) {
 			<Icon name="timer" />{" "}
 			{left
 				? `مهلت: ${clock(left)}`
-				: "مهلت تمام شد؛ هنوز می‌توانی حل کنی ولی امتیاز این مرحله صفر است."}
+				: "مهلت تمام شد؛ هنوز می‌توانی حل کنی ولی سکهٔ این مرحله صفر است."}
 		</p>
 	);
 }
@@ -206,7 +206,7 @@ function Hints({
 					{h.kind === "answer" ? (
 						<p>
 							<bdi className="my-hint-answer">{h.answer}</bdi> — همین را بنویس؛
-							این مرحله امتیازی ندارد.
+							این مرحله سکه‌ای ندارد.
 						</p>
 					) : null}
 				</div>
@@ -216,8 +216,8 @@ function Hints({
 					<div className="my-hint-ask" role="group" aria-label="تأیید راهنمایی">
 						<span>
 							{next === "answer"
-								? "با دیدن جواب، امتیاز این مرحله صفر می‌شود."
-								: `${fa(step.next_hint_cost)} امتیاز از این مرحله کم می‌شود.`}
+								? "با دیدن جواب، سکهٔ این مرحله صفر می‌شود."
+								: `${fa(step.next_hint_cost)} سکه از این مرحله کم می‌شود.`}
 						</span>
 						<button
 							type="button"
@@ -250,7 +250,7 @@ function Hints({
 						<small>
 							({fa(shown.length + 1)} از {fa(step.hints_total)}
 							{step.next_hint_cost && next !== "answer"
-								? ` · −${fa(step.next_hint_cost)} امتیاز`
+								? ` · −${fa(step.next_hint_cost)} سکه`
 								: ""}
 							)
 						</small>
@@ -543,11 +543,11 @@ export default function Mystery({ id }: { id: string }) {
 					});
 			} else if (reward.mystery) {
 				setProblem(
-					`این QR مال معمای دیگری است («${reward.summary ?? ""}»)؛ امتیازش ثبت شد.`,
+					`این QR مال معمای دیگری است («${reward.summary ?? ""}»)؛ سکه‌اش ثبت شد.`,
 				);
 			} else {
 				setProblem(
-					`این QR مال مأموریت «${reward.title ?? ""}» بود${reward.already_rewarded ? "" : ` و ${fa(reward.points)} امتیاز گرفتی`}.`,
+					`این QR مال مأموریت «${reward.title ?? ""}» بود${reward.already_rewarded ? "" : ` و ${fa(reward.points)} سکه گرفتی`}.`,
 				);
 			}
 			refreshAll();
@@ -579,7 +579,7 @@ export default function Mystery({ id }: { id: string }) {
 	return (
 		<AppShell nav="earn" title={m.title}>
 			<Link className="my-back" href={R.earn}>
-				<Icon name="arrow-left" /> دریافت امتیاز
+				<Icon name="arrow-left" /> دریافت سکه
 			</Link>
 			<section className="bd-panel my-hero">
 				{m.cover ? <img className="my-cover" src={m.cover} alt="" /> : null}
@@ -607,7 +607,7 @@ export default function Mystery({ id }: { id: string }) {
 					) : null}
 					{m.points ? (
 						<li>
-							<Icon name="coins" /> تا {fa(m.points)} امتیاز
+							<Icon name="coins" /> تا {fa(m.points)} سکه
 						</li>
 					) : null}
 					{m.ends_at ? (
@@ -690,9 +690,9 @@ export default function Mystery({ id }: { id: string }) {
 						{/* (a game without points, like a birthday surprise, says nothing about points) */}
 						{win.points || win.bonus ? (
 							<small>
-								+{fa(win.points)} امتیاز
-								{win.bonus ? ` و ${fa(win.bonus)} امتیاز جایزهٔ پایان` : ""} به
-								کیف امتیازت اضافه شد.
+								+{fa(win.points)} سکه
+								{win.bonus ? ` و ${fa(win.bonus)} سکهٔ جایزهٔ پایان` : ""} به
+								کیفت اضافه شد.
 							</small>
 						) : null}
 					</div>
@@ -777,7 +777,7 @@ export default function Mystery({ id }: { id: string }) {
 					text={[
 						m.completion_message,
 						m.run?.points_earned
-							? `${fa(m.run.points_earned)} امتیاز از این معما گرفتی.`
+							? `${fa(m.run.points_earned)} سکه از این معما گرفتی.`
 							: "",
 						"محل‌هایی که پیدا کردی همین بالا هستند.",
 					]

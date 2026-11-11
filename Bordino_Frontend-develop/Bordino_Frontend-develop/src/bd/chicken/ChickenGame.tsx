@@ -224,9 +224,9 @@ export default function ChickenGame() {
 		!config || !amountText
 			? null
 			: !Number.isInteger(amount) || amount < minBet || amount > maxBet
-				? `امتیاز باید بین ${fa(minBet)} و ${fa(maxBet)} باشد.`
+				? `شرط باید بین ${fa(minBet)} و ${fa(maxBet)} سکه باشد.`
 				: amount > balance
-					? "موجودی امتیاز کافی نیست."
+					? "موجودی سکهٔ کافی نیست."
 					: null;
 
 	// ── actions (each is one server call; the hook runs one at a time) ──
@@ -332,16 +332,16 @@ export default function ChickenGame() {
 				: config && !config.enabled
 					? "مرغ فراری فعلاً غیرفعال است."
 					: lowBalance && view.phase === "ready"
-						? `امتیاز کافی برای شروع نداری (موجودی ${fa(balance)}، کمترین شرط ${fa(minBet)} امتیاز).`
+						? `سکهٔ کافی برای شروع نداری (موجودی ${fa(balance)}، کمترین شرط ${fa(minBet)} سکه).`
 						: amountError && view.phase === "ready"
 							? amountError
 							: {
 									loading: "",
-									ready: "امتیاز و سطح را انتخاب کن؛ سپس شروع.",
+									ready: "مقدار شرط و سطح را انتخاب کن؛ سپس شروع.",
 									playing: view.lane ? "هر پرش موفق، یک خط جلوتر. هر وقت خواستی توقف کن." : "اولین پرش را بزن.",
 									jumping: "در حال پرش…",
 									colliding: "برخورد!",
-									won: "برد ثبت شد و به کیف امتیاز رفت.",
+									won: "برد ثبت شد و به کیف رفت.",
 									lost: "برای دور بعد آماده‌ای؟",
 								}[view.phase];
 
@@ -393,9 +393,9 @@ export default function ChickenGame() {
 									بستن
 								</button>
 							</div>
-							<p>مرغ از پیاده‌رو روی دایرهٔ خط بعد می‌پرد. هر خط که سالم رد شود، ضریب آن خط به دست می‌آید؛ «توقف و دریافت» شرط × همان ضریب را به کیف امتیاز می‌برد. برخورد با خودرو یعنی باخت شرط.</p>
+							<p>مرغ از پیاده‌رو روی دایرهٔ خط بعد می‌پرد. هر خط که سالم رد شود، ضریب آن خط به دست می‌آید؛ «توقف و دریافت» شرط × همان ضریب را به کیف می‌برد. برخورد با خودرو یعنی باخت شرط.</p>
 							<p>
-								جاده تا وقتی خودرویی نزند ادامه دارد؛ هر سطح خطرِ هر خط و رشد ضریب خودش را دارد. وقتی برد به سقف {fa(config?.max_payout ?? 0)} امتیاز برسد، همان‌جا خودکار دریافت می‌شود.
+								جاده تا وقتی خودرویی نزند ادامه دارد؛ هر سطح خطرِ هر خط و رشد ضریب خودش را دارد. وقتی برد به سقف {fa(config?.max_payout ?? 0)} سکه برسد، همان‌جا خودکار دریافت می‌شود.
 							</p>
 							<p>
 								خط برخورد پیش از شروع دور با سید سرور تعیین می‌شود و هش آن از قبل نمایش داده می‌شود: <bdi dir="ltr" className="ck-hash">{(round?.server_seed_hash ?? "—").slice(0, 24)}…</bdi>
@@ -498,7 +498,7 @@ export default function ChickenGame() {
 											{round.step === round.lanes ? (endsAtCap ? "سقف برد! " : "پایان جاده! ") : ""}
 											توقف در {mult(round.cashout_multiplier ?? reachedValue)}
 										</strong>
-										<p>{fa(round.payout)} امتیاز به کیف امتیاز رفت</p>
+										<p>{fa(round.payout)} سکه به کیف رفت</p>
 									</div>
 								) : null}
 								{lost ? (
@@ -516,7 +516,7 @@ export default function ChickenGame() {
 							</div>
 							<div className="ck-board-footer">
 								<span>
-									موجودی: <b>{config ? fa(balance) : "…"}</b> امتیاز
+									موجودی: <b>{config ? fa(balance) : "…"}</b> سکه
 								</span>
 								<span className="ck-demo">{LEVELS.find(([key]) => key === level)?.[1]}</span>
 							</div>
@@ -532,21 +532,21 @@ export default function ChickenGame() {
 								</div>
 								<div className="ck-settings">
 									<div className="ck-setting">
-										<span className="ck-label">امتیاز هر شرط</span>
+										<span className="ck-label">سکهٔ هر شرط</span>
 										<div className="ck-stake-strip" dir="ltr">
-											<button type="button" aria-label="کم کردن امتیاز" disabled={locked || amount <= minBet} onClick={() => setAmountText(String(Math.max(minBet, (Number.isFinite(amount) ? amount : minBet) - 1)))}>
+											<button type="button" aria-label="کم کردن سکه" disabled={locked || amount <= minBet} onClick={() => setAmountText(String(Math.max(minBet, (Number.isFinite(amount) ? amount : minBet) - 1)))}>
 												−
 											</button>
 											<input
 												type="text"
 												inputMode="numeric"
-												aria-label="امتیاز هر شرط"
+												aria-label="سکهٔ هر شرط"
 												value={amountText}
 												disabled={locked}
 												aria-invalid={!!amountError}
 												onChange={(e) => setAmountText(e.target.value.replace(/[^0-9۰-۹٠-٩]/g, "").slice(0, 7))}
 											/>
-											<button type="button" aria-label="زیاد کردن امتیاز" disabled={locked || amount >= maxBet} onClick={() => setAmountText(String(Math.min(maxBet, (Number.isFinite(amount) ? amount : minBet - 1) + 1)))}>
+											<button type="button" aria-label="زیاد کردن سکه" disabled={locked || amount >= maxBet} onClick={() => setAmountText(String(Math.min(maxBet, (Number.isFinite(amount) ? amount : minBet - 1) + 1)))}>
 												+
 											</button>
 										</div>
@@ -567,7 +567,7 @@ export default function ChickenGame() {
 										<Icon name="hand-coins" />
 										<span className="ck-action-label">توقف و دریافت</span>
 									</button>
-									<small className="ck-action-caption">{view.phase === "playing" && view.lane && round ? `${fa(Math.floor(round.bet * (values[view.lane - 1] ?? 1)))} امتیاز` : view.phase === "won" && round ? `${fa(round.payout)} امتیاز گرفتی` : "پس از اولین پرش"}</small>
+									<small className="ck-action-caption">{view.phase === "playing" && view.lane && round ? `${fa(Math.floor(round.bet * (values[view.lane - 1] ?? 1)))} سکه` : view.phase === "won" && round ? `${fa(round.payout)} سکه گرفتی` : "پس از اولین پرش"}</small>
 								</div>
 							</div>
 							<p className="ck-notice" aria-live="polite" role={game.error || !online ? "alert" : undefined}>

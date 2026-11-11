@@ -78,12 +78,12 @@ const STATE_RANK: Record<MissionState, number> = {
 type Sort = "suggested" | "points" | "newest" | "ending";
 const SORTS: [Sort, string][] = [
 	["suggested", "پیشنهادی"],
-	["points", "بیشترین امتیاز"],
+	["points", "بیشترین سکه"],
 	["newest", "جدیدترین"],
 	["ending", "زودتر تمام می‌شود"],
 ];
 
-/** Each order's own direction first («بیشترین امتیاز» = most first); the arrow reverses it. */
+/** Each order's own direction first («بیشترین سکه» = most first); the arrow reverses it. */
 function sorted(rows: Row[], sort: Sort, reverse = false) {
 	const list = [...rows];
 	const time = (s: string | null, none: number) =>
@@ -105,7 +105,7 @@ function sorted(rows: Row[], sort: Sort, reverse = false) {
 	return reverse ? list.reverse() : list;
 }
 
-/** «دریافت امتیاز»: the missions a player can do for points, by category, with their state. */
+/** «دریافت سکه»: the missions a player can do for points, by category, with their state. */
 export default function Earn() {
 	const { data, isLoading, error, refetch } = useMissions();
 	const list = data?.result;
@@ -192,11 +192,11 @@ export default function Earn() {
 	];
 
 	return (
-		<AppShell nav="earn" title="دریافت امتیاز" headingExtra={<Balance />}>
+		<AppShell nav="earn" title="دریافت سکه" headingExtra={<Balance />}>
 			<section className="ng-catalog">
 				<div className="ng-filterbar">
 					<h3>
-						<Icon name="coins" /> مأموریت‌های امتیاز
+						<Icon name="coins" /> مأموریت‌های سکه
 						{/* Its room is kept while loading (invisible), so the heading never grows and moves the sort menu. */}
 						<span
 							className="bd-tag"
@@ -297,7 +297,7 @@ export default function Earn() {
 										</span>
 										<span className="mi-points">
 											<bdi dir="ltr">+{fa(row.points)}</bdi>
-											<small>امتیاز</small>
+											<small>سکه</small>
 										</span>
 									</Link>
 								) : (
@@ -326,7 +326,7 @@ export default function Earn() {
 										</span>
 										<span className="mi-points">
 											<bdi dir="ltr">+{fa(row.m.points)}</bdi>
-											<small>امتیاز</small>
+											<small>سکه</small>
 										</span>
 									</button>
 								),
@@ -345,7 +345,7 @@ export default function Earn() {
 			<div className="ng-status">
 				<Icon name="info" />
 				<div>
-					<b>امتیاز هر مأموریت بعد از انجام یا تأیید به کیف امتیاز می‌رود.</b>
+					<b>سکهٔ هر مأموریت بعد از انجام یا تأیید به کیف می‌رود.</b>
 					<small>
 						مأموریت‌های ثبت‌نام و نصب اپ بعد از بررسی تأیید می‌شوند؛ وضعیت هر
 						مأموریت روی همان ردیف دیده می‌شود.

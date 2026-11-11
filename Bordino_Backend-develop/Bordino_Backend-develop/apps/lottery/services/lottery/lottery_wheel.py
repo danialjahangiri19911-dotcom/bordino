@@ -184,7 +184,7 @@ class LotteryWheelService:
                     wallet.token_wallet_accounts.filter(token_id=token_id, status=valid).order_by("create_time", "pk").first()
                 )
                 if targets[token_id] is None:
-                    raise ValidationError(_("کیف امتیاز این جایزه برای تو ساخته نشده؛ با پشتیبانی تماس بگیر."))
+                    raise ValidationError(_("کیف این جایزه برای تو ساخته نشده؛ با پشتیبانی تماس بگیر."))
 
         # Locked, checked and debited in one go: two spins at once cannot both pass the check,
         # and no other change to the account is overwritten.

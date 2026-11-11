@@ -152,7 +152,7 @@ export default function AvailabilitySetup({
 					<div className="gm-choice-grid" role="radiogroup" aria-label="بعد از پایان">
 						<button type="button" role="radio" aria-checked={a.after === "strict"} className="gm-choice" disabled={disabled} onClick={() => setA({ after: "strict", grace_hours: 0 })}>
 							<b>پایان کامل</b>
-							<small>سر وقت، بازی برای همه بسته می‌شود؛ امتیازهای گرفته‌شده می‌ماند.</small>
+							<small>سر وقت، بازی برای همه بسته می‌شود؛ سکه‌های گرفته‌شده می‌ماند.</small>
 						</button>
 						<button type="button" role="radio" aria-checked={a.after === "finish"} className="gm-choice" disabled={disabled} onClick={() => setA({ after: "finish", grace_hours: a.grace_hours || 24 })}>
 							<b>فرصت تمام کردن</b>
@@ -184,7 +184,7 @@ export default function AvailabilitySetup({
 					) : null}
 					<small className="bd-muted">
 						بعد از پایان، بازی از فهرست بازی‌ها پنهان می‌شود؛ آمار، پیشرفت بازیکنان، جایزه‌ها و تراکنش‌ها می‌ماند و بازیکنان سابقهٔ خودشان را می‌بینند. باقی‌ماندهٔ بودجه به کیف
-						امتیازت برمی‌گردد.
+						سکه‌ات برمی‌گردد.
 					</small>
 				</>
 			) : null}

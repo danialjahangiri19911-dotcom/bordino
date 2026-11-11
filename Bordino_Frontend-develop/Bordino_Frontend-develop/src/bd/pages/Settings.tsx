@@ -327,7 +327,7 @@ export function AppearancePage() {
 						</button>
 					))}
 				</div>
-				<small className="bd-muted">طرح همهٔ صفحه‌ها و بازی‌ها عوض می‌شود؛ امتیاز و حسابت همان می‌ماند.</small>
+				<small className="bd-muted">طرح همهٔ صفحه‌ها و بازی‌ها عوض می‌شود؛ سکه و حسابت همان می‌ماند.</small>
 			</Panel>
 			<Panel title="روشن یا تیره">
 				<div className="rt-theme-options" role="radiogroup" aria-label="روشن یا تیره">
@@ -383,7 +383,7 @@ export function Prizes() {
 					<>
 						<PartialHistoryNotice
 							parts={[
-								{ label: "امتیاز", history: withSummary(p, points) },
+								{ label: "سکه", history: withSummary(p, points) },
 								{ label: "نقدی", history: withSummary(c, cash) },
 							]}
 						/>

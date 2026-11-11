@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { CASH_WALLET_VISIBLE } from "../features";
 import { HistoryFooter, HistoryRow, useHistory } from "../history";
 import Icon from "../Icon";
 import { fa, faDate } from "../format";
@@ -34,117 +35,126 @@ export default function Wallet() {
 	const price = lottery ? Number(lottery.ticket_price) : null;
 	const progress = points.account && price ? Math.min(100, (Number(points.account.current_points) / price) * 100) : 0;
 
+	// The cash (toman) wallet is hidden for now (features.ts); its card stays here for later.
+	const cashPanel = (
+		<Panel title="کیف نقدی">
+			{cash.balance === null ? (
+				<LoadState loading={cash.isLoading} error={cash.error} onRetry={cash.refetch} />
+			) : (
+				<>
+					<strong className="rt-big">
+						{fa(cash.balance)} <small>تومان</small>
+					</strong>
+					<p>موجودی قابل برداشت</p>
+					<div className="bd-actions">
+						<Link className="bd-secondary" href={R.withdraw}>
+							درخواست برداشت
+						</Link>
+						<Link className="bd-text-btn" href={`${R.transactions}?kind=currency`}>
+							تراکنش‌های نقدی →
+						</Link>
+					</div>
+				</>
+			)}
+		</Panel>
+	);
+	const lotteriesPanel = (
+		<Panel title="قرعه‌کشی‌ها">
+			{lottery ? (
+				<div className="bd-rows">
+					<div className="bd-row">
+						<span className="bd-mission-icon">
+							<Icon name="ticket" />
+						</span>
+						<span>
+							<b>{lottery.name}</b>
+							<small>جایزه {fa(lottery.balance_in_money)} تومان · پایان {faDate(lottery.end_date)}</small>
+						</span>
+						<Link className="bd-text-btn" href={R.lotteryDetail(lottery.id)}>
+							جزئیات
+						</Link>
+					</div>
+				</div>
+			) : !lotteriesLoaded ? (
+				<LoadState loading={!lotteriesError} error={lotteriesError} onRetry={refetchLotteries} errorText="قرعه‌کشی‌ها بارگذاری نشد." />
+			) : (
+				<EmptyState
+					title={(points.account?.total_tickets ?? 0) > 0 ? "دورهٔ فعالی نیست" : "هنوز بلیتی نداری"}
+					text="بلیت‌های هر دوره در این بخش دیده می‌شوند."
+				/>
+			)}
+			<div className="bd-actions">
+				<Link className="bd-secondary" href={R.lotteries}>
+					مشاهدهٔ دوره‌ها{lotteryData.length ? ` (${fa(lotteryData.length)})` : ""}
+				</Link>
+			</div>
+		</Panel>
+	);
+	const historyPanel = (
+		<Panel title="گردش حساب">
+			{recent.length ? (
+				<div className="bd-rows">
+					{recent.map((entry) => (
+						<HistoryRow key={entry.id} entry={entry} />
+					))}
+				</div>
+			) : (
+				<HistoryFooter history={pointsHistory} empty={!pointsHistory.rows.length} emptyTitle="تراکنشی ثبت نشده" />
+			)}
+			{recent.length || !points.account ? (
+				<div className="bd-actions">
+					<Link className="bd-secondary" href={R.transactions}>
+						مشاهدهٔ تاریخچه
+					</Link>
+				</div>
+			) : null}
+		</Panel>
+	);
+
 	return (
 		<AppShell nav="wallet" title="کیف‌پول">
 			<div className="rt-two">
-				<Panel title="کیف امتیاز">
+				<Panel title="کیف">
 					{points.points === null ? (
 						<LoadState loading={points.isLoading} error={points.error} onRetry={points.refetch} />
 					) : (
 						<>
 							<strong className="rt-big">
-								{fa(points.points)} <small>امتیاز</small>
+								{fa(points.points)} <small>سکه</small>
 							</strong>
 							<p>
 								{fa(points.account?.total_tickets ?? 0)} بلیت فعال
-								{price ? ` · هر بلیت ${fa(price)} امتیاز` : lotteriesLoaded ? " · قرعه‌کشی فعالی نیست" : ""}
+								{price ? ` · هر بلیت ${fa(price)} سکه` : lotteriesLoaded ? " · قرعه‌کشی فعالی نیست" : ""}
 							</p>
 							{price ? (
 								<>
 									<div className="rt-track" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} aria-label="پیشرفت تا بلیت بعدی">
 										<span style={{ width: `${progress}%` }} />
 									</div>
-									<small>{fa(points.account?.remaining_points ?? price)} امتیاز تا بلیت بعدی</small>
+									<small>{fa(points.account?.remaining_points ?? price)} سکه تا بلیت بعدی</small>
 								</>
 							) : null}
 							{points.account?.expire_time ? (
 								<small className="bd-muted"> · اعتبار تا {faDate(points.account.expire_time)}</small>
 							) : null}
 							<div className="bd-actions">
-								{lottery ? (
-									<Link className="bd-action" href={R.tickets}>
-										تبدیل امتیاز به بلیت
-									</Link>
-								) : (
-									<button type="button" className="bd-action" disabled>
-										تبدیل امتیاز به بلیت
-									</button>
-								)}
-							</div>
-						</>
-					)}
-				</Panel>
-				<Panel title="کیف نقدی">
-					{cash.balance === null ? (
-						<LoadState loading={cash.isLoading} error={cash.error} onRetry={cash.refetch} />
-					) : (
-						<>
-							<strong className="rt-big">
-								{fa(cash.balance)} <small>تومان</small>
-							</strong>
-							<p>موجودی قابل برداشت</p>
-							<div className="bd-actions">
-								<Link className="bd-secondary" href={R.withdraw}>
-									درخواست برداشت
-								</Link>
-								<Link className="bd-text-btn" href={`${R.transactions}?kind=currency`}>
-									تراکنش‌های نقدی →
+								<Link className="bd-action" href={R.coins}>
+									<Icon name="coins" /> خرید سکه
 								</Link>
 							</div>
 						</>
 					)}
 				</Panel>
+				{CASH_WALLET_VISIBLE ? cashPanel : lotteriesPanel}
 			</div>
-			<div className="rt-two rt-gap-top">
-				<Panel title="قرعه‌کشی‌ها">
-					{lottery ? (
-						<div className="bd-rows">
-							<div className="bd-row">
-								<span className="bd-mission-icon">
-									<Icon name="ticket" />
-								</span>
-								<span>
-									<b>{lottery.name}</b>
-									<small>جایزه {fa(lottery.balance_in_money)} تومان · پایان {faDate(lottery.end_date)}</small>
-								</span>
-								<Link className="bd-text-btn" href={R.lotteryDetail(lottery.id)}>
-									جزئیات
-								</Link>
-							</div>
-						</div>
-					) : !lotteriesLoaded ? (
-						<LoadState loading={!lotteriesError} error={lotteriesError} onRetry={refetchLotteries} errorText="قرعه‌کشی‌ها بارگذاری نشد." />
-					) : (
-						<EmptyState
-							title={(points.account?.total_tickets ?? 0) > 0 ? "دورهٔ فعالی نیست" : "هنوز بلیتی نداری"}
-							text="بلیت‌های هر دوره در این بخش دیده می‌شوند."
-						/>
-					)}
-					<div className="bd-actions">
-						<Link className="bd-secondary" href={R.lotteries}>
-							مشاهدهٔ دوره‌ها{lotteryData.length ? ` (${fa(lotteryData.length)})` : ""}
-						</Link>
-					</div>
-				</Panel>
-				<Panel title="گردش حساب">
-					{recent.length ? (
-						<div className="bd-rows">
-							{recent.map((entry) => (
-								<HistoryRow key={entry.id} entry={entry} />
-							))}
-						</div>
-					) : (
-						<HistoryFooter history={pointsHistory} empty={!pointsHistory.rows.length} emptyTitle="تراکنشی ثبت نشده" />
-					)}
-					{recent.length || !points.account ? (
-						<div className="bd-actions">
-							<Link className="bd-secondary" href={R.transactions}>
-								مشاهدهٔ تاریخچه
-							</Link>
-						</div>
-					) : null}
-				</Panel>
-			</div>
+			{CASH_WALLET_VISIBLE ? (
+				<div className="rt-two rt-gap-top">
+					{lotteriesPanel}
+					{historyPanel}
+				</div>
+			) : (
+				<div className="rt-gap-top">{historyPanel}</div>
+			)}
 		</AppShell>
 	);
 }

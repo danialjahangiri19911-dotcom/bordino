@@ -30,6 +30,7 @@ urlpatterns += [
     path("", include("apps.ops.urls")),
     path("", include("apps.dowr.urls")),
     path("", include("apps.spy.urls")),
+    path("", include("apps.coins.urls")),
 ]
 
 if settings.DEBUG:

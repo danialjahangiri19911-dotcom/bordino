@@ -517,7 +517,7 @@ class GameMasterAuditTests(TestCase):
         steps = engine.steps_of(m)
         self.player_api.post(f"{url}/steps/{steps[0].pk}/checkin/", {"answer": "1404"}, format="json")
         wrong = body(self.player_api.post(f"{url}/steps/{steps[1].pk}/checkin/", {"answer": "الف"}, format="json"))
-        self.assertIn("امتیاز این مرحله از دست رفت", wrong["error"])
+        self.assertIn("سکهٔ این مرحله از دست رفت", wrong["error"])
         current = body(self.player_api.get(f"{url}/"))["mystery"]["step_list"][1]
         self.assertEqual(current["points_now"], 0)
         r = body(self.player_api.post(f"{url}/steps/{steps[1].pk}/checkin/", {"answer": "ب"}, format="json"))
@@ -561,7 +561,7 @@ class GameMasterAuditTests(TestCase):
 
     def test_problem_messages_use_persian_digits(self):
         d = quiz(budget_points=1)
-        self.assertEqual(schema.check(d)["budget_points"], "بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن (۳۵ امتیاز) باشد.")
+        self.assertEqual(schema.check(d)["budget_points"], "بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن (۳۵ سکه) باشد.")
         self.assertEqual(schema.fa(12500), "۱۲٬۵۰۰")
 
     def test_choice_options_must_differ(self):

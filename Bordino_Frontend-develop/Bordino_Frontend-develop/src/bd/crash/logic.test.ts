@@ -12,7 +12,7 @@ describe("crash form", () => {
 	it("checks the stake against the server's limits and the balance", () => {
 		expect(validate(DEFAULT_FORM, limits, false)).toBe("");
 		expect(validate({ ...DEFAULT_FORM, stake: "0" }, limits, false)).toMatch("بین");
-		expect(validate({ ...DEFAULT_FORM, stake: "600" }, limits, false)).toMatch("امتیاز کافی");
+		expect(validate({ ...DEFAULT_FORM, stake: "600" }, limits, false)).toMatch("سکهٔ کافی");
 		expect(validate({ ...DEFAULT_FORM, stake: "2.5" }, limits, false)).toMatch("بین");
 	});
 

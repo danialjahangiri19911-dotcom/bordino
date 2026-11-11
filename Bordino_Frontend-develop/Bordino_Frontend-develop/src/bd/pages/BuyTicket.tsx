@@ -73,7 +73,7 @@ export default function BuyTicket() {
 						<Facts
 							items={[
 								["عددهای انتخاب‌شده", `${fa(selectedBalls.length)} از ۶`],
-								["هزینهٔ این بلیت", offerPrice !== undefined ? `${fa(offerPrice)} امتیاز` : "—"],
+								["هزینهٔ این بلیت", offerPrice !== undefined ? `${fa(offerPrice)} سکه` : "—"],
 							]}
 						/>
 						{snackbarMessage ? <Notice>{snackbarMessage}</Notice> : null}
@@ -95,7 +95,7 @@ export default function BuyTicket() {
 								پاک کردن
 							</button>
 						</div>
-						<small className="bd-muted">امتیاز این بلیت هنگام ثبت کسر می‌شود.</small>
+						<small className="bd-muted">سکهٔ این بلیت هنگام ثبت کسر می‌شود.</small>
 					</Panel>
 				</div>
 			)}

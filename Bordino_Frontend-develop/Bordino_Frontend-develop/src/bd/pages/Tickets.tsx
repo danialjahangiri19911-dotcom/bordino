@@ -14,7 +14,7 @@ import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 import { addSearchParamsToUrl } from "@/libs/utils/urls";
 
 /**
- * «تبدیل امتیاز به بلیت»: choose how many tickets, then pick each ticket's numbers on the
+ * «تبدیل سکه به بلیت»: choose how many tickets, then pick each ticket's numbers on the
  * purchase page. Nothing is charged here: each ticket is paid when its numbers are submitted,
  * bound to this lottery and this price (a changed offer is refused by the server).
  */
@@ -40,8 +40,8 @@ export default function Tickets() {
 	else if (!enough) problem = `موجودی کافی نیست؛ با موجودی فعلی ${fa(affordable)} بلیت می‌توانی بگیری.`;
 
 	return (
-		<AppShell nav="wallet" title="تبدیل امتیاز به بلیت">
-			<Panel title="تبدیل امتیاز به بلیت">
+		<AppShell nav="wallet" title="تبدیل سکه به بلیت">
+			<Panel title="تبدیل سکه به بلیت">
 				{points.points === null ? (
 					<LoadState loading={points.isLoading} error={points.error} onRetry={points.refetch} />
 				) : !lottery ? (
@@ -68,9 +68,9 @@ export default function Tickets() {
 							);
 						}}
 					>
-						<div className="rt-conversion" aria-label={`${fa(price)} امتیاز برای هر بلیت`}>
+						<div className="rt-conversion" aria-label={`${fa(price)} سکه برای هر بلیت`}>
 							<span>
-								<b>{fa(price)}</b>امتیاز
+								<b>{fa(price)}</b>سکه
 							</span>
 							<Icon name="arrow-left" />
 							<span>
@@ -91,15 +91,15 @@ export default function Tickets() {
 						<Facts
 							items={[
 								["دوره", lottery.name],
-								["موجودی", `${fa(balance)} امتیاز`],
-								["امتیاز لازم", `${fa(valid ? needed : price)} امتیاز`],
+								["موجودی", `${fa(balance)} سکه`],
+								["سکهٔ لازم", `${fa(valid ? needed : price)} سکه`],
 							]}
 						/>
 						<div id="tickets-problem">{problem ? <Notice>{problem}</Notice> : null}</div>
 						<button className="bd-action" type="submit" disabled={!!problem}>
 							انتخاب عددهای بلیت
 						</button>
-						<p className="bd-muted">امتیاز هر بلیت هنگام ثبت عددهایش کسر می‌شود.</p>
+						<p className="bd-muted">سکهٔ هر بلیت هنگام ثبت عددهایش کسر می‌شود.</p>
 					</form>
 				)}
 			</Panel>

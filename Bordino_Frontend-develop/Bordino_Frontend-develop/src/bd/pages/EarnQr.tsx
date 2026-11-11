@@ -68,23 +68,23 @@ export default function EarnQr({ token }: { token: string }) {
 		</Link>
 	);
 	return (
-		<AppShell nav="earn" title="دریافت امتیاز" allowGuest={!isLoggedIn}>
+		<AppShell nav="earn" title="دریافت سکه" allowGuest={!isLoggedIn}>
 			<div className="bd-panel mi-qr-result" role="status">
 				{result ? (
 					<EmptyState
 						icon={result.already_rewarded ? "badge-check" : "coins"}
-						title={result.already_rewarded ? "امتیاز این QR را قبلاً گرفته‌ای" : `+${fa(result.points)} امتیاز گرفتی!`}
+						title={result.already_rewarded ? "سکهٔ این QR را قبلاً گرفته‌ای" : `+${fa(result.points)} سکه گرفتی!`}
 						text={
 							result.mystery
 								? `«${result.title}» در معمای «${result.summary}»${result.already_rewarded ? "" : result.mystery.finished ? " — معما را حل کردی!" : " — مرحلهٔ بعد باز شد."}`
 								: result.title
-									? `«${result.title}»${result.already_rewarded ? "" : " — به کیف امتیازت اضافه شد."}`
+									? `«${result.title}»${result.already_rewarded ? "" : " — به کیفت اضافه شد."}`
 									: undefined
 						}
 						action={more}
 					/>
 				) : problem ? (
-					<EmptyState icon="circle-alert" title="امتیاز داده نشد" text={problem} action={more} />
+					<EmptyState icon="circle-alert" title="سکه داده نشد" text={problem} action={more} />
 				) : (
 					<EmptyState icon="qr-code" title="در حال بررسی کد…" text={<Icon name="loader-circle" className="bd-spin" />} />
 				)}

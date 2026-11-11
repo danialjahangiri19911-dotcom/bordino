@@ -6,6 +6,10 @@ Modes (setting GM_ZIBAL_MODE):
 - "test": Zibal's own test merchant ("zibal") on the real gateway (needs the server to reach Zibal).
 - "live": the real merchant (GM_ZIBAL_MERCHANT, from Zibal's panel).
 Amounts here are in toman; Zibal takes rial (×10).
+
+Each caller has its own settings, by prefix: "GM" (Game Master fees: GM_ZIBAL_MODE / GM_ZIBAL_MERCHANT)
+and "COIN" (coin purchases: COIN_ZIBAL_MODE / COIN_ZIBAL_MERCHANT, an empty merchant falls back to the
+Game Master one: one Bordino merchant).
 """
 
 import json
@@ -34,23 +38,31 @@ class Verified:
     result: int | None
 
 
-def _mode() -> str:
+def _setting(prefix: str, name: str):
+    if prefix == "COIN":
+        from apps.coins.services import setting  # pylint: disable=import-outside-toplevel
+
+        return setting(f"COIN_{name}")
     from apps.gamemaster.services import setting  # pylint: disable=import-outside-toplevel
 
-    mode = str(setting("GM_ZIBAL_MODE") or "sandbox").lower()
+    return setting(f"GM_{name}")
+
+
+def _mode(prefix: str = "GM") -> str:
+    mode = str(_setting(prefix, "ZIBAL_MODE") or "sandbox").lower()
     return mode if mode in ("sandbox", "test", "live") else "sandbox"
 
 
-def mode() -> str:
-    return _mode()
+def mode(prefix: str = "GM") -> str:
+    return _mode(prefix)
 
 
-def _merchant() -> str:
-    from apps.gamemaster.services import setting  # pylint: disable=import-outside-toplevel
-
-    if _mode() == "test":
+def _merchant(prefix: str = "GM") -> str:
+    if _mode(prefix) == "test":
         return TEST_MERCHANT
-    merchant = str(setting("GM_ZIBAL_MERCHANT") or "").strip()
+    merchant = str(_setting(prefix, "ZIBAL_MERCHANT") or "").strip()
+    if not merchant and prefix != "GM":
+        merchant = str(_setting("GM", "ZIBAL_MERCHANT") or "").strip()
     if not merchant:
         raise ZibalError("پرداخت آنلاین هنوز راه‌اندازی نشده است.")
     return merchant
@@ -68,12 +80,12 @@ def _post(path: str, body: dict) -> dict:
         raise ZibalError("ارتباط با درگاه پرداخت برقرار نشد؛ کمی بعد دوباره امتحان کن.") from exc
 
 
-def request(amount_toman: int, description: str, callback_url: str, order_id: str, mobile: str = "") -> str:
+def request(amount_toman: int, description: str, callback_url: str, order_id: str, mobile: str = "", prefix: str = "GM") -> str:
     """A new transaction: its trackId."""
-    if _mode() == "sandbox":
+    if _mode(prefix) == "sandbox":
         return f"sbx-{uuid.uuid4().hex}"
     body = {
-        "merchant": _merchant(),
+        "merchant": _merchant(prefix),
         "amount": int(amount_toman) * 10,
         "callbackUrl": callback_url,
         "description": description[:255],
@@ -88,18 +100,18 @@ def request(amount_toman: int, description: str, callback_url: str, order_id: st
     return str(data["trackId"])
 
 
-def pay_url(track_id: str, sandbox_url: str) -> str:
-    return sandbox_url if _mode() == "sandbox" else f"{API}/start/{track_id}"
+def pay_url(track_id: str, sandbox_url: str, prefix: str = "GM") -> str:
+    return sandbox_url if _mode(prefix) == "sandbox" else f"{API}/start/{track_id}"
 
 
-def verify(track_id: str, sandbox_success: bool = False) -> Verified:
+def verify(track_id: str, sandbox_success: bool = False, prefix: str = "GM") -> Verified:
     """Asks Zibal whether the transaction was paid (result 100 = now, 201 = before). In sandbox mode
     the «پرداخت آزمایشی» page's answer stands in for it."""
-    if _mode() == "sandbox":
+    if _mode(prefix) == "sandbox":
         if not track_id.startswith("sbx-"):
             return Verified(False, None, "", "", None)
         return Verified(bool(sandbox_success), None, f"SANDBOX-{track_id[4:16]}", "sandbox", 100 if sandbox_success else None)
-    data = _post("/v1/verify", {"merchant": _merchant(), "trackId": int(track_id) if track_id.isdigit() else track_id})
+    data = _post("/v1/verify", {"merchant": _merchant(prefix), "trackId": int(track_id) if track_id.isdigit() else track_id})
     result = data.get("result")
     return Verified(
         result in (100, 201),

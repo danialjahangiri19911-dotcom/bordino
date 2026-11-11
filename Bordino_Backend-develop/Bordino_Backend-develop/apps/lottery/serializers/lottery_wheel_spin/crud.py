@@ -115,7 +115,7 @@ class LotteryWheelSpinCRUDSerializer(BaseModelSerializer):
         effective = bet if bet is not None else int(lottery_wheel.cost_per_spin)
         if lottery_wheel.cost_per_spin and not lottery_wheel.min_bet <= effective <= lottery_wheel.max_bet:
             raise serializers.ValidationError(
-                _("شرط باید بین %(min)s و %(max)s امتیاز باشد.") % {"min": lottery_wheel.min_bet, "max": lottery_wheel.max_bet}
+                _("شرط باید بین %(min)s و %(max)s سکه باشد.") % {"min": lottery_wheel.min_bet, "max": lottery_wheel.max_bet}
             )
         if would_deduction_exceed_negative_limit(
             token_wallet_account.amount,

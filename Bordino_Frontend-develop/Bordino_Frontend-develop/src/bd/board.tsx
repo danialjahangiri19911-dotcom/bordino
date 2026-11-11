@@ -78,7 +78,7 @@ export function LeaderList({
 					<span className="lb-metric">
 						{show.score ? (
 							<span>
-								<b>{fa(r.score)}</b> <small>امتیاز</small>
+								<b>{fa(r.score)}</b> <small>سکه</small>
 							</span>
 						) : null}
 						{show.time ? (

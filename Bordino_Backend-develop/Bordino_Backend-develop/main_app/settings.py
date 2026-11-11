@@ -55,6 +55,7 @@ LOCAL_APPS = [
     "apps.ops.apps.OpsConfig",
     "apps.dowr.apps.DowrConfig",
     "apps.spy.apps.SpyConfig",
+    "apps.coins.apps.CoinsConfig",
 ]
 
 THIRD_PARTY_APPS = [

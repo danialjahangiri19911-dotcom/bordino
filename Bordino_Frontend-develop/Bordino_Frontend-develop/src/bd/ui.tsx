@@ -32,6 +32,7 @@ export const R = {
 	wallet: "/pwa/wallet",
 	transactions: "/pwa/wallet/transactions",
 	withdraw: "/pwa/wallet/withdraw",
+	coins: "/pwa/coins",
 	tickets: "/pwa/wallet/tickets",
 	lotteries: "/pwa/lottery",
 	lotteryDetail: (id: string) => `/pwa/lottery/lottery-detail/${id}`,
@@ -66,7 +67,7 @@ type NavKey = "home" | "games" | "earn" | "wallet" | "profile";
 const NAV: { key: NavKey; icon: IconName; label: string; href: string }[] = [
 	{ key: "home", icon: "house", label: "خانه", href: R.home },
 	{ key: "games", icon: "gamepad-2", label: "گیمنت", href: R.games },
-	{ key: "earn", icon: "coins", label: "دریافت امتیاز", href: R.earn },
+	{ key: "earn", icon: "coins", label: "دریافت سکه", href: R.earn },
 	{ key: "wallet", icon: "wallet", label: "کیف‌پول", href: R.wallet },
 	{ key: "profile", icon: "user-round", label: "پروفایل", href: R.profile },
 ];
@@ -122,7 +123,7 @@ export function Balance() {
 	return (
 		<div className="bd-balance" aria-live="polite">
 			<Icon name="coins" />
-			<span>{points === null ? (error ? "امتیاز نامشخص" : "…") : `${fa(points)} امتیاز`}</span>
+			<span>{points === null ? (error ? "سکه نامشخص" : "…") : `${fa(points)} سکه`}</span>
 		</div>
 	);
 }

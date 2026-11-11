@@ -101,7 +101,7 @@ describe("WheelGame", () => {
 		runSpin();
 		expect(under(before)).toBe(2);
 		expect(q(".wh-selected text")?.textContent).toBe("۲۰");
-		expect(q(".wh-result strong").textContent).toBe("۲۰ امتیاز");
+		expect(q(".wh-result strong").textContent).toBe("۲۰ سکه");
 	});
 
 	it("shows the server's amount and type, also for a prize this page does not know", async () => {
@@ -119,7 +119,7 @@ describe("WheelGame", () => {
 		await click(".wh-spin");
 		await reply({ prize: prizes[1] });
 		runSpin();
-		expect(q(".wh-result strong").textContent).toBe("۲۰ امتیاز");
+		expect(q(".wh-result strong").textContent).toBe("۲۰ سکه");
 		expect(q(".wh-selected")).toBeNull();
 	});
 
@@ -128,7 +128,7 @@ describe("WheelGame", () => {
 		await click(".wh-spin");
 		await reply({ prize: { ...prizes[1], prize_amount: "40" } });
 		runSpin();
-		expect(q(".wh-result strong").textContent).toBe("۴۰ امتیاز");
+		expect(q(".wh-result strong").textContent).toBe("۴۰ سکه");
 		expect(q(".wh-history .wh-chip").textContent).toBe("۴۰");
 	});
 

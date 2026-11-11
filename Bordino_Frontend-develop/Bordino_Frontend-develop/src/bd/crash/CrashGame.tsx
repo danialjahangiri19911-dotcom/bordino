@@ -336,7 +336,7 @@ export default function CrashGame() {
 				text: flying
 					? round?.auto_cashout
 						? `دور جاری روی سرور ادامه دارد؛ اگر ضریب به ${fa2(round.auto_cashout)} برسد خودکار برداشت می‌شود.`
-						: "دور جاری روی سرور ادامه دارد و بدون برداشت، با انفجار امتیاز شرط از دست می‌رود."
+						: "دور جاری روی سرور ادامه دارد و بدون برداشت، با انفجار سکهٔ شرط از دست می‌رود."
 					: "اجرای خودکار متوقف می‌شود.",
 				yes: "خروج",
 				no: "ادامهٔ بازی",
@@ -378,12 +378,12 @@ export default function CrashGame() {
 	}[phase];
 	const resultText =
 		round && cashedAt
-			? `برداشت ${fa(round.payout)} امتیاز`
+			? `برداشت ${fa(round.payout)} سکه`
 			: phase === "crashed" && round
-				? `نتیجهٔ دور: ${fa(round.payout - round.bet)} امتیاز`
+				? `نتیجهٔ دور: ${fa(round.payout - round.bet)} سکه`
 				: "";
 	const announcement =
-		phase === "crashed" && round ? (cashedAt ? `برد! ${fa(round.payout)} امتیاز با ضریب ${fa2(cashedAt)}` : `انفجار در ${fa2(crashPoint ?? 0)}`) : "";
+		phase === "crashed" && round ? (cashedAt ? `برد! ${fa(round.payout)} سکه با ضریب ${fa2(cashedAt)}` : `انفجار در ${fa2(crashPoint ?? 0)}`) : "";
 
 	return (
 		<div
@@ -444,11 +444,11 @@ export default function CrashGame() {
 				{panel === "help" ? (
 					<section ref={panelBox} className="cr-help">
 						<b>ضریب و برداشت</b>
-						<p>پیش از شروع دور امتیاز شرط را انتخاب کن. ضریب از ۱٫۰۰ بالا می‌رود؛ قبل از انفجار برداشت کن تا شرط × ضریب را ببری. اگر پیش از برداشت منفجر شود، امتیاز همان دور از دست می‌رود.</p>
+						<p>پیش از شروع دور سکهٔ شرط را انتخاب کن. ضریب از ۱٫۰۰ بالا می‌رود؛ قبل از انفجار برداشت کن تا شرط × ضریب را ببری. اگر پیش از برداشت منفجر شود، سکه همان دور از دست می‌رود.</p>
 						<p>با «برداشت در ضریب» روشن، سرور در همان ضریب خودکار برداشت می‌کند. در حالت خودکار، دورها پشت سر هم با قوانینی که تعیین می‌کنی بازی می‌شوند.</p>
 						<p>
-							نقطهٔ انفجار را سرور پیش از دور تعیین می‌کند و بعد از دور قابل بررسی است (بخش «شفافیت»). شرط {fa(limits.minBet)} تا {fa(limits.maxBet)} امتیاز
-							{config ? `، حداکثر برد هر دور ${fa(config.max_payout)} امتیاز` : ""}.
+							نقطهٔ انفجار را سرور پیش از دور تعیین می‌کند و بعد از دور قابل بررسی است (بخش «شفافیت»). شرط {fa(limits.minBet)} تا {fa(limits.maxBet)} سکه
+							{config ? `، حداکثر برد هر دور ${fa(config.max_payout)} سکه` : ""}.
 						</p>
 					</section>
 				) : null}
@@ -560,7 +560,7 @@ export default function CrashGame() {
 					<div ref={stage} className={`cr-stage ${cashedAt ? "cr-cashed" : ""}`} data-phase={phase}>
 						<div className="cr-stage-top">
 							<span>{status}</span>
-							<small>{round ? `شرط ${fa(round.bet)} امتیاز` : `کمینهٔ شرط ${fa(limits.minBet)}`}</small>
+							<small>{round ? `شرط ${fa(round.bet)} سکه` : `کمینهٔ شرط ${fa(limits.minBet)}`}</small>
 						</div>
 						<div className="cr-multiplier">
 							<strong dir="ltr">
@@ -606,7 +606,7 @@ export default function CrashGame() {
 								className="cr-cash-mark"
 								style={{ left: `${(chart.mark[0] / size.width) * 100}%`, top: `${(chart.mark[1] / size.height) * 100}%` }}
 								role="img"
-								aria-label={`برداشت در ${fa2(cashedAt)}×: ${fa(round.payout)} امتیاز`}
+								aria-label={`برداشت در ${fa2(cashedAt)}×: ${fa(round.payout)} سکه`}
 							>
 								<b>+{fa(round.payout)}</b>
 							</span>
@@ -642,19 +642,19 @@ export default function CrashGame() {
 							<legend className="cr-sr">تنظیمات دور</legend>
 							<div className="cr-input-row">
 								<label className="cr-field">
-									<span>امتیاز هر شرط</span>
+									<span>سکهٔ هر شرط</span>
 									<span className="cr-stepper">
-										<button type="button" aria-label="کم کردن امتیاز" onClick={() => stepStake(-1)}>
+										<button type="button" aria-label="کم کردن سکه" onClick={() => stepStake(-1)}>
 											<Icon name="minus" />
 										</button>
 										<input
 											type="text"
 											inputMode="numeric"
-											aria-label="امتیاز هر شرط"
+											aria-label="سکهٔ هر شرط"
 											value={form.stake}
 											onChange={(e) => update({ stake: e.target.value.replace(/[^0-9۰-۹٠-٩]/g, "").slice(0, 9) })}
 										/>
-										<button type="button" aria-label="زیاد کردن امتیاز" onClick={() => stepStake(1)}>
+										<button type="button" aria-label="زیاد کردن سکه" onClick={() => stepStake(1)}>
 											<Icon name="plus" />
 										</button>
 									</span>

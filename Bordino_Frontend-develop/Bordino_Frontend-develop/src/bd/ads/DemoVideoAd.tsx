@@ -59,7 +59,7 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 		<div className="bd-ad" role="dialog" aria-modal="true" aria-label="ویدیوی جایزه‌دار">
 			<div className="bd-ad-top">
 				<span className="bd-ad-pill" aria-live="polite">
-					{left > 0 ? `${fa(left)} ثانیه تا ${fa(session.reward_points)} امتیاز` : "جایزه‌ات آماده است"}
+					{left > 0 ? `${fa(left)} ثانیه تا ${fa(session.reward_points)} سکه` : "جایزه‌ات آماده است"}
 				</span>
 				{session.creative.demo ? <span className="bd-ad-demo">ویدیوی نمونه · حالت آزمایشی</span> : null}
 				<button type="button" className="bd-ad-icon" aria-label={muted ? "روشن کردن صدا" : "بی‌صدا"} onClick={() => setMuted((m) => !m)}>
@@ -129,7 +129,7 @@ export default function DemoVideoAd({ session, onWatched, onAbort }: Readonly<Ad
 			) : leaving ? (
 				<div ref={leaveBox} className="bd-ad-sheet" role="alertdialog" aria-label="بستن ویدیو">
 					<b>ویدیو را می‌بندی؟</b>
-					<p>اگر الان ببندی، {fa(session.reward_points)} امتیاز را نمی‌گیری.</p>
+					<p>اگر الان ببندی، {fa(session.reward_points)} سکه را نمی‌گیری.</p>
 					<div className="bd-actions">
 						<button type="button" className="bd-action" autoFocus onClick={() => setLeaving(false)}>
 							ادامهٔ تماشا

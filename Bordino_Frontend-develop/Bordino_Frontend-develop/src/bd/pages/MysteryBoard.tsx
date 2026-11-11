@@ -103,7 +103,7 @@ export default function MysteryBoard({ id }: { id: string }) {
 								<div className="bd-panel lb-mine">
 									<b>رتبهٔ تو: {fa(me.position)}</b>
 									<small>
-										{fa(me.stages)} از {fa(me.total)} مرحله · {fa(me.score)} امتیاز
+										{fa(me.stages)} از {fa(me.total)} مرحله · {fa(me.score)} سکه
 									</small>
 									{!meShown ? <LeaderList rows={[me]} show={show} highlightMe={b.config.highlight_me !== false} /> : null}
 								</div>

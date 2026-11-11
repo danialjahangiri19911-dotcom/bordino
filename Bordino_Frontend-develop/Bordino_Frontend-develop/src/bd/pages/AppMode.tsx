@@ -60,7 +60,7 @@ export default function AppMode() {
 				</div>
 				{profile && !profile.available ? <Notice tone="info">گیم مستر به‌زودی برای همه باز می‌شود.</Notice> : null}
 				{problem ? <Notice>{problem}</Notice> : null}
-				<small className="bd-muted">با عوض کردن حالت از حسابت خارج نمی‌شوی؛ امتیاز و کیف پولت همان می‌ماند. انتخابت برای دفعه‌های بعد هم یادمان می‌ماند.</small>
+				<small className="bd-muted">با عوض کردن حالت از حسابت خارج نمی‌شوی؛ سکه و کیف پولت همان می‌ماند. انتخابت برای دفعه‌های بعد هم یادمان می‌ماند.</small>
 			</Panel>
 		</AppShell>
 	);

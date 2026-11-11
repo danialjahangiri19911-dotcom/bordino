@@ -49,7 +49,7 @@ class GamePlayChargeService:
         # The points (L) account, locked: two plays at once cannot both pass the balance check.
         account = balance.points_account(user, lock=True)
         if account is None:
-            raise ValidationError(_("کیفِ امتیازی برای کاربر یافت نشد."))
+            raise ValidationError(_("کیفی برای کاربر یافت نشد."))
 
         if request_id:
             # Under the account lock: a retry (or two copies at once) finds the first charge.
@@ -67,7 +67,7 @@ class GamePlayChargeService:
         cost = self.price(game_name, difficulty)
 
         if cost > 0:
-            balance.check_debit(account, cost, _("امتیازِ کافی برای بازی نداری."))
+            balance.check_debit(account, cost, _("سکهٔ کافی برای بازی نداری."))
             balance.add_points(account, -cost)
         # Recorded even when free: it is the play's history row and its proof (activity rewards).
         GamePlayCharge.objects.create(

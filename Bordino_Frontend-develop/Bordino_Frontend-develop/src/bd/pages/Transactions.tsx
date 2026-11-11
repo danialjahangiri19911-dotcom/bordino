@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useSearchParams } from "next/navigation";
 
+import { CASH_WALLET_VISIBLE } from "../features";
 import { type Entry, HistoryFooter, HistoryRow, PartialHistoryNotice, useHistory, withSummary } from "../history";
 import { AppShell, Chips, Panel, usePoints } from "../ui";
 import { useCashAccount } from "./Wallet";
@@ -12,7 +13,9 @@ type Filter = "all" | "points" | "currency";
 
 export default function Transactions() {
 	const initial = useSearchParams().get("kind");
-	const [filter, setFilter] = useState<Filter>(initial === "currency" || initial === "points" ? initial : "all");
+	const [chosen, setFilter] = useState<Filter>(initial === "currency" || initial === "points" ? initial : "all");
+	// The cash wallet is hidden for now (features.ts): only the coins history.
+	const filter: Filter = CASH_WALLET_VISIBLE ? chosen : "points";
 	const points = usePoints();
 	const cash = useCashAccount();
 	const pointsHistory = useHistory("points", points.account?.id);
@@ -35,16 +38,18 @@ export default function Transactions() {
 	return (
 		<AppShell nav="wallet" title="تراکنش‌ها">
 			<Panel title="تاریخچهٔ حساب">
-				<Chips
-					label="نوع تراکنش"
-					value={filter}
-					onChange={setFilter}
-					options={[
-						["all", "همه"],
-						["points", "امتیاز"],
-						["currency", "نقدی"],
-					]}
-				/>
+				{CASH_WALLET_VISIBLE ? (
+					<Chips
+						label="نوع تراکنش"
+						value={filter}
+						onChange={setFilter}
+						options={[
+							["all", "همه"],
+							["points", "سکه"],
+							["currency", "نقدی"],
+						]}
+					/>
+				) : null}
 				{rows.length ? (
 					<div className="bd-rows">
 						{rows.map((entry) => (
@@ -55,7 +60,7 @@ export default function Transactions() {
 				{filter === "all" && (rows.length || points.error || cash.error) ? (
 					<PartialHistoryNotice
 						parts={[
-							{ label: "امتیاز", history: withSummary(pointsHistory, points) },
+							{ label: "سکه", history: withSummary(pointsHistory, points) },
 							{ label: "نقدی", history: withSummary(cashHistory, cash) },
 						]}
 					/>

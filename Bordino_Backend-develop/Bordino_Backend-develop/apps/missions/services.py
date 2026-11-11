@@ -299,7 +299,7 @@ def claim(customer: Customer, attempt_id, evidence: dict | None = None) -> Claim
                 )
             wait = mission.min_seconds - (timezone.now() - attempt.opened_at).total_seconds()
             if wait > 0:
-                raise MissionError(f"{int(wait) + 1} ثانیهٔ دیگر امتیاز را بگیر.", "too_soon")
+                raise MissionError(f"{int(wait) + 1} ثانیهٔ دیگر سکه را بگیر.", "too_soon")
             _pay(attempt)
         return Claim(attempt, already=False)
 
@@ -556,7 +556,7 @@ def _notify(attempt: MissionAttempt, title: str, body: str):
 
 
 def _notify_paid(attempt: MissionAttempt):
-    _notify(attempt, "امتیاز مأموریت رسید", f"«{attempt.mission.title}» تأیید شد: {attempt.points} امتیاز.")
+    _notify(attempt, "سکهٔ مأموریت رسید", f"«{attempt.mission.title}» تأیید شد: {attempt.points} سکه.")
 
 
 def approve(attempt_id, by=None) -> bool:

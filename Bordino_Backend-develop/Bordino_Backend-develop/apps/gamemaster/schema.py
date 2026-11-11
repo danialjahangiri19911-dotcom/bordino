@@ -299,7 +299,7 @@ def check(definition: dict) -> dict:
     errors.update(boards.problems(d["leaderboard"]))
     need = max_run_points(d)
     if need and d["budget_points"] < need:
-        errors["budget_points"] = f"بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({fa(need)} امتیاز) باشد."
+        errors["budget_points"] = f"بودجه دست‌کم باید به اندازهٔ جایزهٔ یک بازیکن ({fa(need)} سکه) باشد."
     return errors
 
 

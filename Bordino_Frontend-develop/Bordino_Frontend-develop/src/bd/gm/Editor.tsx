@@ -365,7 +365,7 @@ function StageCard({
 						<b>{stage.title || STAGE_LABEL[t]}</b>
 						<small>
 							{STAGE_LABEL[t]}
-							{stage.points ? ` · ${fa(stage.points)} امتیاز` : ""}
+							{stage.points ? ` · ${fa(stage.points)} سکه` : ""}
 							{problems.length ? " · نیاز به تکمیل" : ""}
 						</small>
 					</span>
@@ -670,7 +670,7 @@ function StageCard({
 					{t !== "media" && t !== "reward" ? (
 						<Field
 							label="راهنمایی‌ها"
-							hint="هر خط یک راهنمایی، از کم به زیاد. هر راهنمایی بخشی از امتیاز این مرحله را کم می‌کند."
+							hint="هر خط یک راهنمایی، از کم به زیاد. هر راهنمایی بخشی از سکهٔ این مرحله را کم می‌کند."
 						>
 							<textarea
 								rows={2}
@@ -683,7 +683,7 @@ function StageCard({
 						</Field>
 					) : null}
 					<div className="gm-row-2">
-						<Field label="امتیاز این مرحله">
+						<Field label="سکهٔ این مرحله">
 							<NumberInput
 								min={0}
 								max={500}
@@ -695,7 +695,7 @@ function StageCard({
 						</Field>
 						<Field
 							label="مهلت (ثانیه، اختیاری)"
-							hint="بعد از مهلت، مرحله امتیازی ندارد."
+							hint="بعد از مهلت، مرحله سکه‌ای ندارد."
 						>
 							<NumberInput
 								min={10}
@@ -753,7 +753,7 @@ function PreviewRunner({ game }: { game: GameFull }) {
 			<EmptyState
 				icon="trophy"
 				title="بازی تمام شد (امتحانی)"
-				text={`${d.completion_message || "پیام پایان را در «جایزه و بودجه» بنویس."} · بازیکن تا ${fa(total + (d.finish_points || 0))} امتیاز می‌گرفت.`}
+				text={`${d.completion_message || "پیام پایان را در «جایزه و بودجه» بنویس."} · بازیکن تا ${fa(total + (d.finish_points || 0))} سکه می‌گرفت.`}
 				action={
 					<button
 						type="button"
@@ -793,7 +793,7 @@ function PreviewRunner({ game }: { game: GameFull }) {
 	return (
 		<div className="gm-preview">
 			<Notice tone="info">
-				حالت امتحانی: هیچ امتیاز، بازدید یا پرداختی ثبت نمی‌شود. تغییرهای
+				حالت امتحانی: هیچ سکه، بازدید یا پرداختی ثبت نمی‌شود. تغییرهای
 				ذخیره‌شده را امتحان می‌کنی.
 			</Notice>
 			<p className="bd-muted">
@@ -892,7 +892,7 @@ function PreviewRunner({ game }: { game: GameFull }) {
 			{result ? (
 				<Notice tone={result.ok ? "ok" : "warn"}>
 					{result.message}
-					{result.ok && stage.points ? ` +${fa(stage.points)} امتیاز.` : ""}
+					{result.ok && stage.points ? ` +${fa(stage.points)} سکه.` : ""}
 					{result.ok && result.coupon ? ` کد هدیه: ${result.coupon}` : ""}
 				</Notice>
 			) : null}
@@ -1014,7 +1014,7 @@ function Stats({ id }: { id: string }) {
 						["مرحله‌های حل‌شده", a.stage_completions ?? 0, "check", "همهٔ اثبات‌های معتبر"],
 						["بازدید تأییدشده", a.verified_visits ?? 0, "badge-check", "اسکن QR نمایشگر محل"],
 						["کد هدیهٔ دریافت‌شده", a.reward_claims ?? 0, "gift", ""],
-						["امتیاز پرداخت‌شده", a.budget.spent, "coins", "هزینهٔ کمپین"],
+						["سکهٔ پرداخت‌شده", a.budget.spent, "coins", "هزینهٔ کمپین"],
 						["بودجهٔ مانده", a.budget.left, "wallet", ""],
 					] as [string, number, IconName, string][]
 				).map(([label, n, icon, hint]) => (
@@ -1228,7 +1228,7 @@ export default function Editor({ id }: { id: string }) {
 				publish: "منتشر شد! حالا بازیکنان آن را می‌بینند.",
 				pause: "متوقف شد.",
 				resume: "دوباره باز شد.",
-				archive: "بایگانی شد؛ باقی‌ماندهٔ بودجه به کیف امتیازت برگشت.",
+				archive: "بایگانی شد؛ باقی‌ماندهٔ بودجه به کیفت برگشت.",
 				duplicate: "",
 			};
 			setAction({ busy: null, message: done[a], ok: true });
@@ -1516,7 +1516,7 @@ export default function Editor({ id }: { id: string }) {
 							}
 						>
 							<option value="public">
-								عمومی (بعد از تأیید بردینو در گیمنت و دریافت امتیاز)
+								عمومی (بعد از تأیید بردینو در گیمنت و دریافت سکه)
 							</option>
 							<option value="private">خصوصی (فقط با لینک دعوت)</option>
 						</select>
@@ -1582,7 +1582,7 @@ export default function Editor({ id }: { id: string }) {
 			{tab === "rewards" ? (
 				<Panel title="جایزه و بودجه">
 					<div className="gm-row-2">
-						<Field label="جایزهٔ پایان (امتیاز)">
+						<Field label="جایزهٔ پایان (سکه)">
 							<NumberInput
 								min={0}
 								max={500}
@@ -1616,8 +1616,8 @@ export default function Editor({ id }: { id: string }) {
 						/>
 					</Field>
 					<Field
-						label="بودجهٔ امتیاز جایزه‌ها"
-						hint="هنگام انتشار از کیف امتیاز تو کنار گذاشته می‌شود؛ باقی‌مانده در پایان بازی برمی‌گردد."
+						label="بودجهٔ سکهٔ جایزه‌ها"
+						hint="هنگام انتشار از کیف تو کنار گذاشته می‌شود؛ باقی‌مانده در پایان بازی برمی‌گردد."
 					>
 						<NumberInput
 							min={0}
@@ -1630,11 +1630,11 @@ export default function Editor({ id }: { id: string }) {
 					</Field>
 					<ul className="gm-budget-facts">
 						<li>
-							بیشترین جایزهٔ یک بازیکن: <b>{fa(run)}</b> امتیاز
+							بیشترین جایزهٔ یک بازیکن: <b>{fa(run)}</b> سکه
 						</li>
 						<li>
 							{funded === null ? (
-								"این بازی امتیازی نمی‌دهد؛ بودجه لازم نیست."
+								"این بازی سکه‌ای نمی‌دهد؛ بودجه لازم نیست."
 							) : (
 								<>
 									این بودجه جایزهٔ کامل <b>{fa(funded)}</b> بازیکن را می‌پردازد.
@@ -1642,7 +1642,7 @@ export default function Editor({ id }: { id: string }) {
 							)}
 						</li>
 						<li>
-							موجودی امتیاز تو: <b>{fa(points.points ?? 0)}</b>
+							موجودی سکهٔ تو: <b>{fa(points.points ?? 0)}</b>
 						</li>
 					</ul>
 					{run > 0 && (d.budget_points || 0) < run ? (
@@ -1725,7 +1725,7 @@ export default function Editor({ id }: { id: string }) {
 									? ` هزینهٔ انتشار: ${fa(v.fee_toman)} تومان${v.fee_paid ? " (پرداخت شد)" : ""}.`
 									: " انتشار هزینه‌ای ندارد."}
 								{v.budget_points
-									? ` با انتشار، ${fa(v.budget_points)} امتیاز برای جایزه‌ها از کیف امتیازت کنار گذاشته می‌شود.`
+									? ` با انتشار، ${fa(v.budget_points)} سکه برای جایزه‌ها از کیفت کنار گذاشته می‌شود.`
 									: ""}
 							</p>
 							{editedAfterApproval ? (
@@ -1765,7 +1765,7 @@ export default function Editor({ id }: { id: string }) {
 									<span>
 										مطمئنی؟ بازی برای بازیکنان باز می‌شود
 										{v.budget_points
-											? ` و ${fa(v.budget_points)} امتیاز کنار گذاشته می‌شود`
+											? ` و ${fa(v.budget_points)} سکه کنار گذاشته می‌شود`
 											: ""}
 										.
 									</span>

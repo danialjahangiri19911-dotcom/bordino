@@ -95,7 +95,7 @@ export default function LotteryDetail() {
 							["وضعیت", lotteryStatus(lottery)],
 							[completed ? "زمان پایان فروش" : "پایان فروش", formatTehranDateTime(lottery.end_date)],
 							...(open ? ([["زمان باقی‌مانده", formatLeft(left)]] as [string, string][]) : []),
-							["قیمت هر بلیت", `${fa(lottery.ticket_price)} امتیاز`],
+							["قیمت هر بلیت", `${fa(lottery.ticket_price)} سکه`],
 						]}
 					/>
 					{rules.length ? (

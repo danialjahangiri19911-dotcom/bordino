@@ -35,7 +35,7 @@ export default function Landing() {
 	const { isLoggedIn } = useAuthStore();
 	const appHref = isLoggedIn ? R.home : R.login;
 	useEffect(() => {
-		document.title = "بردینو | بازی کن، امتیاز بگیر، در قرعه‌کشی شرکت کن";
+		document.title = "بردینو | بازی کن، سکه بگیر، در قرعه‌کشی شرکت کن";
 	}, []);
 	return (
 		<article className={`bd-product bd-landing ${st} lay-1 bd-page`} aria-label="بردینو">
@@ -56,14 +56,14 @@ export default function Landing() {
 				<section className="bd-hero">
 					<div className="bd-hero-copy">
 						<p className="bd-overline">
-							<Icon name="sparkles" /> سرگرمیِ امتیازمحور
+							<Icon name="sparkles" /> سرگرمیِ سکه‌محور
 						</p>
 						<h1>
 							وقتشه
 							<br />
 							<span className="bd-em">یه چالش بری!</span>
 						</h1>
-						<p>بازی کن، امتیاز جمع کن و امتیازهایت را به بلیت قرعه‌کشی یا فرصت گردونه تبدیل کن.</p>
+						<p>بازی کن، سکه جمع کن و سکه‌هایت را به بلیت قرعه‌کشی یا فرصت گردونه تبدیل کن.</p>
 						<div className="bd-actions">
 							<Link className="bd-action" href={appHref}>
 								شروع یک بازی <Icon name="arrow-right" />
@@ -92,12 +92,12 @@ export default function Landing() {
 						</div>
 						<div className="bd-step">
 							<span className="bd-step-num">۰۲</span>
-							<h3>امتیاز جمع کن</h3>
-							<p>با بازی و همراهی روزانه، امتیازهای تو بیشتر می‌شوند.</p>
+							<h3>سکه جمع کن</h3>
+							<p>با بازی و همراهی روزانه، سکه‌های تو بیشتر می‌شوند.</p>
 						</div>
 						<div className="bd-step">
 							<span className="bd-step-num">۰۳</span>
-							<h3>امتیازها را استفاده کن</h3>
+							<h3>سکه‌ها را استفاده کن</h3>
 							<p>بلیت قرعه‌کشی یا فرصت گردونه را انتخاب کن.</p>
 						</div>
 					</div>
@@ -186,7 +186,7 @@ export default function Landing() {
 					<Art name="rewards" />
 					<div>
 						<h3>چالش بعدی منتظر توست.</h3>
-						<p>بازی‌ها، امتیازها و بلیت‌هایت را در فضای خودت ببین.</p>
+						<p>بازی‌ها، سکه‌ها و بلیت‌هایت را در فضای خودت ببین.</p>
 					</div>
 					<Link className="bd-action" href={appHref}>
 						دیدن محیط اپلیکیشن <Icon name="arrow-right" />
@@ -194,7 +194,7 @@ export default function Landing() {
 				</section>
 			</main>
 			<footer className="bd-landing-footer">
-				<span>بردینو · بازی، امتیاز، قرعه‌کشی</span>
+				<span>بردینو · بازی، سکه، قرعه‌کشی</span>
 				<span>
 					<Link href={R.rules}>قوانین</Link> · <Link href={R.rules}>راهنما</Link>
 				</span>

@@ -37,11 +37,11 @@ RunStatus = MysteryRun.Status
 METRICS = {
     "stages": "مرحله‌های انجام‌شده",
     "progress": "درصد پیشرفت",
-    "score": "امتیاز",
+    "score": "سکه",
     "duration": "زمان تمام کردن",
 }
 # Known but not offered yet: team play needs team sessions the game runtime does not have.
-UNSUPPORTED_METRICS = {"team": "امتیاز تیم"}
+UNSUPPORTED_METRICS = {"team": "سکهٔ تیم"}
 VISIBILITY = ("players", "finishers", "creator")
 AFTER = ("keep", "top10", "hide", "participants", "creator")
 # Only the game's whole life for now; the others need period boundaries the events do not keep yet.
@@ -67,7 +67,7 @@ PRESETS = {
         "show": _show("rank", "name", "avatar", "stages", "bar", "participants", "finishers"),
     },
     "score": {
-        "name": "بیشترین امتیاز",
+        "name": "بیشترین سکه",
         "rank_by": ["score", "stages", "duration"],
         "only_finishers": False,
         "show": _show("rank", "name", "avatar", "score", "stages", "participants", "finishers"),
@@ -152,7 +152,7 @@ def problems(cfg: dict) -> dict:
     if cfg.get("period") not in PERIODS:
         errors["leaderboard.period"] = "فعلاً فقط «کل دورهٔ بازی» در دسترس است."
     if not any(cfg.get("show", {}).get(k) for k in ("stages", "percent", "bar", "score", "time")):
-        errors["leaderboard.show"] = "دست‌کم یکی از مرحله، پیشرفت، امتیاز یا زمان را نشان بده."
+        errors["leaderboard.show"] = "دست‌کم یکی از مرحله، پیشرفت، سکه یا زمان را نشان بده."
     return errors
 
 

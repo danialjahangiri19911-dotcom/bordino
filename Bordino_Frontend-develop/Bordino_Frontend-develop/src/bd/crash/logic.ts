@@ -48,8 +48,8 @@ export function num(text: string) {
 export function validate(form: CrashForm, limits: Limits, auto: boolean) {
 	const stake = num(form.stake);
 	if (!Number.isInteger(stake) || stake < limits.minBet || stake > limits.maxBet)
-		return `امتیاز شرط باید عددی بین ${fa(limits.minBet)} و ${fa(limits.maxBet)} باشد.`;
-	if (stake > limits.balance) return `امتیاز کافی نداری (موجودی ${fa(limits.balance)}).`;
+		return `سکهٔ شرط باید عددی بین ${fa(limits.minBet)} و ${fa(limits.maxBet)} باشد.`;
+	if (stake > limits.balance) return `سکهٔ کافی نداری (موجودی ${fa(limits.balance)}).`;
 	if (form.autoCash || auto) {
 		const target = num(form.target);
 		if (!Number.isFinite(target) || target < 1.01 || target > limits.maxMultiplier)

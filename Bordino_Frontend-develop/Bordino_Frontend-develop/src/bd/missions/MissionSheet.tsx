@@ -223,9 +223,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							<Icon name="check" />
 						</span>
 						<b id="mission-title">
-							<bdi dir="ltr">+{fa(step.points)}</bdi> امتیاز
+							<bdi dir="ltr">+{fa(step.points)}</bdi> سکه
 						</b>
-						<p>به کیف امتیازت اضافه شد.</p>
+						<p>به کیفت اضافه شد.</p>
 					</div>
 				) : (
 					<>
@@ -239,7 +239,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							<span className={`bd-tag mi-state mi-${m.state}`}>{STATE_LABEL[m.state]}</span>
 							<span className="bd-tag">{KIND_LABEL[m.kind]}</span>
 							<span className="bd-tag mi-points-tag">
-								<bdi dir="ltr">+{fa(m.points)}</bdi> امتیاز
+								<bdi dir="ltr">+{fa(m.points)}</bdi> سکه
 							</span>
 						</div>
 						{m.summary ? <p className="bd-reward-text">{m.summary}</p> : null}
@@ -250,9 +250,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							{m.ends_at ? <li>پایان: {dateText(m.ends_at)}</li> : null}
 						</ul>
 
-						{m.state === "pending" || m.pending > 0 ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، امتیاز خودکار اضافه می‌شود.</p> : null}
+						{m.state === "pending" || m.pending > 0 ? <p className="mi-note mi-note-wait">مدرکت رسید و در انتظار بررسی است؛ بعد از تأیید، سکه خودکار اضافه می‌شود.</p> : null}
 						{m.state === "rejected" && m.attempt?.review_note ? <p className="mi-note mi-note-bad">دلیل رد: {m.attempt.review_note}</p> : null}
-						{m.state === "done" ? <p className="mi-note mi-note-ok">این مأموریت را انجام داده‌ای و امتیازش را گرفته‌ای.</p> : null}
+						{m.state === "done" ? <p className="mi-note mi-note-ok">این مأموریت را انجام داده‌ای و سکه‌اش را گرفته‌ای.</p> : null}
 						{m.state === "done_today" ? <p className="mi-note mi-note-ok">سهم امروزت را گرفتی؛ فردا دوباره بیا.</p> : null}
 						{m.state === "upcoming" ? <p className="mi-note">این مأموریت هنوز شروع نشده است.</p> : null}
 						{m.state === "expired" ? <p className="mi-note">زمان این مأموریت تمام شده است.</p> : null}
@@ -284,7 +284,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						) : null}
 						{m.kind === "qr" && m.state === "available" ? (
 							<p className="mi-note">
-								<Icon name="map-pin" /> به محل برو و QR آن‌جا را با دوربین گوشی اسکن کن؛ امتیاز همان لحظه اضافه می‌شود.
+								<Icon name="map-pin" /> به محل برو و QR آن‌جا را با دوربین گوشی اسکن کن؛ سکه همان لحظه اضافه می‌شود.
 							</p>
 						) : null}
 
@@ -296,17 +296,17 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 						{open && m.kind === "interstitial" && fullScreenHere && !open.opened ? (
 							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy} onClick={() => void showFullScreen(open)}>
 								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name="play" />}
-								دیدن تبلیغ و دریافت {fa(m.points)} امتیاز
+								دیدن تبلیغ و دریافت {fa(m.points)} سکه
 							</button>
 						) : null}
 						{open && (m.kind === "banner" || (m.kind === "interstitial" && open.opened)) ? (
 							<button type="button" className="bd-sheet-item bd-reward-main" disabled={busy || !open.opened || waitSeconds > 0} onClick={() => void claim()}>
 								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name="coins" />}
-								{!open.opened ? "اول بنر را باز کن" : waitSeconds > 0 ? `دریافت امتیاز تا ${fa(waitSeconds)} ثانیهٔ دیگر` : `دریافت ${fa(m.points)} امتیاز`}
+								{!open.opened ? "اول بنر را باز کن" : waitSeconds > 0 ? `دریافت سکه تا ${fa(waitSeconds)} ثانیهٔ دیگر` : `دریافت ${fa(m.points)} سکه`}
 							</button>
 						) : null}
 						{open && m.verification === "callback" ? (
-							<p className="mi-note mi-note-wait">بعد از {m.kind === "install" ? "نصب و ثبت‌نام" : "ثبت‌نام"} در {partner}، تأیید از طرف خود {partner} می‌رسد و امتیاز خودکار اضافه می‌شود.</p>
+							<p className="mi-note mi-note-wait">بعد از {m.kind === "install" ? "نصب و ثبت‌نام" : "ثبت‌نام"} در {partner}، تأیید از طرف خود {partner} می‌رسد و سکه خودکار اضافه می‌شود.</p>
 						) : null}
 						{open && m.verification === "review" ? (
 							<div className="mi-proof">
@@ -338,9 +338,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 							<button type="button" className="bd-sheet-item bd-reward-main" autoFocus disabled={busy} onClick={() => void start()}>
 								{busy ? <Icon name="loader-circle" className="bd-spin" /> : <Icon name={m.kind === "video" || m.kind === "interstitial" ? "play" : "arrow-right"} />}
 								{m.kind === "video"
-									? `تماشای ویدیو و دریافت ${fa(m.points)} امتیاز`
+									? `تماشای ویدیو و دریافت ${fa(m.points)} سکه`
 									: m.kind === "interstitial"
-										? `دیدن تبلیغ و دریافت ${fa(m.points)} امتیاز`
+										? `دیدن تبلیغ و دریافت ${fa(m.points)} سکه`
 										: m.state === "rejected"
 											? "تلاش دوباره"
 											: "شروع مأموریت"}

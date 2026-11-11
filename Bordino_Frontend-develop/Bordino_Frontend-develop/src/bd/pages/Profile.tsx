@@ -253,7 +253,7 @@ export default function Profile() {
 					{gmOpen ? <ProfileRow href={R.appMode} icon="sparkles" title="حالت برنامه" text="بازیکن یا گیم مستر (ساخت بازی)" /> : null}
 				</section>
 				<section className="bd-panel rt-panel">
-					<h3>امتیازها و جوایز</h3>
+					<h3>سکه‌ها و جوایز</h3>
 					<ProfileRow href={R.prizes} icon="gift" title="تاریخچهٔ جوایز" text="جایزه‌های گردونه و قرعه‌کشی" />
 					<ProfileRow href={R.achievements} icon="medal" title="دستاوردها" text="روزهای همراهی و مسیر پیشرفت" />
 				</section>

@@ -672,7 +672,7 @@ class AuditPhase1Tests(TestCase):
         rows = self.api.get("/api/v1/wallet/points/transactions/").json()
         rows = (rows.get("result") or rows)
         rows = rows.get("results", rows) if isinstance(rows, dict) else rows
-        self.assertIn("تنظیم امتیاز توسط پشتیبانی", {r["title"] for r in rows})
+        self.assertIn("تنظیم سکه توسط پشتیبانی", {r["title"] for r in rows})
 
     def test_a_cancelled_reward_takes_back_what_was_posted_not_an_edited_amount(self):
         from apps.wallet.models import ActivityTransaction  # pylint: disable=import-outside-toplevel

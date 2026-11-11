@@ -24,7 +24,7 @@ from apps.wallet.models import (
 from apps.wallet.services.balance import POINTS_SYMBOL
 
 GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸"}
-ACTIVITY_TITLES = {"sudoku": "امتیاز سودوکو", "game_2048": "امتیاز ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "mission": "جایزهٔ مأموریت", "admin_adjust": "تنظیم امتیاز توسط پشتیبانی"}
+ACTIVITY_TITLES = {"sudoku": "سکهٔ سودوکو", "game_2048": "سکهٔ ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "mission": "جایزهٔ مأموریت", "admin_adjust": "تنظیم سکه توسط پشتیبانی", "coin_purchase": "خرید سکه"}
 WITHDRAWAL_STATUS = {
     CurrencyTransaction.Status.PENDING: "در انتظار واریز",
     CurrencyTransaction.Status.COMPLETED: "واریز شد",
@@ -92,7 +92,7 @@ def points_history(user, token_account=None):
     for t in transfers:
         incoming = t.destination_wallet.wallet.owner_id == user.id
         rows.append(
-            _row(t.id, "points_transfer", "انتقال امتیاز", t.amount, incoming, t.create_time, _logo(t.token))
+            _row(t.id, "points_transfer", "انتقال سکه", t.amount, incoming, t.create_time, _logo(t.token))
         )
 
     # These always move the points (L) account: listed for it, not for another token's account.
@@ -102,7 +102,7 @@ def points_history(user, token_account=None):
         for t in ActivityTransaction.objects.filter(
             customer=customer, status=ActivityTransaction.Status.COMPLETED
         ).exclude(score_value=0).exclude(score_value__isnull=True):
-            title = ACTIVITY_TITLES.get(t.section, "امتیاز فعالیت")
+            title = ACTIVITY_TITLES.get(t.section, "سکهٔ فعالیت")
             if t.section == "mission" and t.metadata.get("title"):
                 title = f"مأموریت: {t.metadata['title']}"[:120]
             elif t.section == "gamemaster" and t.metadata.get("title"):

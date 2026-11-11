@@ -321,13 +321,13 @@ export default function SudokuGame() {
 					? "یادداشت روشن است؛ عددهای احتمالی را انتخاب کن."
 					: `سطر ${fa(sel.x + 1)}، ستون ${fa(sel.y + 1)} · عدد دلخواه را وارد کن.`;
 	const dialog: Record<string, [string, string]> = {
-		ready: ["یک جدول، یک ذهن آرام", playCost !== undefined ? `هر بازی ${fa(playCost)} امتیاز${points !== undefined ? ` · موجودی تو ${fa(points)} امتیاز` : ""}` : "هزینهٔ بازی در حال دریافت است…"],
+		ready: ["یک جدول، یک ذهن آرام", playCost !== undefined ? `هر بازی ${fa(playCost)} سکه${points !== undefined ? ` · موجودی تو ${fa(points)} سکه` : ""}` : "هزینهٔ بازی در حال دریافت است…"],
 		won: ["عالی بود، جدول کامل شد!", `${fa(game.mistakes)} خطا · ${fa(game.maxHints - game.remainingHints)} کمک · ${unlockText}`],
 		lost: [
 			"این بار تمام شد",
-			`${game.mistakes >= game.maxMistakes ? "همهٔ فرصت‌ها استفاده شد." : "زمان تمام شد."}${playCost !== undefined ? ` ادامهٔ همین جدول ${fa(playCost)} امتیاز است.` : ""}`,
+			`${game.mistakes >= game.maxMistakes ? "همهٔ فرصت‌ها استفاده شد." : "زمان تمام شد."}${playCost !== undefined ? ` ادامهٔ همین جدول ${fa(playCost)} سکه است.` : ""}`,
 		],
-		new: ["یک جدول تازه؟", "پیشرفت این جدول از بین می‌رود و بازی تازه دوباره امتیاز می‌گیرد."],
+		new: ["یک جدول تازه؟", "پیشرفت این جدول از بین می‌رود و بازی تازه دوباره سکه می‌گیرد."],
 		level: ["سطح را عوض کنیم؟", `این جدول کنار گذاشته می‌شود و در سطح ${label(pendingLevel)} بازی تازه شروع می‌کنی.`],
 		pause: ["کمی استراحت", "زمان و موسیقی متوقف شده‌اند؛ جدول تا ادامهٔ بازی پنهان است."],
 	};
@@ -372,7 +372,7 @@ export default function SudokuGame() {
 					<b>هر عدد، فقط یک‌بار</b>
 					<p>هر سطر، ستون و مربع ۳×۳ باید عددهای ۱ تا ۹ را بدون تکرار داشته باشد. یک خانه را انتخاب کن و عدد را بزن. در حالت یادداشت، عددهای احتمالی را علامت بزن.</p>
 					<small>
-						هر بازی امتیاز می‌گیرد؛ زمان، تعداد فرصت و کمک را تنظیمات بازی در سرور تعیین می‌کند. با یک برد آسان، متوسط و با دو برد متوسط، سخت باز می‌شود. صفحه‌کلید: ۱ تا ۹، جهت‌نما، Delete و N برای یادداشت.
+						هر بازی سکه می‌گیرد؛ زمان، تعداد فرصت و کمک را تنظیمات بازی در سرور تعیین می‌کند. با یک برد آسان، متوسط و با دو برد متوسط، سخت باز می‌شود. صفحه‌کلید: ۱ تا ۹، جهت‌نما، Delete و N برای یادداشت.
 					</small>
 				</section>
 				<main className="sd-main">
@@ -569,7 +569,7 @@ export default function SudokuGame() {
 					<p className="sd-unlock">{unlockText}</p>
 					<footer className="sd-footer">
 						<span>{status === "won" ? "جدول کامل شد" : `${label(game.difficulty ?? level)} · ${noteMode ? "حالت یادداشت" : "حالت عدد"}`}</span>
-						<span>{playCost !== undefined ? `هر بازی ${fa(playCost)} امتیاز` : ""}</span>
+						<span>{playCost !== undefined ? `هر بازی ${fa(playCost)} سکه` : ""}</span>
 					</footer>
 				</main>
 				<p className="sd-sr" aria-live="polite">

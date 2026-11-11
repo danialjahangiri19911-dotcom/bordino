@@ -143,12 +143,12 @@ export default function VenueScreen({ screenKey }: { screenKey: string }) {
 						<p className="vn-kicker">مأموریت حضوری</p>
 						<h1>{screen.title}</h1>
 						<p className="vn-points">
-							<strong>+{fa(screen.points)}</strong> امتیاز
+							<strong>+{fa(screen.points)}</strong> سکه
 						</p>
 						<ol className="vn-steps">
 							<li>دوربین گوشی را روی این QR بگیر.</li>
 							<li>لینک را باز کن و وارد بردینو شو.</li>
-							<li>امتیاز به کیف امتیازت اضافه می‌شود.</li>
+							<li>سکه به کیفت اضافه می‌شود.</li>
 						</ol>
 						{!screen.active ? <p className="vn-warn">این مأموریت فعلاً غیرفعال است.</p> : null}
 					</div>

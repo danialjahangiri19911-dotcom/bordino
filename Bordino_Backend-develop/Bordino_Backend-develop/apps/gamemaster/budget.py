@@ -37,7 +37,7 @@ def reserve(game: Game, version: GameVersion, points: int):
     account = balance.points_account(user, lock=True)
     if account is None or account.amount < points:
         have = int(account.amount) if account else 0
-        raise BudgetError(f"برای بودجهٔ جایزه‌ها {points} امتیاز لازم است؛ موجودی امتیاز تو {have} است.", "insufficient_points")
+        raise BudgetError(f"برای بودجهٔ جایزه‌ها {points} سکه لازم است؛ موجودی سکهٔ تو {have} است.", "insufficient_points")
     tx = ActivityTransaction.objects.create(
         customer=user.customer,
         section=SECTION,

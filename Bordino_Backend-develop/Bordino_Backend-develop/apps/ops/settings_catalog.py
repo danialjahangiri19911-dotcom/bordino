@@ -6,12 +6,14 @@ the default (or the server's environment variable of the same name)."""
 import os
 
 from apps.configuration.models.system_configuration import SystemConfiguration
+from apps.coins.services import DEFAULTS as COIN
 from apps.gamemaster.services import DEFAULTS as GM
 from apps.wallet.services.ad_reward import DEFAULTS as AD
 
 GROUPS = {
     "gm": "گیم مستر (بازی‌های سازندگان)",
     "ads": "تبلیغ و جایزه",
+    "coins": "سکه و خرید سکه",
     "wallet": "کیف پول",
     "files": "فایل‌ها",
 }
@@ -53,6 +55,9 @@ CATALOG = [
     _e("ADIVERY_TRUST_APP", "ads", "bool", "پذیرفتن «دیدم» از خود اپ (ادیوری)", "تا وقتی ادیوری به سرور خبر نمی‌دهد.", AD["ADIVERY_TRUST_APP"]),
     _e("ADIVERY_TRUST_SECONDS", "ads", "int", "حداقل ثانیه برای پذیرفتن «دیدم»", "", AD["ADIVERY_TRUST_SECONDS"], 1, 20),  # (the app asks again for ~28 s: longer would never pay)
     _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "امتیاز تکمیل پروفایل", "یک بار برای هر کاربر.", 25, 0, 10_000),
+    # Coins
+    _e("COIN_ZIBAL_MODE", "coins", "choice", "درگاه خرید سکه", "خاموش: خرید بسته است · آزمایشی: پولی جابه‌جا نمی‌شود اما سکه داده می‌شود · تست زیبال · واقعی (نیاز به مرچنت).", COIN["COIN_ZIBAL_MODE"], choices=[["off", "خاموش"], ["sandbox", "آزمایشی"], ["test", "تست زیبال"], ["live", "واقعی"]]),
+    _e("COIN_ZIBAL_MERCHANT", "coins", "str", "کد مرچنت زیبال برای سکه", "خالی = همان مرچنت گیم مستر. فقط برای حالت واقعی.", COIN["COIN_ZIBAL_MERCHANT"]),
     # Wallet
     _e("WALLET_TOKEN_EXPIRATION_DAYS", "wallet", "int", "اعتبار امتیازها (روز)", "", 365, 1, 3650),
     _e("WALLET_CURRENCY_EXPIRATION_DAYS", "wallet", "int", "اعتبار موجودی نقدی (روز)", "", 365, 1, 3650),

@@ -213,7 +213,7 @@ def complete(customer: Customer, session_id, evidence: dict | None = None, missi
         if session is None:
             raise AdRewardError("این ویدیو پیدا نشد.")
         if session.placement.startswith("mission:") and not mission:
-            raise AdRewardError("این ویدیو از بخش «دریافت امتیاز» پرداخت می‌شود.")
+            raise AdRewardError("این ویدیو از بخش «دریافت سکه» پرداخت می‌شود.")
         if session.status == AdRewardSession.Status.REWARDED:
             return Claim(session, already=True)
         if timezone.now() - session.create_time > SESSION_TTL:
