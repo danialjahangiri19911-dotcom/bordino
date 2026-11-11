@@ -90,3 +90,20 @@ class SpyConfigCostTests(TestCase):
         with mock.patch.object(services, "MAX_WORDS", 5):
             services._changed()  # pylint: disable=protected-access
             self.assertEqual(len(body(self.api.get(URL))["words"]), 5)
+
+
+@override_settings(CACHES=LOCMEM)
+class SpyCacheCommitTests(TestCase):
+    def test_the_cache_is_cleared_again_once_a_change_is_committed(self):
+        from django.core.cache import cache  # pylint: disable=import-outside-toplevel
+
+        from apps.spy import services  # pylint: disable=import-outside-toplevel
+
+        with self.captureOnCommitCallbacks() as callbacks:
+            s = SpySettings.objects.get()
+            s.enabled = False
+            s.save()
+            cache.set(services.CACHE_KEY, {"enabled": True, "categories": [], "words": []})  # a read before commit
+        for cb in callbacks:
+            cb()
+        self.assertFalse(services.config_payload()["enabled"])

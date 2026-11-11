@@ -56,7 +56,15 @@ def config_payload() -> dict:
 @receiver(post_save, sender=SpyWord)
 @receiver(post_delete, sender=SpyWord)
 def _changed(**_kwargs):
-    try:
-        cache.delete(CACHE_KEY)
-    except Exception:  # pylint: disable=broad-except
-        pass
+    from django.db import transaction  # pylint: disable=import-outside-toplevel
+
+    def clear():
+        try:
+            cache.delete(CACHE_KEY)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    clear()
+    # …and again once the change is committed: a request reading between the save and its commit would
+    # otherwise cache the old bank for a minute.
+    transaction.on_commit(clear)

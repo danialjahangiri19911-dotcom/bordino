@@ -360,3 +360,19 @@ class AdiverySecretTests(TestCase):
             self.assertEqual(ad_reward.adivery_callback_secret(), "r" * 40)
         with mock.patch.dict(os.environ, {"ADIVERY_CALLBACK_SECRET": "short"}):
             self.assertEqual(ad_reward.adivery_callback_secret(), derived)  # (too weak: the derived one stays)
+
+
+class AdiveryRedactionShapeTests(TestCase):
+    def test_masking_keeps_the_records_arguments_for_formatters_that_unpack_them(self):
+        import logging  # pylint: disable=import-outside-toplevel
+
+        from main_app.log_redaction import RedactSecrets  # pylint: disable=import-outside-toplevel
+
+        secret = "0123456789abcdef0123456789abcdef01234567"
+        args = ("1.2.3.4:5", "GET", f"/api/v1/wallet/ad-reward/adivery/{secret}/?uid=x", "1.1", 200)
+        record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d', args, None)
+        RedactSecrets().filter(record)
+        client, method, path, version, status = record.args  # (as uvicorn's AccessFormatter does)
+        self.assertEqual((client, method, version, status), ("1.2.3.4:5", "GET", "1.1", 200))
+        self.assertNotIn(secret, path)
+        self.assertNotIn(secret, record.getMessage())

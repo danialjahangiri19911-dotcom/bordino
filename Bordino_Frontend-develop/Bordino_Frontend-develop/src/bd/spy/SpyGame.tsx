@@ -154,8 +154,15 @@ export default function SpyGame() {
 						e.stopPropagation();
 						e.preventDefault();
 						void refetchRef.current().then((r) => {
+							// Only a fresh answer counts: a failed refresh keeps the old cached one, which proves
+							// nothing about the switch (the game is then not started; the next tap asks again).
+							const fresh = r.isError ? undefined : r.data?.data?.result; // (refetch gives the response still wrapped)
+							if (!playable(fresh) || !fresh) return; // (the notice above says why)
 							checkedAt = Date.now();
-							if (!playable(r.data?.data?.result)) return; // (the notice above says why; refetch gives the response still wrapped)
+							// The new bank reaches the engine before this game is dealt (React's own update of it
+							// comes a render later).
+							const engine = (globalThis as Globals).SpyEngine;
+							if (engine) Object.assign(engine, bankFrom(fresh));
 							passing = true;
 							start.click();
 							passing = false;

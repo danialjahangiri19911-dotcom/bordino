@@ -15,16 +15,27 @@ SECRET_IN_PATH = re.compile(r"(adivery/)[A-Za-z0-9_-]{16,}")
 PATH_LOGGERS = ("uvicorn.access", "uvicorn.error", "gunicorn.access", "gunicorn.error", "django.request", "django.server")
 
 
+def _mask(value):
+    return SECRET_IN_PATH.sub(r"\1<secret>", value) if isinstance(value, str) and "adivery/" in value else value
+
+
 class RedactSecrets(logging.Filter):
+    """Masks the message and each of its arguments in place, keeping the record's shape: formatters that
+    read the arguments themselves (uvicorn's access formatter unpacks them) keep working."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         try:
+            if isinstance(record.args, tuple):
+                record.args = tuple(_mask(a) for a in record.args)
+            elif isinstance(record.args, dict):
+                record.args = {k: _mask(v) for k, v in record.args.items()}
+            record.msg = _mask(record.msg)
             message = record.getMessage()
         except Exception:  # pylint: disable=broad-except
             return True
-        if "adivery/" in message:
-            masked = SECRET_IN_PATH.sub(r"\1<secret>", message)
-            if masked != message:
-                record.msg, record.args = masked, None
+        if "adivery/" in message and SECRET_IN_PATH.search(message):
+            # (the secret came in some other way, e.g. a formatted object): the whole text, as a last resort
+            record.msg, record.args = SECRET_IN_PATH.sub(r"\1<secret>", message), None
         return True
 
 
