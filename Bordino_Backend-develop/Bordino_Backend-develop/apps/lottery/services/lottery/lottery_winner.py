@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from apps.coins.services import cash_prizes_as_coins
 from apps.lottery.models import Lottery, Ticket
 from apps.lottery.services.lottery.draw import draw_numbers
 from apps.wallet.services import balance
@@ -14,6 +15,37 @@ from apps.wallet.services.currency_wallet_account.transfer import (
     CurrencyWalletAccountTransferService,
 )
 from apps.wallet.services.transaction import TransactionService
+
+
+def pay_prize_as_coins(ticket, amount) -> None:
+    """A winning ticket's prize as coins (1 coin = 1 toman, while the cash wallet is hidden): one
+    ledger row per ticket (its unique key), so a second settlement or a retry never pays it twice."""
+    from django.db import IntegrityError  # pylint: disable=import-outside-toplevel
+
+    from apps.wallet.models.transactions.activity import ActivityTransaction  # pylint: disable=import-outside-toplevel
+    from apps.wallet.repositories.token_wallet_account.query import TokenWalletAccountQueryRepository  # pylint: disable=import-outside-toplevel
+
+    customer = ticket.customer
+    # The coins account must exist first: the ledger's signal skips a customer without one.
+    if balance.points_account(customer.user) is None:
+        TokenWalletAccountQueryRepository.get_last_active_for_customer(customer)
+        if balance.points_account(customer.user) is None:
+            raise ValidationError(_("کیف سکهٔ برنده پیدا نشد."))
+    try:
+        with transaction.atomic():
+            ActivityTransaction.objects.create(
+                customer=customer,
+                section="lottery_prize",
+                action_type=f"ticket:{ticket.pk}",
+                score_value=int(amount),
+                reward_data={"coins": int(amount)},
+                metadata={"lottery": str(ticket.lottery_id), "ticket": str(ticket.pk)},
+                status=ActivityTransaction.Status.COMPLETED,
+                description=f"Lottery prize {int(amount)}",
+            )
+    except (IntegrityError, ValidationError):
+        if not ActivityTransaction.objects.filter(customer=customer, section="lottery_prize", action_type=f"ticket:{ticket.pk}").exists():
+            raise  # not a duplicate: a real failure
 
 
 class LotteryWinnerService:
@@ -169,15 +201,18 @@ class LotteryWinnerService:
             if prize > 0:
                 try:
                     with transaction.atomic():
-                        self.prize_transfer_service.send_prize_to_customer(
-                            dto=CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
-                                prize_amount=prize,
-                                customer=ticket.customer,
-                                destination_wallet_account=balance.currency_account(
-                                    ticket.customer.user
-                                ),
+                        if cash_prizes_as_coins():
+                            pay_prize_as_coins(ticket, prize)
+                        else:
+                            self.prize_transfer_service.send_prize_to_customer(
+                                dto=CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
+                                    prize_amount=prize,
+                                    customer=ticket.customer,
+                                    destination_wallet_account=balance.currency_account(
+                                        ticket.customer.user
+                                    ),
+                                )
                             )
-                        )
                 except (ValidationError, DRFValidationError) as exc:
                     paid = False
                     logging.error("Lottery prize for ticket %s not paid: %s", ticket.pk, exc)
@@ -218,13 +253,16 @@ def pay_pending_prize(prize_transaction_id) -> bool:
         customer = tx.ticket.customer
         try:
             with transaction.atomic():
-                CurrencyWalletAccountTransferService().send_prize_to_customer(
-                    CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
-                        prize_amount=tx.prize_amount,
-                        customer=customer,
-                        destination_wallet_account=balance.currency_account(customer.user),
+                if cash_prizes_as_coins():
+                    pay_prize_as_coins(tx.ticket, tx.prize_amount)
+                else:
+                    CurrencyWalletAccountTransferService().send_prize_to_customer(
+                        CurrencyWalletAccountTransferService.SendPrizeToCustomerDTO(
+                            prize_amount=tx.prize_amount,
+                            customer=customer,
+                            destination_wallet_account=balance.currency_account(customer.user),
+                        )
                     )
-                )
         except (ValidationError, DRFValidationError) as exc:
             logging.warning("Pending lottery prize %s still not payable: %s", tx.pk, exc)
             return False

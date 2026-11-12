@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { entryFeeText, useEntryFee } from "../entryFee";
 import { installLucideShim } from "../dowr/lucide";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type SpyConfig, useSpyConfig } from "./api";
@@ -134,6 +135,11 @@ export default function SpyGame() {
 	const refetchRef = useRef(config.refetch);
 	refetchRef.current = config.refetch;
 	const [mounted, setMounted] = useState(false);
+	// The entry fee: a new game («شروع») and each new round («دور بعد؛ کارت‌های تازه», a fresh secret
+	// word) are charged once; resuming a saved game («ادامهٔ بازی») and moves inside a round are free.
+	const entry = useEntryFee("spy", router.push);
+	const entryRef = useRef(entry);
+	entryRef.current = entry;
 
 	useEffect(() => {
 		document.title = "جاسوس | بردینو";
@@ -180,10 +186,53 @@ export default function SpyGame() {
 					},
 					true,
 				);
+				// After the switch check above (its own re-click comes through here): the charge, then the start.
+				// A paid start the module did not begin is a credit for the next one: never paid twice.
+				let paidStart = false;
+				let feePassing = false;
+				root.addEventListener(
+					"click",
+					(e) => {
+						const button = (e.target as Element | null)?.closest?.('[data-a="start"], [data-a="next-round"]') as HTMLButtonElement | null;
+						if (!button || e.defaultPrevented || feePassing || button.disabled) return;
+						const isStart = button.dataset.a === "start";
+						if (isStart && paidStart) {
+							window.setTimeout(() => {
+								if (game.current?.getState().screen === "game") paidStart = false;
+							}, 0);
+							return;
+						}
+						e.stopImmediatePropagation();
+						e.preventDefault();
+						void entryRef.current.start(() => {
+							if (isStart && (entryRef.current.fee ?? 0) > 0) paidStart = true;
+							feePassing = true;
+							try {
+								button.click();
+							} finally {
+								feePassing = false;
+							}
+							if (isStart && game.current?.getState().screen === "game") paidStart = false;
+						});
+					},
+					true,
+				);
 				game.current = api.mount(root, { storageKey: STORAGE });
 				setMounted(true);
 				const polish = () => {
 					applyLook(root, lookRef.current);
+					// The fee under the home screen's introduction (one note; it follows the server's price).
+					const fee = entryRef.current.fee;
+					const hero = root.querySelector(".sp-hero");
+					let note = root.querySelector<HTMLElement>(".spy-fee-note");
+					if (hero && fee) {
+						if (!note) {
+							note = document.createElement("p");
+							note.className = "spy-fee-note bd-fee-note";
+							hero.after(note);
+						}
+						if (note.textContent !== entryFeeText(fee)) note.textContent = entryFeeText(fee);
+					} else if (note && (!fee || !hero)) note.remove();
 					persianSeparators(root);
 					// The design's note «this design version has N sample word pairs» is about the
 					// prototype, not the app (whose bank Bordino keeps growing): not shown.

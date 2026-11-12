@@ -10,6 +10,7 @@ import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { EntryFeeNote, askBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
@@ -191,13 +192,16 @@ export default function SudokuGame() {
 				// The configuration checked before paying: no second request after the charge.
 				game.startServerRound(difficulty, config, round.puzzle, round.id);
 			} catch (e) {
-				setProblem(gameErrorMessage(e));
+				// Not enough coins (the server refuses before charging anything): «خرید سکه».
+				const message = gameErrorMessage(e);
+				if (message.includes("کافی")) askBuyCoins(push, playCost ?? 0, costData?.result ? Number(costData.result.current_amount) : null);
+				else setProblem(message);
 			} finally {
 				busy.current = false;
 				setPaying(false);
 			}
 		},
-		[chargeAsync, refetchCost, game],
+		[refetchCost, game, push, playCost, costData],
 	);
 
 	/** After a loss: pay again and carry on with the same board (mistakes reset, as before). */
@@ -212,7 +216,9 @@ export default function SudokuGame() {
 			void refetchCost();
 			game.continueAfterLoss();
 		} catch (e) {
-			setProblem(gameErrorMessage(e));
+			const message = gameErrorMessage(e);
+			if (message.includes("کافی")) askBuyCoins(push, playCost ?? 0, costData?.result ? Number(costData.result.current_amount) : null);
+			else setProblem(message);
 		} finally {
 			busy.current = false;
 			setPaying(false);
@@ -374,6 +380,7 @@ export default function SudokuGame() {
 					<small>
 						هر بازی سکه می‌گیرد؛ زمان، تعداد فرصت و کمک را تنظیمات بازی در سرور تعیین می‌کند. با یک برد آسان، متوسط و با دو برد متوسط، سخت باز می‌شود. صفحه‌کلید: ۱ تا ۹، جهت‌نما، Delete و N برای یادداشت.
 					</small>
+					<EntryFeeNote fee={playCost} />
 				</section>
 				<main className="sd-main">
 					<div className="sd-meta" {...inertIf(!!modal)}>
@@ -445,6 +452,7 @@ export default function SudokuGame() {
 									</span>
 									<h3>{dialog[modal][0]}</h3>
 									<p>{dialog[modal][1]}</p>
+									{modal !== "pause" ? <EntryFeeNote fee={playCost} /> : null}
 									{problem ? (
 										<p className="sd-problem" role="alert">
 											{problem}

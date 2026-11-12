@@ -22,6 +22,12 @@ class DrawTests(TestCase):
     """Phase 4 (2026-10-22): the server draws the numbers; a lottery is settled once."""
 
     def setUp(self):
+        # (these tests check the cash-wallet payouts and set their own game prices: the coin defaults
+        # of 2026-11-12 — cash prizes as coins, the seeded entry fees — are switched off here)
+        from apps.configuration.models import GameConfiguration as _GC, SystemConfiguration as _SC  # pylint: disable=import-outside-toplevel
+
+        _SC.objects.update_or_create(key="CASH_PRIZES_AS_COINS", defaults={"value": "false"})
+        _GC.objects.all().delete()
         self.player = make_customer("9120000801", points=1000)
         sponsor = Sponsor.objects.create(user=make_customer("9120000802"))
         now = timezone.now()
@@ -464,6 +470,12 @@ class AccountingReviewTests(TestCase):
     """Codex accounting review, 2026-11-02: each case below once moved money it should not have."""
 
     def setUp(self):
+        # (these tests check the cash-wallet payouts and set their own game prices: the coin defaults
+        # of 2026-11-12 — cash prizes as coins, the seeded entry fees — are switched off here)
+        from apps.configuration.models import GameConfiguration as _GC, SystemConfiguration as _SC  # pylint: disable=import-outside-toplevel
+
+        _SC.objects.update_or_create(key="CASH_PRIZES_AS_COINS", defaults={"value": "false"})
+        _GC.objects.all().delete()
         from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
 
         self.player = make_customer("9120004001", points=1000)
@@ -610,6 +622,12 @@ class AccountingFollowUpTests(TestCase):
     """Codex's check of the accounting fixes, 2026-11-02: each case below still moved money wrongly."""
 
     def setUp(self):
+        # (these tests check the cash-wallet payouts and set their own game prices: the coin defaults
+        # of 2026-11-12 — cash prizes as coins, the seeded entry fees — are switched off here)
+        from apps.configuration.models import GameConfiguration as _GC, SystemConfiguration as _SC  # pylint: disable=import-outside-toplevel
+
+        _SC.objects.update_or_create(key="CASH_PRIZES_AS_COINS", defaults={"value": "false"})
+        _GC.objects.all().delete()
         from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
 
         self.player = make_customer("9120004201", points=1000)

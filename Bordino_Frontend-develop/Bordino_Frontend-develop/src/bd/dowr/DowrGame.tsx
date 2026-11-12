@@ -9,6 +9,7 @@ import Icon from "../Icon";
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import GameSettings from "../GameSettings";
+import { entryFeeText, useEntryFee } from "../entryFee";
 import { fa } from "../format";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type DowrConfig, type DowrResult, report, saveGame, useDowrConfig, useDowrHistory } from "./api";
@@ -172,6 +173,13 @@ export default function DowrGame() {
 	const [saved, setSaved] = useState<{ ok: boolean; text: string } | null>(null);
 	const [failed, setFailed] = useState<string | null>(null);
 	const [showSettings, setShowSettings] = useState(false);
+	// The entry fee: charged when a new game really begins (the module's «شروع بازی» / «یک دست دیگر»),
+	// never for its turns and rounds inside one game. A paid start the module refused (no cards for
+	// the chosen topics…) is kept as a credit for the next start: never paid twice.
+	const entry = useEntryFee("dowr", router.push);
+	const entryRef = useRef(entry);
+	entryRef.current = entry;
+	const paidCredit = useRef(false);
 	const [soundOn, setSoundOn] = useState(false);
 	const cfg = config.data?.result;
 	const refetchHistory = useRef(history.refetch);
@@ -265,6 +273,18 @@ export default function DowrGame() {
 				polish.current = () => {
 					const now = cfgRef.current;
 					if (now) applyLimits(root, now.limits);
+					// The fee under the setup's heading (one note; its text follows the server's price).
+					const fee = entryRef.current.fee;
+					const heading = root.querySelector(".dr-setup-heading");
+					let note = root.querySelector<HTMLElement>(".dowr-fee-note");
+					if (heading && fee) {
+						if (!note) {
+							note = document.createElement("p");
+							note.className = "dowr-fee-note bd-fee-note";
+							heading.after(note);
+						}
+						if (note.textContent !== entryFeeText(fee)) note.textContent = entryFeeText(fee);
+					} else if (note && !fee) note.remove();
 					chosen = readChosen(root) ?? chosen;
 					blockStart(root, !playable(now));
 					polishTeams(root);
@@ -284,6 +304,43 @@ export default function DowrGame() {
 						root.querySelector<HTMLButtonElement>('[data-act="settings"]')?.click();
 						root.querySelector<HTMLButtonElement>('[data-act="rules"]')?.click();
 						polish.current?.();
+					},
+					true,
+				);
+				// The entry fee, after the limits guard above (a start it turned back is not a game):
+				// the start waits for the charge, then runs once (the module's own click).
+				let passing = false;
+				root.addEventListener(
+					"click",
+					(e) => {
+						const start = (e.target as Element | null)?.closest?.<HTMLButtonElement>('[data-act="start"]');
+						if (!start || e.defaultPrevented || passing) return;
+						const begin = () => {
+							passing = true;
+							try {
+								start.click();
+							} finally {
+								passing = false;
+							}
+							const now = livePhase();
+							if (now !== "setup" && now !== "finished") paidCredit.current = false; // the game began
+							setPhase(now);
+						};
+						if (paidCredit.current) {
+							// Already paid (a start the module refused): this click goes through as it is.
+							window.setTimeout(() => {
+								const now = livePhase();
+								if (now !== "setup" && now !== "finished") paidCredit.current = false;
+								setPhase(now);
+							}, 0);
+							return;
+						}
+						e.stopImmediatePropagation();
+						e.preventDefault();
+						void entryRef.current.start(() => {
+							if ((entryRef.current.fee ?? 0) > 0) paidCredit.current = true;
+							begin();
+						});
 					},
 					true,
 				);

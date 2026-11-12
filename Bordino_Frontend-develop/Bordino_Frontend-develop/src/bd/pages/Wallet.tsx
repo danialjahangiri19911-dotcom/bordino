@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { CASH_WALLET_VISIBLE } from "../features";
+import { CASH_WALLET_VISIBLE, PRIZE_UNIT } from "../features";
 import { HistoryFooter, HistoryRow, useHistory } from "../history";
 import Icon from "../Icon";
 import { fa, faDate } from "../format";
@@ -68,7 +68,7 @@ export default function Wallet() {
 						</span>
 						<span>
 							<b>{lottery.name}</b>
-							<small>جایزه {fa(lottery.balance_in_money)} تومان · پایان {faDate(lottery.end_date)}</small>
+							<small>جایزه {fa(lottery.balance_in_money)} {PRIZE_UNIT} · پایان {faDate(lottery.end_date)}</small>
 						</span>
 						<Link className="bd-text-btn" href={R.lotteryDetail(lottery.id)}>
 							جزئیات

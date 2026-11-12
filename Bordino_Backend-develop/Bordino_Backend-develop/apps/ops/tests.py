@@ -286,7 +286,7 @@ class SettingsAndDashboardTests(OpsTestCase):
         self.assertEqual(body(r)["setting"]["source"], "default")
         self.assertEqual(SystemConfiguration.objects.get("AD_REWARD_POINTS", 5), 5)
         logs = OpsAuditLog.objects.filter(target_id="AD_REWARD_POINTS").order_by("create_time")
-        self.assertEqual([(l.action, l.data["after"]) for l in logs], [("setting_change", 12), ("setting_reset", 5)])
+        self.assertEqual([(l.action, l.data["after"]) for l in logs], [("setting_change", 12), ("setting_reset", 500)])
 
     def test_dashboards(self):
         own = self.ops(self.owner)

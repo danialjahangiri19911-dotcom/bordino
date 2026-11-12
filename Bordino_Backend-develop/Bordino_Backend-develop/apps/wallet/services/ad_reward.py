@@ -35,7 +35,7 @@ SESSION_TTL = timedelta(minutes=15)
 DEFAULTS = {
     "AD_REWARD_ENABLED": True,
     "AD_REWARD_PROVIDER": "demo",
-    "AD_REWARD_POINTS": 5,
+    "AD_REWARD_POINTS": 500,  # (1 coin = 1 toman since 2026-11-12)
     "AD_REWARD_DAILY_LIMIT": 5,
     "AD_DEMO_VIDEO_URL": "/bd/ads/demo-ad.mp4",
     "AD_DEMO_SECONDS": 15,

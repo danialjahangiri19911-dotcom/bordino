@@ -10,6 +10,7 @@ import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import "./chicken.css";
@@ -397,6 +398,7 @@ export default function ChickenGame() {
 							<p>
 								جاده تا وقتی خودرویی نزند ادامه دارد؛ هر سطح خطرِ هر خط و رشد ضریب خودش را دارد. وقتی برد به سقف {fa(config?.max_payout ?? 0)} سکه برسد، همان‌جا خودکار دریافت می‌شود.
 							</p>
+							<BetFeeNote minBet={minBet} />
 							<p>
 								خط برخورد پیش از شروع دور با سید سرور تعیین می‌شود و هش آن از قبل نمایش داده می‌شود: <bdi dir="ltr" className="ck-hash">{(round?.server_seed_hash ?? "—").slice(0, 24)}…</bdi>
 							</p>
@@ -573,6 +575,11 @@ export default function ChickenGame() {
 							<p className="ck-notice" aria-live="polite" role={game.error || !online ? "alert" : undefined}>
 								{note}
 							</p>
+							{lowBalance && view.phase === "ready" ? (
+								<button type="button" className="bd-buy-coins" onClick={() => goBuyCoins(push)}>
+								<Icon name="coins" /> خرید سکه
+							</button>
+							) : null}
 						</section>
 					</div>
 					<div className="ck-recent">

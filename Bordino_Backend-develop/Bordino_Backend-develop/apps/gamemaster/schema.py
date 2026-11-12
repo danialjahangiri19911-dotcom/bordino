@@ -47,7 +47,7 @@ PROOF_OF = {
 }
 MAX_STAGES = 20
 MAX_BYTES = 64 * 1024
-MAX_STAGE_POINTS = 500
+MAX_STAGE_POINTS = 50_000  # (1 coin = 1 toman since 2026-11-12; was 500)
 # A mission location must be in Iran (a rough box: the review checks the exact place).
 IRAN = (24.0, 40.5, 43.5, 64.0)
 EXPIRY = ("none", "date", "duration")

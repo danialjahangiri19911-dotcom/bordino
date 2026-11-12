@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Icon from "../Icon";
+import { clearCoinsReturn, coinsReturn } from "../entryFee";
 import { fa } from "../format";
 import { AppShell, EmptyState, Facts, LoadState, Notice, Panel, R } from "../ui";
 import { type CoinPackage, type CoinPurchase, buyPackage, useCoinShop, verifyPurchase } from "./api";
@@ -14,6 +15,22 @@ import { type CoinPackage, type CoinPurchase, buyPackage, useCoinShop, verifyPur
 import { gameErrorMessage } from "@/api/games/request";
 
 const toman = (n: number) => `${fa(n)} تومان`;
+
+/** The game the player came from to buy coins (read after mount: it lives in this tab's storage). */
+function useReturnPath() {
+	const [path, setPath] = useState<string | null>(null);
+	useEffect(() => setPath(coinsReturn()), []);
+	return path;
+}
+
+function BackToGame({ path, primary = false }: { path: string | null; primary?: boolean }) {
+	if (!path) return null;
+	return (
+		<Link className={primary ? "bd-action" : "bd-secondary"} href={path} onClick={clearCoinsReturn}>
+			<Icon name="gamepad-2" /> برگشت به بازی
+		</Link>
+	);
+}
 
 /** One package as a card: its coins, its price, and the discount when there is one. */
 function PackCard({ pack, onPick, disabled }: { pack: CoinPackage; onPick: () => void; disabled: boolean }) {
@@ -47,6 +64,7 @@ function PackCard({ pack, onPick, disabled }: { pack: CoinPackage; onPick: () =>
 export function CoinShopPage() {
 	const shop = useCoinShop();
 	const { push } = useRouter();
+	const back = useReturnPath();
 	const data = shop.data?.result;
 	return (
 		<AppShell nav="wallet" title="خرید سکه">
@@ -77,6 +95,7 @@ export function CoinShopPage() {
 				)
 			) : null}
 			<div className="bd-actions rt-gap-top">
+				<BackToGame path={back} />
 				<Link className="bd-secondary" href={R.wallet}>
 					برگشت به کیف
 				</Link>
@@ -230,6 +249,7 @@ export function CoinCallbackPage() {
 			.catch((e) => setState({ error: gameErrorMessage(e) }));
 	}, [params, queryClient]);
 
+	const back = useReturnPath();
 	const p = state.purchase;
 	const paid = p?.status === "paid";
 	const pending = !p && !state.error;
@@ -264,7 +284,8 @@ export function CoinCallbackPage() {
 				)}
 				{!pending ? (
 					<div className="bd-actions">
-						<Link className="bd-action" href={R.wallet}>
+						{paid ? <BackToGame path={back} primary /> : null}
+						<Link className={paid && back ? "bd-secondary" : "bd-action"} href={R.wallet}>
 							برگشت به کیف
 						</Link>
 						<Link className="bd-secondary" href={R.coins}>

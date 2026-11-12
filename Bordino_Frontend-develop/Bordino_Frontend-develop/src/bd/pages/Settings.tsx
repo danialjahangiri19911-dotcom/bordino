@@ -1,5 +1,6 @@
 "use client";
 
+import { CASH_WALLET_VISIBLE } from "../features";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
@@ -368,7 +369,8 @@ export function Prizes() {
 	const c = useWalletHistory("currency", cash.account?.id);
 	const prizes: Entry[] = useMemo(
 		() =>
-			[...rowsOf(p.data?.pages, "points"), ...rowsOf(c.data?.pages, "currency")]
+			// (the cash wallet hidden: its rows are not shown; prizes are paid in coins meanwhile)
+			[...rowsOf(p.data?.pages, "points"), ...(CASH_WALLET_VISIBLE ? rowsOf(c.data?.pages, "currency") : [])]
 				.filter((row) => PRIZE_TYPES.has(row.type))
 				.sort((a, b) => Date.parse(b.date) - Date.parse(a.date)),
 		[p.data, c.data],

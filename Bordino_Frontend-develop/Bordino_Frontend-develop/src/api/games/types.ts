@@ -1,7 +1,7 @@
 import type { ResponseApiData } from "@/libs/http/interfaces";
 
 /** نامِ بازی در بک‌اند (`GameConfiguration.game_name`). */
-export type GameName = "sudoku" | "game_2048";
+export type GameName = "sudoku" | "game_2048" | "pantomime" | "dowr" | "spy";
 
 export interface PlayCost {
 	game_name: string;

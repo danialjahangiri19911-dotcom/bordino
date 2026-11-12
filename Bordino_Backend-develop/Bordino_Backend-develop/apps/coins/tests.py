@@ -228,3 +228,117 @@ class OpsCoinTests(TestCase):
         self.assertEqual(api.put("/api/v1/ops/settings/COIN_ZIBAL_MERCHANT/", {"value": "m-1"}, format="json").status_code, 200)
         self.assertEqual(api.delete("/api/v1/ops/settings/COIN_ZIBAL_MODE/").status_code, 200)
         self.assertEqual(services.pay_mode(), "sandbox")
+
+
+@override_settings(CACHES=LOCMEM)
+class EntryFeeTests(TestCase):
+    """Every game's entry fee comes from GameConfiguration and is charged once per request id."""
+
+    def setUp(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        cache.clear()
+        GameConfiguration.objects.update_or_create(game_name="dowr", difficulty_level=None, defaults={"play_cost": 5000})
+        self.user = make_customer("9120004001", points=12_000)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def charge(self, game="dowr", rid="g-1"):
+        return self.api.post("/api/v1/wallet/games/charge/", {"game_name": game, "request_id": rid}, format="json")
+
+    def test_the_fee_is_shown_and_charged_once_per_new_game(self):
+        r = self.api.get("/api/v1/wallet/games/charge/", {"game_name": "dowr"})
+        self.assertEqual((result(r)["play_cost"], result(r)["current_amount"]), (5000, 12_000))
+        self.assertEqual(self.charge(rid="g-1").status_code, 200)
+        self.assertEqual(self.charge(rid="g-1").status_code, 200)  # a double tap / retry of the same game
+        self.assertEqual(points(self.user), 7000)
+        self.assertEqual(self.charge(rid="g-2").status_code, 200)  # the next game
+        self.assertEqual(points(self.user), 2000)
+
+    def test_not_enough_coins_never_starts_or_goes_negative(self):
+        self.charge(rid="a")
+        self.charge(rid="b")
+        r = self.charge(rid="c")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(points(self.user), 2000)
+
+    def test_each_charge_is_in_the_history(self):
+        self.charge(rid="h-1")
+        from apps.wallet.services.history import points_history  # pylint: disable=import-outside-toplevel
+
+        self.assertTrue(any(r["title"] == "بازی دُور" and r["amount"] == 5000 and not r["is_positive"] for r in points_history(self.user)))
+
+    def test_the_admin_edits_the_fees(self):
+        from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
+        from apps.ops.auth import tokens_for  # pylint: disable=import-outside-toplevel
+        from apps.ops.models import OpsAuditLog  # pylint: disable=import-outside-toplevel
+
+        with override_settings(OPS_OWNERS=["9128007728"]):
+            owner = make_customer("9128007728")
+            api = APIClient()
+            api.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens_for(owner)['access']}")
+            fees = result(api.get("/api/v1/ops/coins/fees/"))["fees"]
+            dowr = next(f for f in fees if f["game"] == "dowr")
+            self.assertEqual(dowr["fee"], 5000)
+            self.assertEqual(api.put(f"/api/v1/ops/coins/fees/{dowr['id']}/", {"fee": "-1"}, format="json").status_code, 400)
+            self.assertEqual(api.put(f"/api/v1/ops/coins/fees/{dowr['id']}/", {"fee": 3000}, format="json").status_code, 200)
+            self.assertEqual(GameConfiguration.objects.get(pk=dowr["id"]).play_cost, 3000)
+            self.assertTrue(OpsAuditLog.objects.filter(action="game_fee_change").exists())
+            player = APIClient()
+            player.force_authenticate(self.user)
+            self.assertIn(player.get("/api/v1/ops/coins/fees/").status_code, (401, 403))
+
+
+@override_settings(CACHES=LOCMEM)
+class CashPrizesAsCoinsTests(TestCase):
+    def setUp(self):
+        from apps.lottery.models import LotteryWheel, LotteryWheelPrize  # pylint: disable=import-outside-toplevel
+        from apps.users.models import Sponsor  # pylint: disable=import-outside-toplevel
+
+        cache.clear()
+        self.user = make_customer("9120004101", points=1000, rial=0)
+        sponsor = Sponsor.objects.create(user=make_customer("9120004102"))
+        self.wheel = LotteryWheel.objects.create(name="w", owner=sponsor, cost_per_spin=100, max_spins=100, max_spins_per_customer=10)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="پوچ", prize_amount=0, probability=50, prize_type=LotteryWheelPrize.PrizeType.EMPTY)
+        LotteryWheelPrize.objects.create(lottery_wheel=self.wheel, name="۵۰۰ ت", prize_amount=500, probability=50, prize_type=LotteryWheelPrize.PrizeType.CASH)
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def spin(self, rid):
+        from apps.lottery.services.lottery.lottery_wheel import LotteryWheelService  # pylint: disable=import-outside-toplevel
+        from apps.wallet.services import balance  # pylint: disable=import-outside-toplevel
+
+        account = balance.points_account(self.user)
+        # (the draw itself is random: here it always lands on the toman prize)
+        with mock.patch.object(LotteryWheelService, "select_prize", lambda _self, prizes, multiplier=1: next(p for p in prizes if p.prize_type == "cash")):
+            return self.post_spin(rid, account)
+
+    def post_spin(self, rid, account):
+        return self.api.post("/api/v1/lotteries/lottery-wheel/spin/", {"request_id": rid, "lottery_wheel": str(self.wheel.pk), "token_wallet_account": str(account.pk)}, format="json")
+
+    def test_a_toman_wheel_prize_is_paid_as_the_same_number_of_coins(self):
+        from apps.wallet.tests import rial  # pylint: disable=import-outside-toplevel
+
+        r = self.spin("w-1")
+        self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual(points(self.user), 1000 - 100 + 500)
+        self.assertEqual(rial(self.user), 0)
+        self.assertIn("recharge", r.content.decode())
+        self.spin("w-1")  # a retry of the same spin
+        self.assertEqual(points(self.user), 1400)
+
+    def test_with_the_switch_off_it_is_cash_again(self):
+        from apps.wallet.tests import rial  # pylint: disable=import-outside-toplevel
+
+        setting("CASH_PRIZES_AS_COINS", "false")
+        r = self.spin("w-2")
+        self.assertIn(r.status_code, (200, 201), r.content)
+        self.assertEqual((points(self.user), rial(self.user)), (900, 500))
+
+    def test_a_lottery_prize_as_coins_is_paid_once(self):
+        from apps.lottery.services.lottery.lottery_winner import pay_prize_as_coins  # pylint: disable=import-outside-toplevel
+
+        ticket = mock.Mock(pk="t-1", lottery_id="l-1", customer=self.user.customer)
+        pay_prize_as_coins(ticket, 7000)
+        pay_prize_as_coins(ticket, 7000)
+        self.assertEqual(points(self.user), 8000)

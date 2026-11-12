@@ -250,6 +250,12 @@ class HistoryTests(TestCase):
     """Codex review 2026-10-22 (phase 3b): every movement once, signed, in its own history."""
 
     def setUp(self):
+        # (these tests check the cash-wallet payouts and set their own game prices: the coin defaults
+        # of 2026-11-12 — cash prizes as coins, the seeded entry fees — are switched off here)
+        from apps.configuration.models import GameConfiguration as _GC, SystemConfiguration as _SC  # pylint: disable=import-outside-toplevel
+
+        _SC.objects.update_or_create(key="CASH_PRIZES_AS_COINS", defaults={"value": "false"})
+        _GC.objects.all().delete()
         from apps.configuration.models import GameConfiguration  # pylint: disable=import-outside-toplevel
 
         self.user = make_customer("9120000741", points=100, rial=0)

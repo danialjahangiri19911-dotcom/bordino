@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import F, Sum
 from django.utils.translation import gettext_lazy as _
 
+from apps.coins.services import cash_prizes_as_coins
 from apps.lottery.models import (
     LotteryWheel,
     LotteryWheelPrize,
@@ -134,6 +135,8 @@ class LotteryWheelService:
                     prize.prize_amount = (
                         earlier.paid_amount if earlier.paid_amount is not None else prize.prize_amount * earlier.multiplier
                     )
+                    if prize.prize_type == LotteryWheelPrize.PrizeType.CASH and cash_prizes_as_coins():
+                        prize.prize_type = LotteryWheelPrize.PrizeType.RECHARGE  # (shown as it is paid now: coins)
                 return prize, LotteryWheelSpin.objects.get(lottery_wheel=wheel, customer=dto.customer)
         base = int(wheel.cost_per_spin)
         if base < 0:
@@ -167,7 +170,10 @@ class LotteryWheelService:
         wallet = dto.token_wallet_account.wallet
         valid = TokenWalletAccount.WalletStatus.VALID
         cash = None
-        if any(p.prize_type == LotteryWheelPrize.PrizeType.CASH for p in prizes):
+        # While the cash wallet is hidden, a toman prize is paid as the same number of coins (1 coin =
+        # 1 toman) into the account the spin is paid from: no cash account is needed.
+        as_coins = cash_prizes_as_coins()
+        if not as_coins and any(p.prize_type == LotteryWheelPrize.PrizeType.CASH for p in prizes):
             cash = wallet.currency_wallet_accounts.filter(primary=True).first()
             if cash is None or cash.status != valid or is_wallet_expired(cash.wallet):
                 raise ValidationError(_("کیف نقدی برای دریافت جایزه پیدا نشد؛ با پشتیبانی تماس بگیر."))
@@ -210,6 +216,10 @@ class LotteryWheelService:
             selected_prize.prize_amount = scaled
 
         target_account = None  # the token account a recharge prize credited (for the history)
+        if selected_prize.prize_type == LotteryWheelPrize.PrizeType.CASH and as_coins:
+            # In memory only (never saved): the prize is paid, recorded and answered as coins.
+            selected_prize.prize_type = LotteryWheelPrize.PrizeType.RECHARGE
+            selected_prize.target_token_id = None
         match selected_prize.prize_type:
             case LotteryWheelPrize.PrizeType.CASH:
                 self.currency_wallet_account_transfer_service.send_prize_to_customer(

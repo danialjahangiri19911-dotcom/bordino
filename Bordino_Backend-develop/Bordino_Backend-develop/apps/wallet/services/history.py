@@ -23,8 +23,8 @@ from apps.wallet.models import (
 )
 from apps.wallet.services.balance import POINTS_SYMBOL
 
-GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸"}
-ACTIVITY_TITLES = {"sudoku": "سکهٔ سودوکو", "game_2048": "سکهٔ ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "mission": "جایزهٔ مأموریت", "admin_adjust": "تنظیم سکه توسط پشتیبانی", "coin_purchase": "خرید سکه"}
+GAME_TITLES = {"sudoku": "بازی سودوکو", "game_2048": "بازی ۲۰۴۸", "pantomime": "بازی پانتومیم", "dowr": "بازی دُور", "spy": "بازی جاسوس"}
+ACTIVITY_TITLES = {"sudoku": "سکهٔ سودوکو", "game_2048": "سکهٔ ۲۰۴۸", "rewarded_ad": "جایزهٔ تماشای ویدیو", "mission": "جایزهٔ مأموریت", "admin_adjust": "تنظیم سکه توسط پشتیبانی", "coin_purchase": "خرید سکه", "coin_rescale": "تبدیل به سکهٔ جدید (۱ سکه = ۱ تومان)", "lottery_prize": "جایزهٔ قرعه‌کشی"}
 WITHDRAWAL_STATUS = {
     CurrencyTransaction.Status.PENDING: "در انتظار واریز",
     CurrencyTransaction.Status.COMPLETED: "واریز شد",
@@ -107,7 +107,8 @@ def points_history(user, token_account=None):
                 title = f"مأموریت: {t.metadata['title']}"[:120]
             elif t.section == "gamemaster" and t.metadata.get("title"):
                 title = str(t.metadata["title"])[:120]
-            rows.append(_row(t.id, "activity_reward", title, abs(t.score_value), t.score_value > 0, t.create_time))
+            kind = "lottery_prize" if t.section == "lottery_prize" else "activity_reward"  # (a prize, on «جوایز من» too)
+            rows.append(_row(t.id, kind, title, abs(t.score_value), t.score_value > 0, t.create_time))
 
         for c in GamePlayCharge.objects.filter(customer=customer, cost__gt=0):
             title = GAME_TITLES.get(c.game_name, "بازی")
@@ -177,7 +178,15 @@ def currency_history(user, currency_account=None):
         row["destination_name"] = detail
         rows.append(row)
 
+    # A prize paid as coins (cash prizes as coins, while the cash wallet is hidden) is in the coins
+    # history, as its ledger row: not here too.
+    in_coins = {
+        a.split(":", 1)[1]
+        for a in ActivityTransaction.objects.filter(customer=customer, section="lottery_prize").values_list("action_type", flat=True)
+    }
     for t in LotteryPrizeTransaction.objects.filter(ticket__customer=customer).select_related("lottery"):
+        if str(t.ticket_id) in in_coins:
+            continue
         title = f"جایزهٔ {t.lottery.name}" if t.lottery else "جایزهٔ قرعه‌کشی"
         row = _row(t.id, "lottery_prize", title, t.prize_amount, True, t.create_time, status=t.status)
         # Won but not paid yet (the transfer failed; the team pays it by hand): not a credit yet.

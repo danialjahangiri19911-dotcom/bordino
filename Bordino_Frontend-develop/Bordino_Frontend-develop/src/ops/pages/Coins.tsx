@@ -103,6 +103,76 @@ function PackForm({ initial, onSave, onCancel, saving }: { initial: Draft; onSav
 	);
 }
 
+interface Fee {
+	id: string;
+	game: string;
+	game_label: string;
+	level: string;
+	level_label: string;
+	fee: number;
+	active: boolean;
+}
+
+/** Each game's entry fee (GameConfiguration.play_cost): charged once per new game or round. */
+function FeesPanel() {
+	const q = useOps<{ fees: Fee[] }>("coins/fees/");
+	const refresh = useRefresh();
+	const [drafts, setDrafts] = useState<Record<string, string>>({});
+	const [problem, setProblem] = useState<string | null>(null);
+	const [done, setDone] = useState<string | null>(null);
+	const [saving, setSaving] = useState<string | null>(null);
+	const save = async (f: Fee) => {
+		setSaving(f.id);
+		setProblem(null);
+		setDone(null);
+		try {
+			await ops(`coins/fees/${f.id}/`, "PUT", { fee: digits(drafts[f.id] ?? String(f.fee)) || "0" });
+			setDone(`هزینهٔ ${f.game_label}${f.level_label ? ` (${f.level_label})` : ""} ذخیره شد.`);
+			setDrafts((d) => ({ ...d, [f.id]: "" }));
+			refresh();
+		} catch (e) {
+			setProblem(errorText(e));
+		} finally {
+			setSaving(null);
+		}
+	};
+	return (
+		<Panel title="هزینهٔ ورود بازی‌ها">
+			<p className="bd-muted">با شروع هر بازی یا دست تازه، یک‌بار از کیف بازیکن کم می‌شود (ادامهٔ بازی ذخیره‌شده رایگان است). ۰ = رایگان. بازی‌های شرطی (انفجار، مرغ فراری، گردونه) هزینهٔ ورود ندارند؛ شرط هر دست همان ورودی است.</p>
+			{problem ? <Notice>{problem}</Notice> : null}
+			{done ? <Notice tone="ok">{done}</Notice> : null}
+			<LoadState loading={q.isLoading} error={q.error} onRetry={q.refetch} />
+			<div className="ops-list">
+				{(q.data?.fees ?? []).map((f) => (
+					<form
+						key={f.id}
+						className="ops-row ops-fee-row"
+						onSubmit={(e) => {
+							e.preventDefault();
+							void save(f);
+						}}
+					>
+						<span className="ops-row-main">
+							<b>
+								{f.game_label}
+								{f.level_label ? <small className="bd-muted"> · {f.level_label}</small> : null}
+							</b>
+							<small className="bd-muted">الان: {f.fee ? `${fa(f.fee)} سکه` : "رایگان"}</small>
+						</span>
+						<label className="rt-field gm-field ops-fee-input">
+							<span>سکه</span>
+							<input inputMode="numeric" value={drafts[f.id] ?? String(f.fee)} onChange={(e) => setDrafts((d) => ({ ...d, [f.id]: digits(e.target.value) }))} />
+						</label>
+						<button type="submit" className="bd-secondary" disabled={saving === f.id || (drafts[f.id] ?? String(f.fee)) === String(f.fee)}>
+							{saving === f.id ? "…" : "ذخیره"}
+						</button>
+					</form>
+				))}
+			</div>
+		</Panel>
+	);
+}
+
 /** «بسته‌های سکه»: what the coin shop sells (the settings role), and the latest purchases. */
 export function CoinPackagesPage() {
 	const q = useOps<{ packages: Pack[] }>("coins/packages/");
@@ -185,6 +255,7 @@ export function CoinPackagesPage() {
 					</button>
 				</div>
 			)}
+			<FeesPanel />
 			<Panel title="آخرین خریدها">
 				<LoadState loading={purchases.isLoading} error={purchases.error} onRetry={purchases.refetch} />
 				{purchases.data && !purchases.data.purchases.length ? <EmptyState icon="coins" title="هنوز خریدی نشده" /> : null}

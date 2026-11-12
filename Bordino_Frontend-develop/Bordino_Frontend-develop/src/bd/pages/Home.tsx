@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIZE_UNIT } from "../features";
 import { useEffect } from "react";
 
 import Link from "next/link";
@@ -49,7 +50,7 @@ function LotteryPanel() {
 			</p>
 			<h3>{lottery.name}</h3>
 			<p>
-				جایزه: {fa(lottery.balance_in_money)} تومان
+				جایزه: {fa(lottery.balance_in_money)} {PRIZE_UNIT}
 				<br />
 				{left > 0 ? <>زمان باقی‌مانده: {formatLeft(left)}</> : <>فروش بسته شد؛ در انتظار قرعه‌کشی</>}
 			</p>

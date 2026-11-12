@@ -38,7 +38,7 @@ const NAV: { key: OpsNav; icon: IconName; label: string; href: string; roles: (O
 	{ key: "withdrawals", icon: "banknote", label: "درخواست‌های برداشت", href: OPS.withdrawals, roles: ["finance"] },
 	{ key: "banks", icon: "landmark", label: "حساب‌های بانکی", href: OPS.banks, roles: ["finance"] },
 	{ key: "settings", icon: "pencil", label: "تنظیمات", href: OPS.settings, roles: ["settings"] },
-	{ key: "coins", icon: "coins", label: "بسته‌های سکه", href: OPS.coins, roles: ["settings"] },
+	{ key: "coins", icon: "coins", label: "سکه و هزینهٔ بازی‌ها", href: OPS.coins, roles: ["settings"] },
 	{ key: "users", icon: "users", label: "کاربران", href: OPS.users, roles: ["any"] },
 	{ key: "maintenance", icon: "monitor", label: "سلامت سرور", href: OPS.maintenance, roles: ["any"] },
 	{ key: "staff", icon: "user-plus", label: "کارکنان و نقش‌ها", href: OPS.staff, roles: ["owner"] },

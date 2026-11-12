@@ -20,6 +20,8 @@ interface Props {
 	onPlay: () => void;
 	/** Back / tap outside: stay on the game list. */
 	onCancel: () => void;
+	/** Not enough coins for the game's entry fee: «خرید سکه» replaces «ادامه بدون تماشای ویدیو». */
+	onBuyCoins?: () => void;
 }
 
 type Step =
@@ -34,7 +36,7 @@ type Step =
  * Before a game: «تماشای ویدیو و دریافت X سکه» or «ادامه بدون تماشای ویدیو». The game opens only
  * after this flow ends, never behind it. The points come from the server, after it accepts the view.
  */
-export default function RewardOffer({ offer, gameName, placement, onPlay, onCancel }: Readonly<Props>) {
+export default function RewardOffer({ offer, gameName, placement, onPlay, onCancel, onBuyCoins }: Readonly<Props>) {
 	const queryClient = useQueryClient();
 	const [step, setStep] = useState<Step>({ kind: "offer" });
 
@@ -117,9 +119,15 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 							{step.kind === "offer" ? <Icon name="play" /> : <Icon name="loader-circle" className="bd-spin" />}
 							{step.kind === "claiming" ? "در حال ثبت جایزه…" : `تماشای ویدیو و دریافت ${fa(offer.reward_points)} سکه`}
 						</button>
-						<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer"} onClick={onPlay}>
-							ادامه بدون تماشای ویدیو
-						</button>
+						{onBuyCoins ? (
+							<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer"} onClick={onBuyCoins}>
+								<Icon name="coins" /> خرید سکه
+							</button>
+						) : (
+							<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer"} onClick={onPlay}>
+								ادامه بدون تماشای ویدیو
+							</button>
+						)}
 						<small className="bd-reward-left">امروز {fa(offer.remaining_today)} ویدیوی جایزه‌دار دیگر داری.</small>
 					</>
 				)}

@@ -9,6 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
+import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
 import { R, useRequireLogin } from "../ui";
@@ -450,6 +451,7 @@ export default function CrashGame() {
 							نقطهٔ انفجار را سرور پیش از دور تعیین می‌کند و بعد از دور قابل بررسی است (بخش «شفافیت»). شرط {fa(limits.minBet)} تا {fa(limits.maxBet)} سکه
 							{config ? `، حداکثر برد هر دور ${fa(config.max_payout)} سکه` : ""}.
 						</p>
+						<BetFeeNote minBet={limits.minBet} />
 					</section>
 				) : null}
 				<main className="cr-main">
@@ -750,6 +752,11 @@ export default function CrashGame() {
 						<p className="cr-error" role="alert">
 							{game.error ?? (!flying && !autoRunning && !game.loading ? problem : "")}
 						</p>
+						{config && !flying && !autoRunning && Number(balance ?? 0) < limits.minBet ? (
+							<button type="button" className="bd-buy-coins" onClick={() => goBuyCoins(push)}>
+								<Icon name="coins" /> خرید سکه
+							</button>
+						) : null}
 						<div className="cr-actions">
 							<button
 								type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIZE_UNIT } from "../features";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
@@ -80,7 +81,7 @@ export default function LotteryDetail() {
 					<span className="bd-tag">{lotteryStatus(lottery)}</span>
 					<Art name="rewards" />
 					<p>
-						{completed ? "جمع جوایز این دوره" : "موجودی جایزهٔ این دوره"}: <b>{fa(prize)} تومان</b>
+						{completed ? "جمع جوایز این دوره" : "موجودی جایزهٔ این دوره"}: <b>{fa(prize)} {PRIZE_UNIT}</b>
 					</p>
 					{completed && winning.length ? (
 						<>
@@ -106,7 +107,7 @@ export default function LotteryDetail() {
 									.sort((a, b) => b.match_count - a.match_count)
 									.map((rule) => [
 										`${fa(rule.match_count)} عدد درست`,
-										rule.match_count === 6 ? "سهم از باقی‌ماندهٔ جایزه" : `${fa(rule.prize_amount)} تومان`,
+										rule.match_count === 6 ? "سهم از باقی‌ماندهٔ جایزه" : `${fa(rule.prize_amount)} ${PRIZE_UNIT}`,
 									])}
 							/>
 						</>
@@ -155,7 +156,7 @@ export default function LotteryDetail() {
 													<b>{winner.is_me ? "تو" : winner.username || "کاربر بردینو"}</b>
 													<small>{fa(winner.tickets_count)} بلیت</small>
 												</span>
-												<span className="bd-amount is-plus">{fa(winner.prize_amount)} تومان</span>
+												<span className="bd-amount is-plus">{fa(winner.prize_amount)} {PRIZE_UNIT}</span>
 											</div>
 										))}
 									</div>

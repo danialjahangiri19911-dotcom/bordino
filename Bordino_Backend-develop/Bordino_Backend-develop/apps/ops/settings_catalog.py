@@ -49,19 +49,20 @@ CATALOG = [
     # Ads & rewards
     _e("AD_REWARD_ENABLED", "ads", "bool", "جایزهٔ دیدن تبلیغ", "", AD["AD_REWARD_ENABLED"]),
     _e("AD_REWARD_PROVIDER", "ads", "choice", "تبلیغ‌دهنده", "", AD["AD_REWARD_PROVIDER"], choices=[["demo", "نمایشی (ویدئوی خودمان)"], ["adivery", "ادیوری"]]),
-    _e("AD_REWARD_POINTS", "ads", "int", "امتیاز هر تبلیغ", "", AD["AD_REWARD_POINTS"], 0, 1000),
+    _e("AD_REWARD_POINTS", "ads", "int", "سکهٔ هر تبلیغ", "", AD["AD_REWARD_POINTS"], 0, 100_000),
     _e("AD_REWARD_DAILY_LIMIT", "ads", "int", "سقف تبلیغ جایزه‌دار در روز", "", AD["AD_REWARD_DAILY_LIMIT"], 0, 100),
     _e("AD_DEMO_SECONDS", "ads", "int", "مدت تبلیغ نمایشی (ثانیه)", "", AD["AD_DEMO_SECONDS"], 3, 120),
     _e("ADIVERY_TRUST_APP", "ads", "bool", "پذیرفتن «دیدم» از خود اپ (ادیوری)", "تا وقتی ادیوری به سرور خبر نمی‌دهد.", AD["ADIVERY_TRUST_APP"]),
     _e("ADIVERY_TRUST_SECONDS", "ads", "int", "حداقل ثانیه برای پذیرفتن «دیدم»", "", AD["ADIVERY_TRUST_SECONDS"], 1, 20),  # (the app asks again for ~28 s: longer would never pay)
-    _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "امتیاز تکمیل پروفایل", "یک بار برای هر کاربر.", 25, 0, 10_000),
+    _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "سکهٔ تکمیل پروفایل", "یک بار برای هر کاربر.", 2500, 0, 1_000_000),
     # Coins
     _e("COIN_ZIBAL_MODE", "coins", "choice", "درگاه خرید سکه", "خاموش: خرید بسته است · آزمایشی: پولی جابه‌جا نمی‌شود اما سکه داده می‌شود · تست زیبال · واقعی (نیاز به مرچنت).", COIN["COIN_ZIBAL_MODE"], choices=[["off", "خاموش"], ["sandbox", "آزمایشی"], ["test", "تست زیبال"], ["live", "واقعی"]]),
+    _e("CASH_PRIZES_AS_COINS", "coins", "bool", "جایزه‌های نقدی به سکه", "تا وقتی کیف نقدی پنهان است: جایزهٔ تومانی گردونه و برندگان قرعه‌کشی به سکه (۱ سکه = ۱ تومان) پرداخت می‌شود.", COIN["CASH_PRIZES_AS_COINS"]),
     _e("COIN_ZIBAL_MERCHANT", "coins", "str", "کد مرچنت زیبال برای سکه", "خالی = همان مرچنت گیم مستر. فقط برای حالت واقعی.", COIN["COIN_ZIBAL_MERCHANT"]),
     # Wallet
-    _e("WALLET_TOKEN_EXPIRATION_DAYS", "wallet", "int", "اعتبار امتیازها (روز)", "", 365, 1, 3650),
+    _e("WALLET_TOKEN_EXPIRATION_DAYS", "wallet", "int", "اعتبار سکه‌ها (روز)", "", 365, 1, 3650),
     _e("WALLET_CURRENCY_EXPIRATION_DAYS", "wallet", "int", "اعتبار موجودی نقدی (روز)", "", 365, 1, 3650),
-    _e("WALLET_MAX_NEGATIVE_POINTS", "wallet", "int", "حداکثر منفی شدن امتیاز", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000),
+    _e("WALLET_MAX_NEGATIVE_POINTS", "wallet", "int", "حداکثر منفی شدن سکه", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000),
     _e("WALLET_MAX_NEGATIVE_CURRENCY", "wallet", "int", "حداکثر منفی شدن موجودی نقدی (تومان)", "۰ = هرگز منفی نشود.", 0, 0, 1_000_000_000),
     # Files
     _e("FILE_VALIDATOR_MAX_FILE_SIZE", "files", "int", "حداکثر حجم فایل بارگذاری (بایت)", "", None, 10_000, 50_000_000),

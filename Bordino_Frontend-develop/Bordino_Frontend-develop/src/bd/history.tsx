@@ -30,7 +30,8 @@ function iconFor(entry: Entry): IconName {
 }
 
 export function HistoryRow({ entry }: { entry: Entry }) {
-	const unit = entry.kind === "points" ? "سکه" : "تومان";
+	// Coins: only the number (the wallet is coins); cash keeps its «تومان».
+	const unit = entry.kind === "points" ? null : "تومان";
 	const failed = entry.status === "failed" || entry.status === "cancelled";
 	return (
 		<div className="bd-row">
@@ -47,7 +48,8 @@ export function HistoryRow({ entry }: { entry: Entry }) {
 			</span>
 			<span className={`bd-amount ${failed ? "" : entry.is_positive ? "is-plus" : "is-minus"}`} dir="ltr">
 				{failed ? "" : entry.is_positive ? "+" : "−"}
-				{fa(entry.amount)} <small>{unit}</small>
+				{fa(entry.amount)}
+				{unit ? <small> {unit}</small> : null}
 			</span>
 		</div>
 	);

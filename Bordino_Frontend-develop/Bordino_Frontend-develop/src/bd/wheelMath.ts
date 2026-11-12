@@ -1,9 +1,10 @@
+import { PRIZE_UNIT } from "./features";
 import { fa } from "./format";
 
 import type { WheelPrize } from "@/api/lottery/types/getWheelType";
 
 export function prizeLabel(amount: number, type: WheelPrize["prize_type"]) {
-	return `${fa(amount)} ${type === "cash" ? "تومان" : "سکه"}`;
+	return `${fa(amount)} ${type === "cash" ? PRIZE_UNIT : "سکه"}`;
 }
 
 /** What a prize pays at multiplier M and bet scale (bet / cost_per_spin), rounded down as the server does. */

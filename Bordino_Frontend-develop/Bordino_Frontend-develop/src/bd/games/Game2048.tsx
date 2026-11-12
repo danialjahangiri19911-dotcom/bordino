@@ -10,6 +10,7 @@ import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { EntryFeeNote, askBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
 import { inertIf } from "./SudokuGame";
@@ -126,6 +127,12 @@ function View() {
 	const start = async () => {
 		interacted.current = true;
 		setProblem(null);
+		// Not enough coins for a new game: «خرید سکه» (nothing is charged, the board stays as it is).
+		const now = (await refetchCost()).data?.data?.result; // (refetch gives the response still wrapped)
+		if (now && now.play_cost && Number(now.current_amount) < now.play_cost) {
+			askBuyCoins(push, now.play_cost, Number(now.current_amount));
+			return;
+		}
 		if (await game.startPaidGame()) {
 			void refetchCost();
 			setConfirm("");
@@ -232,6 +239,7 @@ function View() {
 					<b>یک حرکت، یک ترکیب</b>
 					<p>عددهای یکسان را با کشیدن روی صفحه یا کلیدهای جهت‌نما به هم برسان. هر ترکیب به امتیاز بازی اضافه می‌شود. هدف، ساختن کاشی ۲۰۴۸ است؛ زمان محدودی ندارد.</p>
 					<small>هر بازی از سکه‌های کیف کم می‌کند؛ امتیاز و رکورد خود بازی به کیف اضافه نمی‌شوند.</small>
+					<EntryFeeNote fee={playCost} />
 				</section>
 				<div className="g48-layout">
 					<section className="g48-play">
@@ -287,6 +295,7 @@ function View() {
 										</span>
 										<h3>{dialog[modal][0]}</h3>
 										<p>{dialog[modal][1]}</p>
+										{modal === "ready" || modal === "reset" || modal === "lost" || modal === "win" ? <EntryFeeNote fee={playCost} /> : null}
 										{problem ? (
 											<p className="g48-problem" role="alert">
 												{problem}

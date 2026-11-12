@@ -15,7 +15,7 @@ export interface CrashForm {
 }
 
 export const DEFAULT_FORM: CrashForm = {
-	stake: "10",
+	stake: "1000",
 	target: "2.00",
 	autoCash: true,
 	count: "5",

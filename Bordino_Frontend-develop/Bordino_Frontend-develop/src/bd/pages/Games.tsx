@@ -8,11 +8,18 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import RewardOffer from "../ads/RewardOffer";
 import { usePlayableAdOffer } from "../ads/api";
+import { goBuyCoins } from "../entryFee";
 import { fa } from "../format";
 import { GAMES, type GameEntry } from "../games";
 import { useMissions } from "../missions/api";
 import type { MysteryCard, MysteryState } from "../missions/mystery";
 import { AppShell, Balance, Chips, R } from "../ui";
+
+import type { GameName } from "@/api/games/types";
+import useGetPlayCost from "@/api/games/useGetPlayCost";
+
+/** The games with an entry fee (the bet games take their bet instead). */
+const FEE_GAME: Partial<Record<GameEntry["id"], GameName>> = { sudoku: "sudoku", game2048: "game_2048", pantomime: "pantomime", dowr: "dowr", spy: "spy" };
 
 /** A «معمای شهری» card's line under its name: where it is, how far the player got, or why it is closed. */
 function mysteryTag(m: MysteryCard) {
@@ -61,6 +68,11 @@ export default function Games() {
 	// The rewarded-video offer (server decides if one is available today, and for how much).
 	const { offer } = usePlayableAdOffer();
 	const [picked, setPicked] = useState<GameEntry | null>(null);
+	// The picked game's fee and the balance: not enough coins → «خرید سکه» in the offer.
+	const feeGame = picked ? FEE_GAME[picked.id] : undefined;
+	const cost = useGetPlayCost({ gameName: (feeGame ?? "") as GameName, enabled: !!feeGame });
+	const price = cost.data?.result?.play_cost ?? 0;
+	const short = !!feeGame && !!cost.data?.result && price > 0 && Number(cost.data.result.current_amount) < price;
 	const shown = GAMES.filter((game) => group === "all" || game.group === group);
 	return (
 		<AppShell nav="games" title="گیمنت" headingExtra={<Balance />}>
@@ -127,6 +139,14 @@ export default function Games() {
 					gameName={picked.name}
 					placement={picked.id}
 					onCancel={() => setPicked(null)}
+					onBuyCoins={
+						short
+							? () => {
+									setPicked(null);
+									goBuyCoins(router.push, picked.href);
+								}
+							: undefined
+					}
 					onPlay={() => {
 						setPicked(null);
 						router.push(picked.href);

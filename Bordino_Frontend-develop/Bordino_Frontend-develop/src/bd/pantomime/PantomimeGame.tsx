@@ -9,6 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
+import { EntryFeeNote, useEntryFee } from "../entryFee";
 import { fa, faDate } from "../format";
 import { ICONS } from "../icons";
 import { R, useRequireLogin } from "../ui";
@@ -387,7 +388,14 @@ export default function PantomimeGame() {
 			members: s.members.map((list, i) => (i === team ? Array.from({ length: count }, (_, j) => list[j] ?? "") : list)),
 		}));
 
-	const startGame = () => {
+	const deckFor = (c: PantomimeConfig) =>
+		settings.format === "challenge"
+			? []
+			: settings.format === "duel"
+				? c.cards
+				: c.cards.filter((card) => settings.categories.includes(card.category) && (!settings.difficulty || card.difficulty === settings.difficulty));
+
+	const startGame = (built?: Game) => {
 		if (!config || !limits) return;
 		// Switched off in the admin meanwhile: no new game (or rematch); the page says so.
 		if (!config.enabled) {
@@ -396,14 +404,9 @@ export default function PantomimeGame() {
 			rerender();
 			return;
 		}
-		const deck =
-			settings.format === "challenge"
-				? []
-				: settings.format === "duel"
-					? config.cards
-					: config.cards.filter((c) => settings.categories.includes(c.category) && (!settings.difficulty || c.difficulty === settings.difficulty));
+		const deck = deckFor(config);
 		try {
-			gameRef.current = new Game(settings, deck, { limits, weights });
+			gameRef.current = built ?? new Game(settings, deck, { limits, weights });
 			gameTopics.current = config.categories;
 			gameId.current = newId();
 			setSave("");
@@ -423,6 +426,25 @@ export default function PantomimeGame() {
 			setSetupStep(2);
 			setSetupError(err instanceof Error ? err.message : String(err));
 		}
+	};
+
+	// The entry fee: a new game (the setup's «شروع بازی», «یه دست دیگه») is built and checked first —
+	// a game that cannot start is never paid for — then charged once, then begins. A game restored
+	// from this device (the page opened again) was paid when it started: never charged again.
+	const entry = useEntryFee("pantomime", push);
+	const startPaidGame = () => {
+		if (!config || !limits || !config.enabled) {
+			startGame(); // (says why nothing starts; nothing is charged)
+			return;
+		}
+		let built: Game;
+		try {
+			built = new Game(settings, deckFor(config), { limits, weights });
+		} catch {
+			startGame(); // (shows the setup's own error; nothing is charged)
+			return;
+		}
+		void entry.start(() => startGame(built));
 	};
 
 	const beginTurn = (now: number) => {
@@ -577,6 +599,7 @@ export default function PantomimeGame() {
 				<span className="pm-kicker">اول هم‌تیمی‌ها رو جمع کن</span>
 				<h3>چه کسایی بازی می‌کنن؟</h3>
 				<p>اسم‌ها اختیاری‌اند؛ خالی بمانند خودمان نام می‌گذاریم.</p>
+				<EntryFeeNote fee={entry.fee} />
 			</div>
 			<label className="pm-count-label">
 				تعداد تیم‌ها
@@ -718,6 +741,7 @@ export default function PantomimeGame() {
 				<div className="pm-setup-heading">
 					<span className="pm-kicker">{fa(settings.teams.length)} تیم آمادهٔ رقابت</span>
 					<h3>چطور بازی کنیم؟</h3>
+					<EntryFeeNote fee={entry.fee} />
 				</div>
 				{modeButtons}
 				<div className="pm-config">
@@ -761,7 +785,7 @@ export default function PantomimeGame() {
 						شروع بازی <Icon name="arrow-right" />
 					</>,
 					"start",
-					startGame,
+					startPaidGame,
 					"pm-primary",
 				)}
 				{button(
@@ -1236,7 +1260,7 @@ export default function PantomimeGame() {
 							یه دست دیگه <Icon name="rotate-ccw" />
 						</>,
 						"rematch",
-						startGame,
+						startPaidGame,
 						"pm-primary",
 					)}
 					{button("تغییر تیم‌ها و قوانین", "settings", backToSettings)}

@@ -1,6 +1,6 @@
 import { DEFAULT_FORM, afterAutoRound, autoCashout, num, plot, validate } from "./logic";
 
-const limits = { minBet: 1, maxBet: 1000, balance: 500, maxMultiplier: 100 };
+const limits = { minBet: 100, maxBet: 100_000, balance: 50_000, maxMultiplier: 100 }; // (1 coin = 1 toman since 2026-11-12)
 
 describe("crash form", () => {
 	it("reads Persian and Arabic digits and the Persian decimal mark", () => {
@@ -12,7 +12,7 @@ describe("crash form", () => {
 	it("checks the stake against the server's limits and the balance", () => {
 		expect(validate(DEFAULT_FORM, limits, false)).toBe("");
 		expect(validate({ ...DEFAULT_FORM, stake: "0" }, limits, false)).toMatch("بین");
-		expect(validate({ ...DEFAULT_FORM, stake: "600" }, limits, false)).toMatch("سکهٔ کافی");
+		expect(validate({ ...DEFAULT_FORM, stake: "60000" }, limits, false)).toMatch("سکهٔ کافی");
 		expect(validate({ ...DEFAULT_FORM, stake: "2.5" }, limits, false)).toMatch("بین");
 	});
 
@@ -27,6 +27,8 @@ describe("crash form", () => {
 });
 
 describe("automatic play", () => {
+	// (the rules of automatic play, at small numbers: their own limits)
+	const limits = { minBet: 1, maxBet: 1000, balance: 500, maxMultiplier: 100 };
 	const run = { base: 10, stake: 10, played: 0, net: 0 };
 	const won = { bet: 10, payout: 20, status: "won" };
 	const lost = { bet: 10, payout: 0, status: "lost" };

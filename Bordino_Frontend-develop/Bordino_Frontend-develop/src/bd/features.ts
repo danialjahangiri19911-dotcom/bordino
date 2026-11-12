@@ -6,3 +6,7 @@
  * server's accounts and the admin's withdrawals all stay as they are: set this to true to show it again.
  */
 export const CASH_WALLET_VISIBLE = false;
+
+/** The unit of a lottery or wheel prize: while the cash wallet is hidden, prizes are paid in coins
+ * (1 coin = 1 toman, the server's CASH_PRIZES_AS_COINS), so the same number reads «سکه». */
+export const PRIZE_UNIT = CASH_WALLET_VISIBLE ? "تومان" : "سکه";

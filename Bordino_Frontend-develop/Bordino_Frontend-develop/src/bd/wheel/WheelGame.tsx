@@ -1,5 +1,6 @@
 "use client";
 
+import { CASH_WALLET_VISIBLE } from "../features";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,6 +10,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { fa } from "../format";
 import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 import { R, usePoints, useRequireLogin } from "../ui";
@@ -253,7 +255,7 @@ export default function WheelGame() {
 					: {
 							won: true,
 							text: prizeLabel(amount, won.prize_type),
-							short: `${fa(amount)}${won.prize_type === "cash" ? " ت" : ""}`,
+							short: `${fa(amount)}${won.prize_type === "cash" && CASH_WALLET_VISIBLE ? " ت" : ""}`,
 							slice: index < 0 ? null : index,
 						};
 			if (index < 0) {
@@ -367,8 +369,9 @@ export default function WheelGame() {
 				</GameBar>
 				<section className="wh-help" hidden={!help}>
 					<b>یک چرخش، یک شانس تازه</b>
+					<BetFeeNote minBet={free ? 0 : minBet} />
 					<p>شرط هر چرخش را خودت انتخاب می‌کن{minBet ? `ی (${fa(minBet)} تا ${fa(maxBet)} سکه)` : "ی"} و همان از کیف کم می‌شود. جایزه را سرور انتخاب می‌کند و گردونه روی همان خانه می‌ایستد؛ اندازهٔ هر خانه همان شانس واقعی آن است.</p>
-					<p>جایزهٔ هر خانه به نسبت شرط بزرگ‌تر می‌شود{base ? `: شرط ${fa(base * 2)} یعنی دو برابرِ جایزه‌های شرط ${fa(base)}` : ""}؛ شانس‌ها ثابت می‌مانند. جایزهٔ سکه‌ای به کیف و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود.</p>
+					<p>جایزهٔ هر خانه به نسبت شرط بزرگ‌تر می‌شود{base ? `: شرط ${fa(base * 2)} یعنی دو برابرِ جایزه‌های شرط ${fa(base)}` : ""}؛ شانس‌ها ثابت می‌مانند. {CASH_WALLET_VISIBLE ? "جایزهٔ سکه‌ای به کیف و جایزهٔ نقدی («ت» یعنی تومان) به کیف نقدی می‌رود." : "همهٔ جایزه‌ها به‌صورت سکه به کیف تو اضافه می‌شوند."}</p>
 				</section>
 				<main className="wh-main">
 					<div className="wh-topline">
@@ -495,6 +498,11 @@ export default function WheelGame() {
 								<p className="wh-error" role="alert" hidden={!error && !betProblem && (points.points === null || enough || spinning)}>
 									{error ?? betProblem ?? `سکهٔ کافی نیست؛ شرط این چرخش ${fa(cost)} سکه است.`}
 								</p>
+								{points.points !== null && !enough && !spinning ? (
+									<button type="button" className="bd-buy-coins" onClick={() => goBuyCoins(push)}>
+								<Icon name="coins" /> خرید سکه
+							</button>
+								) : null}
 							</section>
 							<div className="wh-history">
 								<span>چرخش‌های اخیر</span>

@@ -119,3 +119,66 @@ class PurchasesView(APIView):
                 ]
             }
         )
+
+
+# ── entry fees: one GameConfiguration.play_cost per game (Sudoku per level) ──
+
+GAMES = {
+    "sudoku": "سودوکو",
+    "game_2048": "۲۰۴۸",
+    "pantomime": "پانتومیم",
+    "dowr": "دُور",
+    "spy": "جاسوس",
+}
+LEVELS = {"easy": "آسان", "medium": "متوسط", "hard": "سخت"}
+MAX_FEE = 10_000_000
+
+
+def fee_payload(c) -> dict:
+    return {
+        "id": str(c.pk),
+        "game": c.game_name,
+        "game_label": GAMES.get(c.game_name, c.game_name),
+        "level": c.difficulty_level or "",
+        "level_label": LEVELS.get(c.difficulty_level or "", ""),
+        "fee": int(c.play_cost),
+        "active": c.is_active,
+    }
+
+
+class FeesView(APIView):
+    """Each game's entry fee in coins (charged once per new game or round, by the server)."""
+
+    permission_classes = (SettingsRole,)
+
+    def get(self, request):
+        from apps.configuration.models.game.configuration import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        order = list(GAMES)
+        rows = [c for c in GameConfiguration.objects.filter(game_name__in=order)]
+        rows.sort(key=lambda c: (order.index(c.game_name), list(LEVELS).index(c.difficulty_level) if c.difficulty_level in LEVELS else -1))
+        return Response({"fees": [fee_payload(c) for c in rows]})
+
+
+class FeeView(APIView):
+    permission_classes = (SettingsRole,)
+
+    def put(self, request, config_id):
+        from apps.configuration.models.game.configuration import GameConfiguration  # pylint: disable=import-outside-toplevel
+
+        raw = (request.data or {}).get("fee") if isinstance(request.data, dict) else None
+        try:
+            fee = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return err("عدد درست وارد کن.", "invalid", 400)
+        if not 0 <= fee <= MAX_FEE:
+            return err("هزینه باید بین ۰ و ۱۰٬۰۰۰٬۰۰۰ سکه باشد.", "invalid", 400)
+        with transaction.atomic():
+            c = GameConfiguration.objects.select_for_update().filter(pk=config_id, game_name__in=list(GAMES)).first()
+            if c is None:
+                return err("این بازی پیدا نشد.", "not_found", 404)
+            before = int(c.play_cost)
+            GameConfiguration.objects.filter(pk=c.pk).update(play_cost=fee)
+            c.play_cost = fee
+            audit(request, "game_fee_change", "game_fee", c.pk, game=c.game_name, level=c.difficulty_level or "", before=before, after=fee)
+        return Response({"fee": fee_payload(c)})

@@ -233,7 +233,7 @@ class CustomerUpdateService:  # pylint: disable=too-many-instance-attributes
                     )
                 )
 
-            reward_points = SystemConfiguration.objects.get("COMPLETE_PROFILE_REWARD_POINTS", 25)
+            reward_points = SystemConfiguration.objects.get("COMPLETE_PROFILE_REWARD_POINTS", 2500)
             # One reward per customer, whatever happens to registration_step later.
             _, created = ProfileReward.objects.get_or_create(
                 customer=customer, defaults={"points": reward_points}

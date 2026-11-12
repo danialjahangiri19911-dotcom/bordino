@@ -1,5 +1,6 @@
 "use client";
 
+import { PRIZE_UNIT } from "../features";
 import { useState } from "react";
 
 import Link from "next/link";
@@ -28,7 +29,7 @@ function LotteryRow({ lottery }: { lottery: Lottery }) {
 			<span>
 				<b>{lottery.name}</b>
 				<small>
-					{lotteryStatus(lottery)} · جایزه {fa(lottery.balance_in_money)} تومان · {faDate(lottery.end_date)}
+					{lotteryStatus(lottery)} · جایزه {fa(lottery.balance_in_money)} {PRIZE_UNIT} · {faDate(lottery.end_date)}
 				</small>
 			</span>
 			<span className="bd-text-btn">جزئیات →</span>

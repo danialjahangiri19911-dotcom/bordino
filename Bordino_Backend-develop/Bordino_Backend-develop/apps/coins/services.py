@@ -26,6 +26,8 @@ MODES = ("off", "sandbox", "test", "live")
 DEFAULTS = {
     "COIN_ZIBAL_MODE": "sandbox",
     "COIN_ZIBAL_MERCHANT": "",
+    # While the cash wallet is hidden: a toman prize (wheel, lottery) is paid as the same number of coins.
+    "CASH_PRIZES_AS_COINS": True,
 }
 OPEN_MINUTES = 20
 
@@ -39,6 +41,12 @@ class CoinError(Exception):
 
 def setting(key: str):
     return SystemConfiguration.objects.get(key, DEFAULTS[key])
+
+
+def cash_prizes_as_coins() -> bool:
+    """1 coin = 1 toman: a toman prize is paid as that many coins while the cash wallet is hidden."""
+    value = setting("CASH_PRIZES_AS_COINS")
+    return value is True or str(value).strip().lower() in ("true", "1", "yes", "on")
 
 
 def pay_mode() -> str:

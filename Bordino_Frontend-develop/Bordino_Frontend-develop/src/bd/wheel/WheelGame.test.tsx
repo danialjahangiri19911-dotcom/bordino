@@ -109,8 +109,9 @@ describe("WheelGame", () => {
 		await click(".wh-spin");
 		await reply({ prize: prize(9, 500000, 1, "cash") });
 		runSpin();
-		expect(q(".wh-result strong").textContent).toBe("۵۰۰٬۰۰۰ تومان");
-		expect(q(".wh-history .wh-chip").textContent).toBe("۵۰۰٬۰۰۰ ت");
+		// (while the cash wallet is hidden a toman prize is paid, and named, in coins: 1 coin = 1 toman)
+		expect(q(".wh-result strong").textContent).toBe("۵۰۰٬۰۰۰ سکه");
+		expect(q(".wh-history .wh-chip").textContent).toBe("۵۰۰٬۰۰۰");
 	});
 
 	it("a prize drawn with no room (0% when the spin began) is shown, never landed beside", async () => {

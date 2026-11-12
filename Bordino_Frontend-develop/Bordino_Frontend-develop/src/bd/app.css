@@ -878,3 +878,16 @@ body { margin: 0; }
 #bordino-directions .ops-row-head { display: flex; align-items: center; gap: 10px; width: 100%; }
 #bordino-directions .ops-check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; }
 #bordino-directions .ops-check input { width: 20px; height: 20px; accent-color: var(--bd-accent); }
+
+/* ── Entry fees (2026-11-12): the fee line under a game's information, and «خرید سکه» inside a game.
+   Both inherit the game's own colours (currentColor), so every game's look keeps them readable. ── */
+#bordino-directions .bd-fee-note { margin: 8px 0 0; font-size: 13px; line-height: 1.9; opacity: .9; }
+#bordino-directions .bd-buy-coins {
+	display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; margin: 8px 0 0;
+	padding: 8px 16px; border: 2px solid currentColor; border-radius: 999px; background: transparent; color: inherit;
+	font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+#bordino-directions .bd-buy-coins svg { width: 18px; height: 18px; }
+#bordino-directions .bd-buy-coins:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+#bordino-directions .ops-fee-row { cursor: default; flex-wrap: wrap; }
+#bordino-directions .ops-fee-input { width: 130px; margin: 0; }
