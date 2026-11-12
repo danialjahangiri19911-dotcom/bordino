@@ -557,6 +557,10 @@ class AdRewardTests(TestCase):
         from django.core.cache import cache  # pylint: disable=import-outside-toplevel
 
         cache.clear()
+        # (the mechanics of a rewarded video, at its old amount: the default is 500 since 2026-11-12)
+        from apps.configuration.models import SystemConfiguration  # pylint: disable=import-outside-toplevel
+
+        SystemConfiguration.objects.update_or_create(key="AD_REWARD_POINTS", defaults={"value": "5"})
         self.user = make_customer("9120000901", points=100)
         self.api = APIClient()
         self.api.force_authenticate(self.user)

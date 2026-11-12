@@ -99,10 +99,15 @@ def forward(apps, schema_editor):
     Setting = get("configuration", "SystemConfiguration")
     for key in ("AD_REWARD_POINTS", "COMPLETE_PROFILE_REWARD_POINTS", "WALLET_MAX_NEGATIVE_POINTS"):
         for row in Setting.objects.filter(key=key):
-            raw = str(row.value or "").strip().translate(EN)
-            if raw.lstrip("-").isdigit() and int(raw):
-                row.value = str(int(raw) * X)
-                row.save(update_fields=["value"])
+            # Both the value and the row's own default (used when the value is empty).
+            changed = []
+            for field in ("value", "default_value"):
+                raw = str(getattr(row, field) or "").strip().translate(EN)
+                if raw.lstrip("-").isdigit() and int(raw):
+                    setattr(row, field, str(int(raw) * X))
+                    changed.append(field)
+            if changed:
+                row.save(update_fields=changed)
 
     for model in ("Game", "GameVersion"):
         field = "draft" if model == "Game" else "definition"
@@ -128,6 +133,16 @@ def forward(apps, schema_editor):
     for p in Package.objects.all():
         p.coins = p.original_price_toman or p.price_toman
         p.save(update_fields=["coins"])
+
+    # Settings are cached (an hour) with what they resolved to before — also a code default that has
+    # changed (ad reward 5 → 500): dropped now, so the new values apply at once.
+    try:
+        from apps.configuration.models.system_configuration import SystemConfiguration as Live  # pylint: disable=import-outside-toplevel
+
+        for key in ("AD_REWARD_POINTS", "COMPLETE_PROFILE_REWARD_POINTS", "WALLET_MAX_NEGATIVE_POINTS"):
+            Live.objects.invalidate(key)
+    except Exception:  # pylint: disable=broad-except  (no cache in this environment: nothing to drop)
+        pass
 
 
 class Migration(migrations.Migration):
