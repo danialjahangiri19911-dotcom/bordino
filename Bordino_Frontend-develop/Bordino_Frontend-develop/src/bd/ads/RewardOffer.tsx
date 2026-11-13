@@ -22,6 +22,10 @@ interface Props {
 	onCancel: () => void;
 	/** Not enough coins for the game's entry fee: «خرید سکه» replaces «ادامه بدون تماشای ویدیو». */
 	onBuyCoins?: () => void;
+	/** What the game costs to start (a fee, or the bet games' smallest bet) and the balance now. */
+	entry?: { cost: number; kind: "fee" | "bet"; balance: number | null } | null;
+	/** The balance is being read: «ادامه» waits for it. */
+	checking?: boolean;
 }
 
 type Step =
@@ -36,7 +40,7 @@ type Step =
  * Before a game: «تماشای ویدیو و دریافت X سکه» or «ادامه بدون تماشای ویدیو». The game opens only
  * after this flow ends, never behind it. The points come from the server, after it accepts the view.
  */
-export default function RewardOffer({ offer, gameName, placement, onPlay, onCancel, onBuyCoins }: Readonly<Props>) {
+export default function RewardOffer({ offer, gameName, placement, onPlay, onCancel, onBuyCoins, entry, checking = false }: Readonly<Props>) {
 	const queryClient = useQueryClient();
 	const [step, setStep] = useState<Step>({ kind: "offer" });
 
@@ -109,6 +113,14 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 						<p className="bd-reward-text">
 							{seconds ? `یک ویدیوی کوتاه (${fa(seconds)} ثانیه) ببین` : "یک ویدیوی کوتاه ببین"} و {fa(offer.reward_points)} سکه بگیر.
 						</p>
+						{entry && entry.cost > 0 ? (
+							<p className="bd-reward-fee">
+								{entry.kind === "fee" ? `هزینهٔ ورود ${gameName}: ${fa(entry.cost)} سکه` : `کمترین شرط هر دست: ${fa(entry.cost)} سکه`}
+								{entry.balance !== null ? ` · موجودی تو: ${fa(entry.balance)} سکه` : ""}
+							</p>
+						) : checking ? (
+							<p className="bd-reward-fee">در حال بررسی موجودی…</p>
+						) : null}
 						<button
 							type="button"
 							className="bd-sheet-item bd-reward-main"
@@ -124,8 +136,8 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 								<Icon name="coins" /> خرید سکه
 							</button>
 						) : (
-							<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer"} onClick={onPlay}>
-								ادامه بدون تماشای ویدیو
+							<button type="button" className="bd-sheet-item bd-sheet-cancel" disabled={step.kind !== "offer" || checking} onClick={onPlay}>
+								ادامه بدون تماشای ویدیو{entry?.kind === "fee" && entry.cost > 0 ? ` (${fa(entry.cost)} سکه)` : ""}
 							</button>
 						)}
 						<small className="bd-reward-left">امروز {fa(offer.remaining_today)} ویدیوی جایزه‌دار دیگر داری.</small>

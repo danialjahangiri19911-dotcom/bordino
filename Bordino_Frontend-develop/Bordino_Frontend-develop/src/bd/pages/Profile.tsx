@@ -101,8 +101,8 @@ function AvatarPicker({ image }: { image?: string | null }) {
 	};
 
 	const choose = async (event: ChangeEvent<HTMLInputElement>) => {
-		const file = event.target.files?.[0];
-		event.target.value = "";
+		const input = event.target;
+		const file = input.files?.[0];
 		setMenu(false);
 		if (!file) return;
 		setProblem(null);
@@ -110,9 +110,12 @@ function AvatarPicker({ image }: { image?: string | null }) {
 		try {
 			setPhoto(await openPhoto(file));
 		} catch (e) {
-			setProblem(e instanceof PhotoError ? e.message : "این فایل باز نشد؛ یک عکس دیگر انتخاب کن.");
+			setProblem(e instanceof PhotoError ? e.message : "این عکس باز نشد؛ دوباره امتحان کن یا عکس دیگری انتخاب کن.");
 		} finally {
 			setOpening(false);
+			// Cleared only after the file was read (some WebViews lose the file once the input is reset);
+			// cleared at all so the same photo can be chosen again.
+			input.value = "";
 		}
 	};
 
@@ -145,9 +148,11 @@ function AvatarPicker({ image }: { image?: string | null }) {
 				<span className="bd-avatar-status" role="status">
 					{opening ? "در حال باز کردن عکس…" : upload.isSending ? "در حال ذخیرهٔ عکس…" : remove.isSending ? "در حال حذف عکس…" : ""}
 				</span>
-				{/* Any image type (HEIC named too: some file pickers file it under no image type); openPhoto decides. */}
-				<input ref={gallery} type="file" accept="image/*,.heic,.heif,.avif" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
-				<input ref={camera} type="file" accept="image/*,.heic,.heif,.avif" capture="user" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
+				{/* Plain «image/*»: phones list HEIC/AVIF photos as images, and extensions mixed into accept make
+				    some Android choosers open a file browser (or nothing) instead of the gallery. The file's real
+				    format is read from its bytes (photo.ts openPhoto), never from its name or type. */}
+				<input ref={gallery} type="file" accept="image/*" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
+				<input ref={camera} type="file" accept="image/*" capture="user" className="bd-visually-hidden" tabIndex={-1} aria-hidden="true" onChange={choose} />
 			</div>
 			{problem ? (
 				<div className="bd-toast" role="alert">

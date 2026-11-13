@@ -163,8 +163,8 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 	};
 
 	const choose = async (event: ChangeEvent<HTMLInputElement>) => {
-		const picked = event.target.files?.[0];
-		event.target.value = "";
+		const input = event.target;
+		const picked = input.files?.[0];
 		if (!picked) return;
 		setProblem(null);
 		try {
@@ -172,7 +172,9 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 			setImage(blob);
 			setPreview(URL.createObjectURL(blob));
 		} catch (e) {
-			setProblem(e instanceof PhotoError ? e.message : "این فایل باز نشد؛ یک تصویر دیگر انتخاب کن.");
+			setProblem(e instanceof PhotoError ? e.message : "این تصویر باز نشد؛ دوباره امتحان کن یا تصویر دیگری انتخاب کن.");
+		} finally {
+			input.value = ""; // (after the read: some WebViews lose the file once the input is reset)
 		}
 	};
 

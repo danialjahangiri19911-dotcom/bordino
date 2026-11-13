@@ -1,7 +1,7 @@
 import type { ResponseApiData } from "@/libs/http/interfaces";
 
 /** نامِ بازی در بک‌اند (`GameConfiguration.game_name`). */
-export type GameName = "sudoku" | "game_2048" | "pantomime" | "dowr" | "spy";
+export type GameName = "sudoku" | "game_2048" | "pantomime" | "dowr" | "spy" | "crash" | "chicken";
 
 export interface PlayCost {
 	game_name: string;
@@ -9,6 +9,8 @@ export interface PlayCost {
 	play_cost: number | null;
 	/** موجودیِ فعلیِ کیفِ امتیاز. */
 	current_amount: number;
+	/** The bet games (crash, chicken): the smallest bet per round — their entry (null: switched off). */
+	min_bet?: number | null;
 }
 
 export interface ChargeResult {

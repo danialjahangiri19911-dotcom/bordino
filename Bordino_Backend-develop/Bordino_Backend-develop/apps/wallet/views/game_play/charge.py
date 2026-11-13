@@ -59,14 +59,14 @@ class GamePlayChargeView(APIView):
         account = balance.points_account(request.user)
         current_amount = int(account.amount) if account else 0
 
-        return Response(
-            {
-                "game_name": game_name,
-                "play_cost": play_cost,
-                "current_amount": current_amount,
-            },
-            status=status.HTTP_200_OK,
-        )
+        body = {"game_name": game_name, "play_cost": play_cost, "current_amount": current_amount}
+        # The bet games have no entry fee: their bet is the entry, at least the smallest bet per round.
+        if game_name in ("crash", "chicken"):
+            from apps.crash.models import ChickenConfiguration, CrashConfiguration  # pylint: disable=import-outside-toplevel
+
+            config = (CrashConfiguration if game_name == "crash" else ChickenConfiguration).current()
+            body["min_bet"] = int(config.min_bet) if config.enabled else None
+        return Response(body, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=["wallet"],

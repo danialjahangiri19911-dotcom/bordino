@@ -891,3 +891,4 @@ body { margin: 0; }
 #bordino-directions .bd-buy-coins:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
 #bordino-directions .ops-fee-row { cursor: default; flex-wrap: wrap; }
 #bordino-directions .ops-fee-input { width: 130px; margin: 0; }
+#bordino-directions .bd-reward-fee { margin: 0 0 10px; text-align: center; font-size: 13px; font-weight: 600; }

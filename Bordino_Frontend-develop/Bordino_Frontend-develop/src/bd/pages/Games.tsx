@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,8 +18,16 @@ import { AppShell, Balance, Chips, R } from "../ui";
 import type { GameName } from "@/api/games/types";
 import useGetPlayCost from "@/api/games/useGetPlayCost";
 
-/** The games with an entry fee (the bet games take their bet instead). */
-const FEE_GAME: Partial<Record<GameEntry["id"], GameName>> = { sudoku: "sudoku", game2048: "game_2048", pantomime: "pantomime", dowr: "dowr", spy: "spy" };
+/** Every game's entry as the server prices it: a fee, or (Crash, Chicken) the smallest bet. */
+const FEE_GAME: Partial<Record<GameEntry["id"], GameName>> = {
+	sudoku: "sudoku",
+	game2048: "game_2048",
+	pantomime: "pantomime",
+	dowr: "dowr",
+	spy: "spy",
+	crash: "crash",
+	chicken: "chicken",
+};
 
 /** A «معمای شهری» card's line under its name: where it is, how far the player got, or why it is closed. */
 function mysteryTag(m: MysteryCard) {
@@ -71,8 +79,18 @@ export default function Games() {
 	// The picked game's fee and the balance: not enough coins → «خرید سکه» in the offer.
 	const feeGame = picked ? FEE_GAME[picked.id] : undefined;
 	const cost = useGetPlayCost({ gameName: (feeGame ?? "") as GameName, enabled: !!feeGame });
-	const price = cost.data?.result?.play_cost ?? 0;
-	const short = !!feeGame && !!cost.data?.result && price > 0 && Number(cost.data.result.current_amount) < price;
+	const refetchCost = cost.refetch;
+	// The balance as it is now, each time a game is picked (not one read a while ago).
+	useEffect(() => {
+		if (feeGame) void refetchCost();
+	}, [feeGame, picked, refetchCost]);
+	const known = cost.data?.result;
+	const fee = known?.play_cost ?? 0;
+	const minBet = known?.min_bet ?? 0;
+	const need = fee > 0 ? fee : minBet;
+	const have = known ? Number(known.current_amount) : null;
+	const short = !!feeGame && have !== null && need > 0 && have < need;
+	const entry = feeGame && known ? { cost: need, kind: fee > 0 ? ("fee" as const) : ("bet" as const), balance: have } : null;
 	const shown = GAMES.filter((game) => group === "all" || game.group === group);
 	return (
 		<AppShell nav="games" title="گیمنت" headingExtra={<Balance />}>
@@ -139,6 +157,8 @@ export default function Games() {
 					gameName={picked.name}
 					placement={picked.id}
 					onCancel={() => setPicked(null)}
+					entry={entry}
+					checking={!!feeGame && !known}
 					onBuyCoins={
 						short
 							? () => {
