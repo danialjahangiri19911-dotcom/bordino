@@ -136,7 +136,7 @@ export function pictureSize(b: Uint8Array, kind: PhotoKind): { width: number; he
 	}
 }
 
-const UNREADABLE = "این عکس از گوشی خوانده نشد (شاید هنوز در فضای ابری است یا دسترسی به آن قطع شد)؛ دوباره انتخاب کن یا عکس دیگری بفرست.";
+export const UNREADABLE = "این عکس از گوشی خوانده نشد (شاید هنوز در فضای ابری است یا دسترسی به آن قطع شد)؛ دوباره انتخاب کن یا عکس دیگری بفرست.";
 const NOT_A_PICTURE = "این فایل عکس نیست؛ یک عکس انتخاب کن (JPG، PNG، WebP، HEIC، AVIF، GIF یا BMP).";
 const NOT_DECODED = "این عکس باز نشد؛ شاید خیلی بزرگ است. یک عکس دیگر یا اسکرین‌شات همین عکس را انتخاب کن.";
 

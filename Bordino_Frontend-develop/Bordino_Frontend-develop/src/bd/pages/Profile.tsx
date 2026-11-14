@@ -8,7 +8,8 @@ import AvatarEditor from "../AvatarEditor";
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
 import { useGmProfile } from "../gm/api";
-import { openPhoto, PhotoError } from "../photo";
+import { APK_URL } from "../BackButton";
+import { openPhoto, PhotoError, UNREADABLE } from "../photo";
 import { errorInfo, newAttempt, trace } from "../trace";
 import { AppShell, LoadState, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,6 +39,8 @@ function AvatarPicker({ image }: { image?: string | null }) {
 	const [lastPicture, setLastPicture] = useState<Blob | null>(null);
 	const imageWhenSent = useRef<string | null | undefined>(undefined);
 	const [problem, setProblem] = useState<string | null>(null);
+	// With «problem»: a link that solves it (an older Android app: its new version).
+	const [problemLink, setProblemLink] = useState<{ href: string; label: string } | null>(null);
 	const gallery = useRef<HTMLInputElement>(null);
 	const camera = useRef<HTMLInputElement>(null);
 	// Traced, step by step (bd/trace.ts → «بردینو ادمین»): one attempt from the menu to the server's answer.
@@ -146,8 +149,16 @@ function AvatarPicker({ image }: { image?: string | null }) {
 			setPhoto(await openPhoto(file, (name, data, level) => step(name, data, level)));
 			step("editor_open");
 		} catch (e) {
-			const message = e instanceof PhotoError ? e.message : "این عکس باز نشد؛ دوباره امتحان کن یا عکس دیگری انتخاب کن.";
-			step("open_failed", { shown: message, ...errorInfo(e) }, "error");
+			let message = e instanceof PhotoError ? e.message : "این عکس باز نشد؛ دوباره امتحان کن یا عکس دیگری انتخاب کن.";
+			// The Android app before 1.5 hands the page photos it may not read (Android 13+ galleries):
+			// 1.5 copies them first. The fix is the new app, not another photo.
+			const app = /BordinoApp\/(\d+)\.(\d+)/.exec(navigator.userAgent);
+			const oldApp = !!app && Number(app[1]) * 100 + Number(app[2]) < 105;
+			if (message === UNREADABLE && oldApp) {
+				message = "اپ بردینوی این گوشی اجازهٔ خواندن عکس‌های گالری را ندارد؛ این مشکل در نسخهٔ جدید اپ حل شده. اپ را به‌روز کن (یا تا آن موقع، عکس را از مرورگر گوشی در lottery.bordino.co عوض کن).";
+				setProblemLink({ href: APK_URL, label: "دریافت نسخهٔ جدید" });
+			} else setProblemLink(null);
+			step("open_failed", { shown: message, old_app: oldApp, ...errorInfo(e) }, "error");
 			setProblem(message);
 		} finally {
 			setOpening(false);
@@ -197,6 +208,11 @@ function AvatarPicker({ image }: { image?: string | null }) {
 			{problem ? (
 				<div className="bd-toast" role="alert">
 					<span>{problem}</span>
+					{problemLink ? (
+						<a className="bd-toast-action" href={problemLink.href}>
+							{problemLink.label}
+						</a>
+					) : null}
 					{lastPicture && !upload.isSending ? (
 						<button type="button" className="bd-toast-action" onClick={() => send(lastPicture)}>
 							تلاش دوباره
