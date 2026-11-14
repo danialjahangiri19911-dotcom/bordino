@@ -31,6 +31,7 @@ urlpatterns += [
     path("", include("apps.dowr.urls")),
     path("", include("apps.spy.urls")),
     path("", include("apps.coins.urls")),
+    path("", include("apps.clientlog.urls")),
 ]
 
 if settings.DEBUG:

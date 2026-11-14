@@ -49,7 +49,28 @@ class CustomerProfileImageView(
         operation_id="upload_profile_image",
     )
     def partial_update(self, request, *args, **kwargs):
-        return super().partial_update(request, *args, **kwargs)
+        # Traced (apps.clientlog): what arrived and how it ended, beside the app's own steps of the attempt.
+        from apps.clientlog.services import record  # pylint: disable=import-outside-toplevel
+
+        upload = request.FILES.get("image")
+        attempt = str(request.data.get("trace_attempt") or "")[:40]
+        record(request.user, "profile_photo", "server_received", attempt=attempt, data={
+            "content_type": getattr(upload, "content_type", None), "size": getattr(upload, "size", None),
+            "name": getattr(upload, "name", None), "fields": sorted(request.data.keys()),
+        }, level="info" if upload else "error")
+        try:
+            response = super().partial_update(request, *args, **kwargs)
+        except Exception as exc:
+            from rest_framework.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+            refused = isinstance(exc, ValidationError)  # (the picture was refused, with the reason the player sees)
+            record(request.user, "profile_photo", "server_refused" if refused else "server_failed", attempt=attempt, level="error",
+                   data={"error": f"{type(exc).__name__}: {getattr(exc, 'detail', exc)}"[:500]})
+            raise
+        ok = 200 <= response.status_code < 300
+        record(request.user, "profile_photo", "server_saved" if ok else "server_refused", attempt=attempt,
+               level="info" if ok else "error", data={"status": response.status_code, **({} if ok else {"errors": response.data})})
+        return response
 
     @extend_schema(
         responses={200: CustomerProfileImageSerializer},

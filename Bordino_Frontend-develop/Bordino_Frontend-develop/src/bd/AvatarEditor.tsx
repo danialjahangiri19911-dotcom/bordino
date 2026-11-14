@@ -11,6 +11,8 @@ interface Props {
 	photo: HTMLCanvasElement;
 	onCancel: () => void;
 	onDone: (picture: Blob) => void;
+	/** The framed picture could not be made (for the trace). */
+	onProblem?: (message: string, error: unknown) => void;
 }
 
 interface Box {
@@ -37,7 +39,7 @@ function fitted(photo: HTMLCanvasElement, b: Box): Frame {
  * Full-screen photo framing, as in Telegram: drag with one finger, pinch with two (or the mouse
  * wheel / + −), double-tap to zoom, rotate a quarter turn, ✓ to keep exactly what is in the circle.
  */
-export default function AvatarEditor({ photo: chosen, onCancel, onDone }: Readonly<Props>) {
+export default function AvatarEditor({ photo: chosen, onCancel, onDone, onProblem }: Readonly<Props>) {
 	const [photo, setPhoto] = useState(chosen);
 	const [box, setBox] = useState<Box | null>(null);
 	const [frame, setFrame] = useState<Frame | null>(null);
@@ -145,7 +147,9 @@ export default function AvatarEditor({ photo: chosen, onCancel, onDone }: Readon
 			onDone(await cutSquare(photo, f, b.left, b.top, b.d));
 		} catch (e) {
 			setSaving(false);
-			setProblem(e instanceof PhotoError ? e.message : "ساختن عکس نشد؛ دوباره امتحان کن.");
+			const message = e instanceof PhotoError ? e.message : "ساختن عکس نشد؛ دوباره امتحان کن.";
+			onProblem?.(message, e);
+			setProblem(message);
 		}
 	};
 

@@ -892,3 +892,9 @@ body { margin: 0; }
 #bordino-directions .ops-fee-row { cursor: default; flex-wrap: wrap; }
 #bordino-directions .ops-fee-input { width: 130px; margin: 0; }
 #bordino-directions .bd-reward-fee { margin: 0 0 10px; text-align: center; font-size: 13px; font-weight: 600; }
+/* «بردینو ادمین» › ردیابی برنامه */
+#bordino-directions .ops-log-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+#bordino-directions .ops-log-search .rt-field { flex: 1 1 200px; margin: 0; }
+#bordino-directions .ops-log-steps { margin: 0; padding: 0 18px 0 0; display: grid; gap: 8px; }
+#bordino-directions .ops-log-steps li[data-level="error"] b { color: var(--bd-accent); }
+#bordino-directions .ops-log-steps pre { margin: 4px 0 0; padding: 8px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; background: var(--bd-bg); border-radius: 8px; max-height: 220px; overflow: auto; }

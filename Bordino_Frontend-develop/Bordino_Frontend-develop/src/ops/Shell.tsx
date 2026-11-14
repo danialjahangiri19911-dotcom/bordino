@@ -27,9 +27,10 @@ export const OPS = {
 	maintenance: "/ops/maintenance",
 	staff: "/ops/staff",
 	audit: "/ops/audit",
+	logs: "/ops/logs",
 } as const;
 
-export type OpsNav = "home" | "games" | "withdrawals" | "banks" | "settings" | "coins" | "users" | "maintenance" | "staff" | "audit";
+export type OpsNav = "home" | "games" | "withdrawals" | "banks" | "settings" | "coins" | "users" | "maintenance" | "staff" | "audit" | "logs";
 
 /** The menu: each entry shows only for the roles that can use it ("owner" = the super admin). */
 const NAV: { key: OpsNav; icon: IconName; label: string; href: string; roles: (OpsRole | "owner" | "any")[] }[] = [
@@ -43,6 +44,7 @@ const NAV: { key: OpsNav; icon: IconName; label: string; href: string; roles: (O
 	{ key: "maintenance", icon: "monitor", label: "سلامت سرور", href: OPS.maintenance, roles: ["any"] },
 	{ key: "staff", icon: "user-plus", label: "کارکنان و نقش‌ها", href: OPS.staff, roles: ["owner"] },
 	{ key: "audit", icon: "history", label: "سابقهٔ کارها", href: OPS.audit, roles: ["any"] },
+	{ key: "logs", icon: "search", label: "ردیابی برنامه", href: OPS.logs, roles: ["any"] },
 ];
 
 export function allowed(me: OpsMe | undefined, roles: (OpsRole | "owner" | "any")[]): boolean {

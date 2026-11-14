@@ -142,8 +142,12 @@ const NOT_DECODED = "این عکس باز نشد؛ شاید خیلی بزرگ ا
 
 type Source = CanvasImageSource & { width: number; height: number; close?: () => void };
 
+/** Where a trace of each stage goes (bd/trace.ts), when the caller wants one. */
+export type PhotoReport = (step: string, data?: Record<string, unknown>, level?: "info" | "error") => void;
+const errText = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e)).slice(0, 300);
+
 /** Decodes the picture, asking the browser for a copy already at most WORK_SIDE px when the size is known. */
-async function decode(blob: Blob, size: { width: number; height: number } | null, swap: boolean): Promise<Source> {
+async function decode(blob: Blob, size: { width: number; height: number } | null, swap: boolean, report?: PhotoReport): Promise<Source> {
 	if (typeof createImageBitmap === "function") {
 		if (size) {
 			const w = swap ? size.height : size.width; // (the size as shown, after the EXIF turn)
@@ -152,17 +156,23 @@ async function decode(blob: Blob, size: { width: number; height: number } | null
 			if (k < 1) {
 				try {
 					// Decoded straight at the small size: a 50 MP photo never has to fit in memory whole.
-					return await createImageBitmap(blob, { imageOrientation: "from-image", resizeWidth: Math.max(1, Math.round(w * k)), resizeHeight: Math.max(1, Math.round(h * k)), resizeQuality: "high" });
-				} catch {
+					const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image", resizeWidth: Math.max(1, Math.round(w * k)), resizeHeight: Math.max(1, Math.round(h * k)), resizeQuality: "high" });
+					report?.("decoded", { via: "bitmap-resized", width: bitmap.width, height: bitmap.height });
+					return bitmap;
+				} catch (e) {
 					// (a browser without the resize options: the plain decode below)
+					report?.("decode_try_failed", { via: "bitmap-resized", error: errText(e) });
 				}
 			}
 		}
 		try {
 			// Camera photos keep their EXIF rotation.
-			return await createImageBitmap(blob, { imageOrientation: "from-image" });
-		} catch {
+			const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" });
+			report?.("decoded", { via: "bitmap", width: bitmap.width, height: bitmap.height });
+			return bitmap;
+		} catch (e) {
 			// Older WebViews refuse the options object or the format; the <img> path below may still work.
+			report?.("decode_try_failed", { via: "bitmap", error: errText(e) });
 		}
 	}
 	const url = URL.createObjectURL(blob);
@@ -174,7 +184,11 @@ async function decode(blob: Blob, size: { width: number; height: number } | null
 			image.onerror = () => reject(new Error("decode"));
 			image.src = url;
 		});
+		report?.("decoded", { via: "img", width: image.naturalWidth, height: image.naturalHeight });
 		return Object.assign(image, { width: image.naturalWidth, height: image.naturalHeight });
+	} catch (e) {
+		report?.("decode_try_failed", { via: "img", error: errText(e) });
+		throw e;
 	} finally {
 		URL.revokeObjectURL(url);
 	}
@@ -200,32 +214,48 @@ async function decodeHeif(file: Blob): Promise<Source> {
 }
 
 /** The chosen file as a canvas of at most WORK_SIDE px, or a PhotoError with a message for the player. */
-export async function openPhoto(file: File): Promise<HTMLCanvasElement> {
-	if (file.size > 60 * 1024 * 1024) throw new PhotoError("حجم این عکس خیلی زیاد است؛ عکس دیگری انتخاب کن.");
+export async function openPhoto(file: File, report?: PhotoReport): Promise<HTMLCanvasElement> {
+	const t0 = Date.now();
+	report?.("file", { name: file.name.slice(-60), type: file.type, size: file.size, modified: file.lastModified });
+	if (file.size > 60 * 1024 * 1024) {
+		report?.("refused_too_big", { size: file.size }, "error");
+		throw new PhotoError("حجم این عکس خیلی زیاد است؛ عکس دیگری انتخاب کن.");
+	}
 	// Read once (a cloud photo or a revoked grant fails HERE: not a format problem).
 	let buffer: ArrayBuffer;
 	try {
 		buffer = await file.arrayBuffer();
-	} catch {
+	} catch (e) {
+		report?.("read_failed", { error: errText(e) }, "error");
 		throw new PhotoError(UNREADABLE);
 	}
 	const bytes = new Uint8Array(buffer);
-	if (!bytes.length) throw new PhotoError(UNREADABLE);
+	if (!bytes.length) {
+		report?.("read_empty", {}, "error");
+		throw new PhotoError(UNREADABLE);
+	}
 	const kind = sniff(bytes);
 	// The true type for the decoder (a picker's «application/octet-stream» or none at all misleads some).
 	const blob = new Blob([buffer], { type: kind ? MIME[kind] : file.type || "" });
 	const size = kind ? pictureSize(bytes, kind) : null;
-	const swap = kind === "jpeg" && jpegOrientation(bytes) >= 5;
+	const orientation = kind === "jpeg" ? jpegOrientation(bytes) : 1;
+	const swap = orientation >= 5;
+	report?.("read", { bytes: bytes.length, kind, size, orientation, head: Array.from(bytes.slice(0, 12), (x) => x.toString(16).padStart(2, "0")).join("") });
 	let source: Source;
 	try {
 		// Whatever the browser shows itself first: JPEG, PNG, WebP, GIF, BMP, AVIF, and HEIC on Safari.
-		source = await decode(blob, size, swap);
+		source = await decode(blob, size, swap, report);
 	} catch {
 		const heif = kind === "heif" || (!kind && (/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)));
-		if (!heif) throw new PhotoError(kind ? NOT_DECODED : NOT_A_PICTURE);
+		if (!heif) {
+			report?.(kind ? "not_decoded" : "not_a_picture", { kind }, "error");
+			throw new PhotoError(kind ? NOT_DECODED : NOT_A_PICTURE);
+		}
 		try {
 			source = await decodeHeif(blob);
-		} catch {
+			report?.("decoded", { via: "heif", width: source.width, height: source.height });
+		} catch (e) {
+			report?.("heif_failed", { error: errText(e) }, "error");
 			throw new PhotoError("این عکس HEIC باز نشد (یا اینترنت برای باز کردنش کند بود)؛ دوباره امتحان کن یا یک عکس JPG انتخاب کن (یا از «گرفتن عکس» استفاده کن).");
 		}
 	}
@@ -234,8 +264,10 @@ export async function openPhoto(file: File): Promise<HTMLCanvasElement> {
 		const k = Math.min(1, WORK_SIDE / Math.max(source.width, source.height));
 		const { canvas, ctx } = canvasOf(Math.max(1, Math.round(source.width * k)), Math.max(1, Math.round(source.height * k)));
 		ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+		report?.("opened", { width: canvas.width, height: canvas.height, ms: Date.now() - t0 });
 		return canvas;
 	} catch (e) {
+		report?.("draw_failed", { error: errText(e) }, "error");
 		if (e instanceof PhotoError && e.message !== "canvas") throw e;
 		throw new PhotoError(NOT_DECODED);
 	} finally {

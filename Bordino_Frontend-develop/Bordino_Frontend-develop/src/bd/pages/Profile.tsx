@@ -9,6 +9,7 @@ import Icon from "../Icon";
 import { useBackHandler } from "../back";
 import { useGmProfile } from "../gm/api";
 import { openPhoto, PhotoError } from "../photo";
+import { errorInfo, newAttempt, trace } from "../trace";
 import { AppShell, LoadState, ProfileRow, R, useProfileSync } from "../ui";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -39,15 +40,41 @@ function AvatarPicker({ image }: { image?: string | null }) {
 	const [problem, setProblem] = useState<string | null>(null);
 	const gallery = useRef<HTMLInputElement>(null);
 	const camera = useRef<HTMLInputElement>(null);
+	// Traced, step by step (bd/trace.ts → «بردینو ادمین»): one attempt from the menu to the server's answer.
+	const attempt = useRef("");
+	const step = (name: string, data: Record<string, unknown> = {}, level: "info" | "error" = "info") => trace("profile_photo", attempt.current, name, data, level);
+	// A picker that comes back with no file (closed, or never opened: a WebView without the permission).
+	const picking = useRef<{ via: string; at: number } | null>(null);
+	useEffect(() => {
+		const back = () => {
+			if (document.visibilityState === "hidden" || !picking.current) return;
+			const pending = picking.current;
+			window.setTimeout(() => {
+				if (picking.current === pending) {
+					step("pick_nothing", { via: pending.via, after_ms: Date.now() - pending.at });
+					picking.current = null;
+				}
+			}, 1500);
+		};
+		window.addEventListener("focus", back);
+		document.addEventListener("visibilitychange", back);
+		return () => {
+			window.removeEventListener("focus", back);
+			document.removeEventListener("visibilitychange", back);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 	const upload = useMutate<ImageAnswer, FormData>({
 		url: CUSTOMER_URLS.PROFILE_IMAGE,
 		method: "PATCH",
 		onSuccess: (data) => {
+			step("upload_ok", { image: !!data?.result?.image_url });
 			if (data?.result?.image_url) setUser({ image_url: data.result.image_url });
 			setLastPicture(null);
 			queryClient.invalidateQueries();
 		},
 		onError: (e) => {
+			step("upload_failed", { status: (e as { response?: { status?: number } })?.response?.status ?? null, message: gameErrorMessage(e).slice(0, 300) }, "error");
 			setPreview(null);
 			setProblem(`عکس ذخیره نشد: ${gameErrorMessage(e)}`);
 		},
@@ -97,20 +124,31 @@ function AvatarPicker({ image }: { image?: string | null }) {
 		setPreview(URL.createObjectURL(picture));
 		const form = new FormData();
 		form.append("image", picture, "avatar.jpg");
+		form.append("trace_attempt", attempt.current);
+		step("upload_start", { size: picture.size, type: picture.type, online: navigator.onLine });
 		upload.submitHandler(form);
 	};
 
 	const choose = async (event: ChangeEvent<HTMLInputElement>) => {
 		const input = event.target;
 		const file = input.files?.[0];
+		picking.current = null;
 		setMenu(false);
-		if (!file) return;
+		if (!attempt.current) attempt.current = newAttempt();
+		if (!file) {
+			step("chose_nothing", { via: input === camera.current ? "camera" : "gallery", files: input.files?.length ?? null });
+			return;
+		}
+		step("chosen", { via: input === camera.current ? "camera" : "gallery" });
 		setProblem(null);
 		setOpening(true);
 		try {
-			setPhoto(await openPhoto(file));
+			setPhoto(await openPhoto(file, (name, data, level) => step(name, data, level)));
+			step("editor_open");
 		} catch (e) {
-			setProblem(e instanceof PhotoError ? e.message : "این عکس باز نشد؛ دوباره امتحان کن یا عکس دیگری انتخاب کن.");
+			const message = e instanceof PhotoError ? e.message : "این عکس باز نشد؛ دوباره امتحان کن یا عکس دیگری انتخاب کن.";
+			step("open_failed", { shown: message, ...errorInfo(e) }, "error");
+			setProblem(message);
 		} finally {
 			setOpening(false);
 			// Cleared only after the file was read (some WebViews lose the file once the input is reset);
@@ -133,6 +171,8 @@ function AvatarPicker({ image }: { image?: string | null }) {
 					onClick={() => {
 						setConfirmRemove(false);
 						setMenu(true);
+						attempt.current = newAttempt();
+						step("menu_open", { has_image: !!src });
 					}}
 				>
 					{src ? <img src={src} alt="" /> : <Icon name="user-round" />}
@@ -184,12 +224,16 @@ function AvatarPicker({ image }: { image?: string | null }) {
 							<>
 								<p className="bd-sheet-title">عکس پروفایل</p>
 								<button type="button" role="menuitem" className="bd-sheet-item" autoFocus onClick={() => {
+										step("pick_open", { via: "gallery", input: !!gallery.current });
+										picking.current = { via: "gallery", at: Date.now() };
 										gallery.current?.click();
 										setMenu(false);
 									}}>
 									<Icon name="image" /> انتخاب از گالری
 								</button>
 								<button type="button" role="menuitem" className="bd-sheet-item" onClick={() => {
+										step("pick_open", { via: "camera", input: !!camera.current });
+										picking.current = { via: "camera", at: Date.now() };
 										camera.current?.click();
 										setMenu(false);
 									}}>
@@ -211,8 +255,13 @@ function AvatarPicker({ image }: { image?: string | null }) {
 			{photo ? (
 				<AvatarEditor
 					photo={photo}
-					onCancel={() => setPhoto(null)}
+					onCancel={() => {
+						step("editor_cancel");
+						setPhoto(null);
+					}}
+					onProblem={(message, error) => step("editor_failed", { shown: message, ...errorInfo(error) }, "error")}
 					onDone={(picture) => {
+						step("editor_done", { size: picture.size, type: picture.type });
 						setPhoto(null);
 						send(picture);
 					}}
