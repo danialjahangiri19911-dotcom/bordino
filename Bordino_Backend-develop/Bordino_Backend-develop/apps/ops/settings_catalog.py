@@ -52,6 +52,7 @@ CATALOG = [
     _e("AD_REWARD_POINTS", "ads", "int", "سکهٔ هر تبلیغ", "", AD["AD_REWARD_POINTS"], 0, 100_000),
     _e("AD_REWARD_DAILY_LIMIT", "ads", "int", "سقف تبلیغ جایزه‌دار در روز", "", AD["AD_REWARD_DAILY_LIMIT"], 0, 100),
     _e("AD_DEMO_SECONDS", "ads", "int", "مدت تبلیغ نمایشی (ثانیه)", "", AD["AD_DEMO_SECONDS"], 3, 120),
+    _e("ADIVERY_CALLBACK_PLACEMENT_IDS", "ads", "str", "شناسهٔ عددی جایگاه در خبر ادیوری", "ادیوری در خبرِ «دیده شد» جایگاه را با عدد می‌فرستد (نه شناسهٔ UUID پنل)؛ با ویرگول جدا کن.", AD["ADIVERY_CALLBACK_PLACEMENT_IDS"]),
     _e("ADIVERY_TRUST_APP", "ads", "bool", "پذیرفتن «دیدم» از خود اپ (ادیوری)", "تا وقتی ادیوری به سرور خبر نمی‌دهد.", AD["ADIVERY_TRUST_APP"]),
     _e("ADIVERY_TRUST_SECONDS", "ads", "int", "حداقل ثانیه برای پذیرفتن «دیدم»", "", AD["ADIVERY_TRUST_SECONDS"], 1, 20),  # (the app asks again for ~28 s: longer would never pay)
     _e("COMPLETE_PROFILE_REWARD_POINTS", "ads", "int", "سکهٔ تکمیل پروفایل", "یک بار برای هر کاربر.", 2500, 0, 1_000_000),

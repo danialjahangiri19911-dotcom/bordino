@@ -57,6 +57,32 @@ class AdiveryTests(TestCase):
         # Bordino's own placement is the default.
         self.assertTrue(ad_reward.offer(self.customer).available)
 
+    def test_adiverys_numeric_placement_id_is_accepted_and_pays_once(self):
+        """2026-11-25: Adivery's server sends the placement as a number (298372), not the panel UUID."""
+        self.start()
+        ref = ad_reward.player_ref(self.customer)
+        self.assertEqual(self.callback(ref, eid="num-1", pid="999999").status_code, 400)  # (not ours)
+        ok = self.callback(ref, eid="num-1", pid="298372")
+        self.assertEqual((ok.status_code, ok.json()["result"]["paid"]), (200, True), ok.content)
+        self.assertTrue(self.callback(ref, eid="num-1", pid="298372").json()["result"]["already"])
+        self.assertEqual(self.points(), 5)
+
+    def test_a_view_the_app_already_got_paid_for_is_never_paid_again_by_the_callback(self):
+        setting("ADIVERY_TRUST_APP", "true")
+        setting("ADIVERY_TRUST_SECONDS", "1")
+        session = self.start()
+        from apps.wallet.models import AdRewardSession  # pylint: disable=import-outside-toplevel
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        AdRewardSession.objects.filter(pk=session["session_id"]).update(create_time=timezone.now() - timedelta(seconds=30))
+        claim = self.api.post(f"/api/v1/wallet/ad-reward/sessions/{session['session_id']}/complete/", {}, format="json")
+        self.assertEqual(claim.status_code, 200, claim.content)
+        self.assertEqual(self.points(), 5)
+        late = self.callback(ad_reward.player_ref(self.customer), eid="late-1", pid="298372")
+        self.assertIn(late.status_code, (200, 404))
+        self.assertEqual(self.points(), 5)  # (the app's claim and Adivery's word are the same view)
+
     def test_the_app_alone_cannot_claim_only_adiverys_server_confirms(self):
         session = self.start()
         self.assertEqual(session["provider"], "adivery")

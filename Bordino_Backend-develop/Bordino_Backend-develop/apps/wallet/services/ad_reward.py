@@ -42,6 +42,9 @@ DEFAULTS = {
     # Adivery (docs.adivery.com): the app's id and its «جایزه‌ای» (rewarded) placement.
     "ADIVERY_APP_ID": "ce7eba05-cd4e-4fa6-aa35-15ad352795ee",
     "ADIVERY_REWARDED_PLACEMENT_ID": "e7e3f382-c0d7-4b9b-b754-b06e5ee5fac1",
+    # Adivery's server names the same placement by its NUMBER in the callback (pid=298372 for ours, seen
+    # 2026-11-25 with the right secret and our player ref), not by the panel's UUID: both are accepted.
+    "ADIVERY_CALLBACK_PLACEMENT_IDS": "298372",
     # The full-screen («میان‌صفحه‌ای») placement of the «دیدن تبلیغ تمام‌صفحه» missions. Adivery confirms
     # only rewarded views to our server: these are paid like a banner (shown, then a wait).
     "ADIVERY_INTERSTITIAL_PLACEMENT_ID": "f720b85e-b057-4f06-9ca8-77a83824568b",
@@ -295,6 +298,14 @@ class Callback:
     reason: str = ""
 
 
+def callback_placements() -> set[str]:
+    """The placement names a callback may carry: the panel's UUID and Adivery's numeric ids."""
+    names = {str(setting("ADIVERY_REWARDED_PLACEMENT_ID") or "").strip()}
+    names.update(x.strip() for x in str(setting("ADIVERY_CALLBACK_PLACEMENT_IDS") or "").split(","))
+    names.discard("")
+    return names
+
+
 def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
     """Adivery says the view of session `uid` on placement `pid` earned its reward (event `eid`,
     unique; Adivery may repeat the call). Verifies the session, then pays it — through the
@@ -303,7 +314,7 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         raise AdRewardError("not found", "not_found")
     if not eid or len(eid) > 100:
         raise AdRewardError("bad event id")
-    if str(pid or "") != str(setting("ADIVERY_REWARDED_PLACEMENT_ID") or "-"):
+    if str(pid or "").strip() not in callback_placements():
         raise AdRewardError("unknown placement")
     player = _player_from_ref(uid)
     session_id = None
