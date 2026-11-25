@@ -30,6 +30,8 @@ from apps.wallet.models.transactions.activity import ActivityTransaction
 
 SECTION = "rewarded_ad"
 SESSION_TTL = timedelta(minutes=15)
+# The shortest time a view takes to be watched: Adivery's confirmation of a later view never comes sooner.
+MIN_VIEW = timedelta(seconds=10)
 
 # Configuration keys (admin → System configurations; env vars of the same name; else these).
 DEFAULTS = {
@@ -318,6 +320,7 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         raise AdRewardError("unknown placement")
     player = _player_from_ref(uid)
     session_id = None
+    reused = False  # (the event id was already used by an earlier view of this player: see below)
     if player is None:
         # (the earlier form: the view's own id)
         try:
@@ -332,6 +335,26 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
             session = AdRewardSession.objects.select_for_update().filter(external_event_id=eid, provider=AdiveryProvider.name).first()
             if session is not None and session.customer_id != player.pk:
                 raise AdRewardError("event already used", "conflict")
+            if session is not None:
+                # Adivery sends the SAME event id again for the next view in the same app session (seen
+                # 2026-11-25: two videos back to back, each confirmed the moment it ended, one id). A newer
+                # view of this player, still waiting and old enough to have been watched, is that view;
+                # with none, it is a repeat of the first.
+                newer = (
+                    AdRewardSession.objects.select_for_update()
+                    .filter(
+                        customer=player,
+                        provider=AdiveryProvider.name,
+                        verified_at__isnull=True,
+                        create_time__gt=session.create_time,
+                        create_time__lte=timezone.now() - MIN_VIEW,
+                        create_time__gte=timezone.now() - SESSION_TTL,
+                    )
+                    .order_by("create_time")
+                    .first()
+                )
+                if newer is not None:
+                    session, reused = newer, True
             if session is None:
                 # The player's latest view still waiting for Adivery (one ad shows at a time; older
                 # unfinished ones were left).
@@ -358,10 +381,11 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
             raise AdRewardError("unknown session", "not_found")
         if session.external_event_id and session.external_event_id != eid:
             raise AdRewardError("session already confirmed by another event", "conflict")
-        if AdRewardSession.objects.filter(external_event_id=eid).exclude(pk=session.pk).exists():
+        if not reused and AdRewardSession.objects.filter(external_event_id=eid).exclude(pk=session.pk).exists():
             raise AdRewardError("event already used", "conflict")
         if session.verified_at is None:
-            session.external_event_id = eid
+            # (the column is unique: a reused event id is stored with this view's mark)
+            session.external_event_id = f"{eid}~{session.pk.hex[:8]}" if reused else eid
             session.verified_at = timezone.now()
             session.save(update_fields=["external_event_id", "verified_at", "update_time"])
         customer = session.customer

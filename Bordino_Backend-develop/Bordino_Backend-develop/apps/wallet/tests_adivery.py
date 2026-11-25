@@ -57,6 +57,33 @@ class AdiveryTests(TestCase):
         # Bordino's own placement is the default.
         self.assertTrue(ad_reward.offer(self.customer).available)
 
+    def test_back_to_back_views_with_one_event_id_are_each_paid_once(self):
+        """2026-11-25: Adivery sent the same eid for the second video of the same app session."""
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models import AdRewardSession  # pylint: disable=import-outside-toplevel
+
+        ref = ad_reward.player_ref(self.customer)
+        old = lambda sid, s: AdRewardSession.objects.filter(pk=sid).update(create_time=timezone.now() - timedelta(seconds=s))
+        first = self.start()
+        old(first["session_id"], 60)
+        self.assertTrue(self.callback(ref, eid="same", pid="298372").json()["result"]["paid"])
+        self.assertEqual(self.points(), 5)
+        self.assertTrue(self.callback(ref, eid="same", pid="298372").json()["result"]["already"])  # a plain repeat
+        self.assertEqual(self.points(), 5)
+        second = self.start()
+        old(second["session_id"], 30)
+        r = self.callback(ref, eid="same", pid="298372")  # the next video, the same event id
+        self.assertEqual((r.status_code, r.json()["result"]["paid"], r.json()["result"]["already"]), (200, True, False), r.content)
+        self.assertEqual(self.points(), 10)
+        self.assertTrue(AdRewardSession.objects.get(pk=second["session_id"]).external_event_id.startswith("same~"))
+        third = self.start()  # just started: not watched yet, a repeat of "same" must not confirm it
+        self.callback(ref, eid="same", pid="298372")
+        self.assertEqual(self.points(), 10)
+        self.assertIsNone(AdRewardSession.objects.get(pk=third["session_id"]).verified_at)
+
     def test_adiverys_numeric_placement_id_is_accepted_and_pays_once(self):
         """2026-11-25: Adivery's server sends the placement as a number (298372), not the panel UUID."""
         self.start()
