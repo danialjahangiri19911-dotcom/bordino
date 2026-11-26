@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
+import { APK_URL } from "../BackButton";
 import Icon from "../Icon";
+import { usePlayableAdOffer } from "../ads/api";
+import { inAndroidApp, useAdsPlugin } from "../ads/native";
 import { fa } from "../format";
 import MissionSheet from "../missions/MissionSheet";
 import { type Mission, type MissionState, useMissions } from "../missions/api";
@@ -36,6 +39,23 @@ const MYSTERY_AS: Record<MysteryState, MissionState> = {
 };
 /** The «معمای شهری» chip (beside the server's mission categories). */
 const MYSTERY_GROUP = "mystery";
+/** In a browser: the chip that leaves out what only the Android app can play (product review 2026-11-26). */
+const WEB_GROUP = "web";
+
+/** Why a mission cannot be done here: «web» (a browser: the Android app plays it), «update» (an
+ * app too old for it), or null. Rewarded videos (Adivery) and full-screen ads need the app's bridge. */
+type Elsewhere = "web" | "update" | null;
+function useElsewhere(): (m: Mission) => Elsewhere {
+	const ads = usePlayableAdOffer();
+	const plugin = useAdsPlugin();
+	const inApp = inAndroidApp();
+	return (m) => {
+		if (m.kind === "video" && (ads.appOnly || ads.needsAppUpdate)) return ads.appOnly ? "web" : "update";
+		if (m.kind === "interstitial" && typeof plugin?.showInterstitial !== "function") return inApp ? "update" : "web";
+		return null;
+	};
+}
+const ACTIONABLE: MissionState[] = ["available", "in_progress", "rejected"];
 
 /** One row of the list: a mission (opens its sheet) or a «معمای شهری» (opens its page). */
 type Row =
@@ -162,28 +182,26 @@ export default function Earn() {
 		],
 		[list],
 	);
-	const shown = useMemo(
-		() =>
-			sorted(
-				rows.filter(
-					(r) =>
-						group === "all" ||
-						(r.kind === "mystery"
-							? group === MYSTERY_GROUP
-							: r.m.category === group),
-				),
-				sort,
-				reverse,
-			),
-		[rows, group, sort, reverse],
+	const elsewhere = useElsewhere();
+	const awayHere = (r: Row) => (r.kind === "mission" ? elsewhere(r.m) : null);
+	// Missions a player could do now but not in this browser/app (said on the card, and in a note).
+	const awayCount = rows.filter((r) => ACTIONABLE.includes(r.state) && awayHere(r) === "web").length;
+	const shown = sorted(
+		rows.filter(
+			(r) =>
+				group === "all" ||
+				(group === WEB_GROUP
+					? !awayHere(r)
+					: r.kind === "mystery"
+						? group === MYSTERY_GROUP
+						: r.m.category === group),
+		),
+		sort,
+		reverse,
 	);
 	const open = list?.missions.find((m) => m.id === openId) ?? null;
-	const doable = rows.filter(
-		(r) =>
-			r.state === "available" ||
-			r.state === "in_progress" ||
-			r.state === "rejected",
-	).length;
+	// «N قابل انجام»: what can be done here (a browser leaves out what only the app plays).
+	const doable = rows.filter((r) => ACTIONABLE.includes(r.state) && !awayHere(r)).length;
 	const groups: [string, string][] = [
 		...(list?.categories ?? []).map((c): [string, string] => [c.id, c.name]),
 		...(list?.mysteries?.length
@@ -244,13 +262,34 @@ export default function Earn() {
 						</select>
 					</div>
 				</div>
-				{list && groups.length > 1 ? (
+				{list && (groups.length > 1 || awayCount > 0) ? (
 					<Chips
 						label="دسته‌بندی مأموریت‌ها"
 						value={group}
 						onChange={setGroup}
-						options={[["all", "همه"], ...groups]}
+						options={[["all", "همه"], ...(awayCount ? ([[WEB_GROUP, "قابل انجام در مرورگر"]] as [string, string][]) : []), ...groups]}
 					/>
+				) : null}
+				{awayCount ? (
+					<div className="mi-web-note" role="note">
+						<Icon name="smartphone" />
+						<div>
+							<b>
+								{fa(awayCount)} مأموریت فقط در اپ اندروید بردینو انجام می‌شود (ویدیوها و تبلیغ‌های تمام‌صفحه).
+							</b>
+							<small>بقیهٔ مأموریت‌ها همین‌جا در مرورگر انجام می‌شوند.</small>
+							<div className="bd-actions">
+								{group !== WEB_GROUP ? (
+									<button type="button" className="bd-secondary" onClick={() => setGroup(WEB_GROUP)}>
+										نمایش مأموریت‌های قابل انجام در مرورگر
+									</button>
+								) : null}
+								<a className="bd-text-btn" href={APK_URL}>
+									<Icon name="download" /> دریافت اپ اندروید
+								</a>
+							</div>
+						</div>
+					</div>
 				) : null}
 				{/* While loading, about a list's height: the note below does not jump down when the list arrives. */}
 				<div className={isLoading ? "mi-loading" : undefined}>
@@ -323,6 +362,11 @@ export default function Earn() {
 											<span className={`bd-tag mi-state mi-${row.m.state}`}>
 												{STATE_LABEL[row.m.state]}
 											</span>
+											{ACTIONABLE.includes(row.m.state) && awayHere(row) ? (
+												<span className="bd-tag mi-away">
+													<Icon name="smartphone" /> {awayHere(row) === "web" ? "فقط در اپ اندروید" : "نیاز به نسخهٔ تازهٔ اپ"}
+												</span>
+											) : null}
 										</span>
 										<span className="mi-points">
 											<bdi dir="ltr">+{fa(row.m.points)}</bdi>

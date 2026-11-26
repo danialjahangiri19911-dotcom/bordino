@@ -913,3 +913,12 @@ body { margin: 0; }
 /* Landing: the sign-in said beside «شروع یک بازی» (product review 2026-11-26). */
 #bordino-directions .bd-login-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; color: var(--bd-muted); }
 #bordino-directions .bd-login-note svg { width: 16px; height: 16px; flex: none; }
+
+/* Missions only the Android app can play, seen in a browser (product review 2026-11-26). */
+#bordino-directions .bd-tag.mi-away { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; margin-inline-start: 6px; font-size: 10px; padding: 2px 9px; background: color-mix(in srgb, var(--bd-muted) 16%, var(--bd-surface)); color: var(--bd-fg); }
+#bordino-directions .bd-tag.mi-away svg { width: 12px; height: 12px; }
+#bordino-directions .mi-web-note { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 12px; padding: 12px 14px; border: 1px solid var(--bd-border); border-radius: 14px; background: var(--bd-surface); }
+#bordino-directions .mi-web-note > svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--bd-accent); }
+#bordino-directions .mi-web-note b { display: block; font-size: 13px; }
+#bordino-directions .mi-web-note small { display: block; margin-top: 2px; font-size: 12px; color: var(--bd-muted); }
+#bordino-directions .mi-web-note .bd-actions { margin-top: 8px; flex-wrap: wrap; gap: 8px; }
