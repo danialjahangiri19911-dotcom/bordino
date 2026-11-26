@@ -22,7 +22,7 @@ interface Overview {
 	lotteries: { active: number };
 }
 
-function Tile({ label, value, icon, href, hint }: { label: string; value: number | string; icon: IconName; href?: string; hint?: string }) {
+export function Tile({ label, value, icon, href, hint }: { label: string; value: number | string; icon: IconName; href?: string; hint?: string }) {
 	const inner = (
 		<>
 			<Icon name={icon} />

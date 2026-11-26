@@ -332,6 +332,73 @@ class AdiveryPlayerRefTests(TestCase):
         self.assertEqual(self.points(), 12)
 
 
+    def _aged(self, session, seconds):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        AdRewardSession.objects.filter(pk=session.pk).update(create_time=timezone.now() - timedelta(seconds=seconds))
+
+    def test_after_an_account_switch_the_previous_players_confirmation_pays_the_new_player(self):
+        """2026-11-25: 09128007728 watched, the SDK loaded the next ad under that reference, the phone
+        switched to 09187513543, whose video Adivery confirmed with the first player's reference and
+        even the first player's event id."""
+        ref_a = ad_reward.player_ref(self.customer)
+        first = ad_reward.start(self.customer, "mission")
+        self._aged(first, 600)
+        self.assertTrue(self.callback(ref_a, "ev-a").json()["result"]["paid"])
+        b, b_user = self.player("9120009104")
+        client = APIClient()
+        client.force_authenticate(b_user)
+        started = client.post("/api/v1/wallet/ad-reward/sessions/", {"placement": "sudoku", "sdk_ref": ref_a}, format="json")
+        self.assertEqual(started.status_code, 201, started.content)
+        second = AdRewardSession.objects.get(pk=started.json()["result"]["session_id"])
+        self.assertEqual(second.sdk_ref, ref_a)
+        self._aged(second, 40)
+        with mock.patch("apps.notifications.services.queue") as told:
+            r = self.callback(ref_a, "ev-a")  # the first player's reference AND event id
+            self.assertEqual((r.status_code, r.json()["result"]["paid"], r.json()["result"]["already"]), (200, True, False), r.content)
+            self.assertEqual((self.points(), self.points(b_user)), (5, 5))
+            self.assertEqual(told.call_count, 1)
+            self.assertEqual(told.call_args.args[0], b)
+            self.assertEqual(told.call_args.args[2], "سکهٔ ویدیو رسید")
+            # Adivery repeats it: nothing more for anybody, and no second notice.
+            self.assertTrue(self.callback(ref_a, "ev-a").json()["result"]["already"])
+            self.assertEqual((self.points(), self.points(b_user)), (5, 5))
+            self.assertEqual(told.call_count, 1)
+        # A fresh event id under the old reference pays the new player's next waiting view too.
+        third = ad_reward.start(b, "sudoku", sdk_ref=ref_a)
+        self._aged(third, 30)
+        self.assertTrue(self.callback(ref_a, "ev-a2").json()["result"]["paid"])
+        self.assertEqual((self.points(), self.points(b_user)), (5, 10))
+
+    def test_a_video_mission_after_an_account_switch_is_paid_to_the_new_player(self):
+        category = MissionCategory.objects.create(name="ویدیو")
+        mission = Mission.objects.create(
+            title="ویدیو", category=category, kind=Mission.Kind.VIDEO, points=12, repeat=Mission.Repeat.DAILY, daily_limit=3
+        )
+        b, b_user = self.player("9120009105")
+        client = APIClient()
+        client.force_authenticate(b_user)
+        r = client.post(f"/api/v1/missions/{mission.pk}/start/", {"sdk_ref": ad_reward.player_ref(self.customer)}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        attempt = MissionAttempt.objects.get(customer=b)
+        self.assertEqual(self.callback(ad_reward.player_ref(self.customer), "m-switch").status_code, 200)
+        attempt.refresh_from_db()
+        self.assertEqual((attempt.status, self.points(b_user), self.points()), (MissionAttempt.Status.COMPLETED, 12, 0))
+
+    def test_a_hint_that_is_not_another_real_player_is_dropped(self):
+        own = ad_reward.player_ref(self.customer)
+        forged = own[:-1] + ("0" if own[-1] != "0" else "1")
+        for hint in (own, forged, "nonsense", ""):
+            self.assertEqual(ad_reward.start(self.customer, "sudoku", sdk_ref=hint).sdk_ref, "")
+        b, _b_user = self.player("9120009106")
+        # Without the hint another player's confirmation pays nobody else.
+        ad_reward.start(b, "sudoku")
+        self.assertEqual(self.callback(ad_reward.player_ref(self.customer), "ev-none").json()["result"]["paid"], True)
+        self.assertEqual(self.points(_b_user), 0)
+
+
 @override_settings(CACHES=LOCMEM)
 class AdiveryCallbackAttemptTests(AdiveryTests):
     """Every call to the confirmation address is recorded, whatever it says (and never its secret)."""

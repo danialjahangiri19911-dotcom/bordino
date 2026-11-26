@@ -2,7 +2,8 @@ import { act } from "react";
 import { type Root, createRoot } from "react-dom/client";
 
 import AdiveryAd from "./AdiveryAd";
-import { untilConfirmed } from "./api";
+import { sdkHint, untilConfirmed } from "./api";
+import { markSdkUser } from "./native";
 import { AxiosError, type AxiosResponse } from "axios";
 
 jest.mock("../back", () => ({ useBackHandler: () => undefined }));
@@ -103,5 +104,14 @@ describe("AdiveryAd", () => {
 	it("outside the app: says where it plays", async () => {
 		await act(async () => root.render(<AdiveryAd session={session} onWatched={jest.fn()} onAbort={jest.fn()} />));
 		expect(host.textContent).toContain("فقط در اپ اندروید");
+	});
+});
+
+describe("sdkHint", () => {
+	it("tells the server which player the phone's SDK holds (an account switch on one phone)", () => {
+		sessionStorage.clear();
+		expect(sdkHint()).toEqual({});
+		markSdkUser("aaaa-1111");
+		expect(sdkHint()).toEqual({ sdk_ref: "aaaa-1111" });
 	});
 });

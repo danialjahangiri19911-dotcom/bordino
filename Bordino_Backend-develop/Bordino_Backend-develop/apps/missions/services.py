@@ -201,7 +201,7 @@ def listing(customer: Customer) -> list[View]:
 # ── doing a mission ──
 
 
-def start(customer: Customer, mission_id) -> MissionAttempt:
+def start(customer: Customer, mission_id, sdk_ref: str = "") -> MissionAttempt:
     """Starts (or continues) a try. A video gets its rewarded-ad session; a full-screen ad its
     placement (in the try's payload); the others get the link."""
     with transaction.atomic():
@@ -224,7 +224,7 @@ def start(customer: Customer, mission_id) -> MissionAttempt:
         attempt = MissionAttempt.objects.create(customer=customer, mission=mission, points=mission.points)
         if mission.kind == Mission.Kind.VIDEO:
             try:
-                attempt.ad_session = ad_reward.start(customer, f"mission:{mission.pk}", points=attempt.points)
+                attempt.ad_session = ad_reward.start(customer, f"mission:{mission.pk}", points=attempt.points, sdk_ref=sdk_ref)
             except ad_reward.AdRewardError as exc:
                 raise MissionError(str(exc), "done_today") from exc
             attempt.save(update_fields=["ad_session", "update_time"])

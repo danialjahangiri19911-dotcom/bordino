@@ -30,6 +30,18 @@ export function markSdkUser(ref: string) {
 		// storage blocked: the next ad is just not loaded ahead
 	}
 }
+/**
+ * The reference the SDK holds now (null: none in this app session). Sent when a view starts: after an
+ * account switch on this phone, the ad the SDK loaded ahead still carries the previous player's
+ * reference, and Adivery confirms the view under it (2026-11-25) — the server then knows whose it is.
+ */
+export function heldSdkUser(): string | null {
+	try {
+		return sessionStorage.getItem(SDK_USER);
+	} catch {
+		return null;
+	}
+}
 export function sdkHoldsUser(ref: string | undefined): boolean {
 	if (!ref) return false;
 	try {

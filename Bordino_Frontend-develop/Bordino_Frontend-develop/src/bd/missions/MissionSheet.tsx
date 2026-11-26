@@ -4,7 +4,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import Icon from "../Icon";
 import { APK_URL } from "../BackButton";
-import { usePlayableAdOffer } from "../ads/api";
+import { LATE_CONFIRMATION, awaitingConfirmation, usePlayableAdOffer } from "../ads/api";
 import { AD_PLAYERS } from "../ads/players";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
@@ -43,6 +43,8 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 	const [m, setM] = useState(mission);
 	const [step, setStep] = useState<Step>({ kind: "idle" });
 	const [problem, setProblem] = useState<string | null>(null);
+	// The video was watched but Adivery's confirmation has not come yet (it still pays when it comes).
+	const [late, setLate] = useState(false);
 	const [text, setText] = useState("");
 	const [image, setImage] = useState<Blob | null>(null);
 	const [preview, setPreview] = useState<string | null>(null);
@@ -149,6 +151,7 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 
 	const claimAttempt = async (attemptId: string) => {
 		setProblem(null);
+		setLate(false);
 		setStep({ kind: "busy" });
 		try {
 			const reward = await claimMission(attemptId);
@@ -156,7 +159,8 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 			update(reward.mission);
 			setStep({ kind: "rewarded", points: reward.points });
 		} catch (e) {
-			setProblem(gameErrorMessage(e));
+			if (awaitingConfirmation(e)) setLate(true);
+			else setProblem(gameErrorMessage(e));
 			setStep({ kind: "idle" });
 			onChanged();
 		}
@@ -347,6 +351,11 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 											? "تلاش دوباره"
 											: "شروع مأموریت"}
 							</button>
+						) : null}
+						{late ? (
+							<p className="mi-note mi-note-wait" role="status">
+								{LATE_CONFIRMATION}
+							</p>
 						) : null}
 						{problem ? (
 							<p className="mi-note mi-note-bad" role="alert">

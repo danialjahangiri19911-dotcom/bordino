@@ -722,6 +722,10 @@ body { margin: 0; }
 #bordino-directions .ops-table summary { cursor: pointer; font-size: 12px; color: var(--bd-muted); }
 #bordino-directions .ops-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
 #bordino-directions .ops-table :is(td, th) { padding: 2px 6px; border-bottom: 1px solid var(--bd-border); text-align: start; }
+#bordino-directions .ops-wide { overflow-x: auto; }
+#bordino-directions .ops-wide table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+#bordino-directions .ops-wide :is(td, th) { padding: 6px 8px; border-bottom: 1px solid var(--bd-border); text-align: start; font-variant-numeric: tabular-nums; }
+#bordino-directions .ops-wide thead th { color: var(--bd-muted); font-weight: 600; font-size: 12px; }
 /* The admin app's menu has nine entries: on a phone they scroll sideways (never widen the page). */
 #bordino-directions .ops-product .bd-shell > * { min-width: 0; }
 #bordino-directions .ops-top-logout { display: none; }

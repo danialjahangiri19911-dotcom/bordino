@@ -50,6 +50,8 @@ class AdRewardOfferView(APIView):
 
 class AdRewardStartSerializer(serializers.Serializer):
     placement = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    # The reference the phone's Adivery SDK held before this view (see AdRewardSession.sdk_ref).
+    sdk_ref = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
 
 class AdRewardStartView(APIView):
@@ -63,7 +65,7 @@ class AdRewardStartView(APIView):
         data = AdRewardStartSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         try:
-            session = ad_reward.start(customer, data.validated_data.get("placement", ""))
+            session = ad_reward.start(customer, data.validated_data.get("placement", ""), sdk_ref=data.validated_data.get("sdk_ref", ""))
         except ad_reward.AdRewardError as e:
             return Response({"error": str(e)}, status=status.HTTP_409_CONFLICT)
         return Response(

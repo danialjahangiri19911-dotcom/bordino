@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
-import { type AdOffer, type AdSession, claimAd, startAd } from "./api";
+import { type AdOffer, type AdSession, LATE_CONFIRMATION, awaitingConfirmation, claimAd, startAd } from "./api";
 import { AD_PLAYERS } from "./players";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -34,7 +34,8 @@ type Step =
 	| { kind: "playing"; session: AdSession }
 	| { kind: "claiming"; session: AdSession }
 	| { kind: "rewarded"; points: number }
-	| { kind: "failed"; message: string };
+	| { kind: "failed"; message: string }
+	| { kind: "late" };
 
 /**
  * Before a game: «تماشای ویدیو و دریافت X سکه» or «ادامه بدون تماشای ویدیو». The game opens only
@@ -44,7 +45,7 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 	const queryClient = useQueryClient();
 	const [step, setStep] = useState<Step>({ kind: "offer" });
 
-	useBackHandler(step.kind === "offer" || step.kind === "failed", step.kind === "offer" ? onCancel : onPlay);
+	useBackHandler(step.kind === "offer" || step.kind === "failed" || step.kind === "late", step.kind === "offer" ? onCancel : onPlay);
 
 	useEffect(() => {
 		if (step.kind !== "rewarded") return;
@@ -69,7 +70,7 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 			void queryClient.invalidateQueries();
 			setStep({ kind: "rewarded", points: result.reward_points });
 		} catch (e) {
-			setStep({ kind: "failed", message: gameErrorMessage(e) });
+			setStep(awaitingConfirmation(e) ? { kind: "late" } : { kind: "failed", message: gameErrorMessage(e) });
 		}
 	};
 
@@ -92,6 +93,21 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 						</b>
 						<p>به کیفت اضافه شد. بریم سراغ {gameName}…</p>
 					</div>
+				) : step.kind === "late" ? (
+					<>
+						<span className="bd-reward-coin" aria-hidden="true">
+							<Icon name="hourglass" />
+						</span>
+						<p className="bd-reward-heading" id="reward-title">
+							در انتظار تأیید ادیوری
+						</p>
+						<p className="bd-reward-text" role="status">
+							{LATE_CONFIRMATION}
+						</p>
+						<button type="button" className="bd-sheet-item bd-reward-main" autoFocus onClick={onPlay}>
+							<Icon name="play" /> رفتن به {gameName}
+						</button>
+					</>
 				) : step.kind === "failed" ? (
 					<>
 						<p className="bd-sheet-title" id="reward-title">

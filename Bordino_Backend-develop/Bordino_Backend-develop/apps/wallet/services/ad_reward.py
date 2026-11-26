@@ -21,6 +21,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.configuration.models.system_configuration import SystemConfiguration
@@ -181,19 +182,24 @@ def offer(customer: Customer) -> Offer:
     return Offer(available, points, remaining, p.name, p.creative(customer) if available else {})
 
 
-def start(customer: Customer, placement: str, points: int | None = None) -> AdRewardSession:
+def start(customer: Customer, placement: str, points: int | None = None, sdk_ref: str = "") -> AdRewardSession:
     """`points` overrides the configured reward (a video mission pays its own amount); the daily
-    limit is the same for every rewarded video."""
+    limit is the same for every rewarded video. `sdk_ref`: the reference the phone's SDK held before
+    this view, when it is another player's (see AdRewardSession.sdk_ref); anything else is dropped."""
     o = offer(customer)
     if not o.available:
         raise AdRewardError("فعلاً ویدیوی جایزه‌داری نیست؛ سقف امروز پر شده یا این بخش خاموش است.")
     p = PROVIDERS[o.provider]
+    held = str(sdk_ref or "").strip()[:100]
+    if held and (p.name != AdiveryProvider.name or held == player_ref(customer) or _player_from_ref(held) is None):
+        held = ""
     return AdRewardSession.objects.create(
         customer=customer,
         provider=p.name,
         placement=(placement or "")[:50],
         reward_points=o.reward_points if points is None else points,
         min_watch_seconds=p.watch_seconds(),
+        sdk_ref=held,
     )
 
 
@@ -333,8 +339,11 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
             Customer.objects.select_for_update(no_key=True).filter(pk=player.pk).first()
             # A repeat of a confirmation already applied: the same view.
             session = AdRewardSession.objects.select_for_update().filter(external_event_id=eid, provider=AdiveryProvider.name).first()
-            if session is not None and session.customer_id != player.pk:
+            if session is not None and session.customer_id != player.pk and session.sdk_ref != uid:
                 raise AdRewardError("event already used", "conflict")
+            # The views this confirmation can be for: the player's own, and those of another player on
+            # the same phone whose SDK still held this player's reference (an account switch).
+            mine = Q(customer=player) | Q(sdk_ref=uid)
             if session is not None:
                 # Adivery sends the SAME event id again for the next view in the same app session (seen
                 # 2026-11-25: two videos back to back, each confirmed the moment it ended, one id). A newer
@@ -343,7 +352,7 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
                 newer = (
                     AdRewardSession.objects.select_for_update()
                     .filter(
-                        customer=player,
+                        mine,
                         provider=AdiveryProvider.name,
                         verified_at__isnull=True,
                         create_time__gt=session.create_time,
@@ -361,7 +370,7 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
                 session = (
                     AdRewardSession.objects.select_for_update()
                     .filter(
-                        customer=player,
+                        mine,
                         provider=AdiveryProvider.name,
                         verified_at__isnull=True,
                         create_time__gte=timezone.now() - SESSION_TTL,
@@ -398,6 +407,8 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
             result = missions.claim(customer, mission_attempt.pk)
             return Callback(paid=True, already=result.already)
         result = complete(customer, session.pk)
+        if not result.already:
+            _notify_video_paid(customer, result.session)
         return Callback(paid=True, already=result.already)
     except (AdRewardError, missions.MissionError) as exc:
         # A rule says no (the day's limit, an old session...): recorded, final — not retried.
@@ -405,6 +416,16 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
         return Callback(paid=False, already=False, reason=str(exc))
     # Anything else (a database hiccup) is not caught: the answer is an error, Adivery calls again,
     # and the already-recorded confirmation pays then (once).
+
+
+def _notify_video_paid(customer: Customer, session: AdRewardSession):
+    """Adivery's confirmation paid the view: the player may have left the app's «waiting» note."""
+    from apps.notifications import services as notifications  # pylint: disable=import-outside-toplevel
+
+    try:
+        notifications.queue(customer, "account", "سکهٔ ویدیو رسید", f"ادیوری تماشای ویدیو را تأیید کرد: {session.reward_points:,} سکه به کیفت اضافه شد.".replace(",", "٬"), url="/pwa/wallet", key=f"ad-paid:{session.pk}")
+    except Exception:  # pylint: disable=broad-except
+        pass  # a courtesy: never the reason a confirmation fails
 
 
 def interstitial_creative() -> dict | None:

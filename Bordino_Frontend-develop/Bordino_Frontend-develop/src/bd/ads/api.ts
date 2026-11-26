@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { inAndroidApp, sdkHoldsUser, useAdsPlugin } from "./native";
+import { heldSdkUser, inAndroidApp, sdkHoldsUser, useAdsPlugin } from "./native";
 import axios from "axios";
 
 import { call } from "@/api/games/request";
@@ -98,7 +98,16 @@ export async function untilConfirmed<T>(ask: () => Promise<T>, tries = 20, gapMs
 }
 
 /** Starts a view on the server; the reward can only be claimed for a session started here. */
-export const startAd = (placement: string) => call<AdSession>("post", SESSIONS, { placement });
+export const startAd = (placement: string) => call<AdSession>("post", SESSIONS, { placement, ...sdkHint() });
+
+/** What a view's start tells the server about the phone's SDK (see heldSdkUser). */
+export function sdkHint(): { sdk_ref?: string } {
+	const held = heldSdkUser();
+	return held ? { sdk_ref: held } : {};
+}
+
+/** The app stopped waiting, Adivery's confirmation had not come yet: it still pays when it comes. */
+export const LATE_CONFIRMATION = "ویدیو ثبت شد. تأیید ادیوری هنوز نرسیده؛ به‌محض رسیدن، سکه خودکار به کیفت اضافه می‌شود و خبرت می‌کنیم.";
 
 /** Asks the server for the reward; it pays once, and only when the provider confirms the view. */
 export const claimAd = (sessionId: string) => untilConfirmed(() => call<AdClaim>("post", `${SESSIONS}${sessionId}/complete/`, {}));

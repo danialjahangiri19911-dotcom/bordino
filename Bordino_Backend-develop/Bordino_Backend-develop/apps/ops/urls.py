@@ -1,6 +1,7 @@
 from django.urls import path
 
 from apps.clientlog.views import OpsClientLogView
+from apps.ops import views_ads as ads
 from apps.ops import views_auth as a
 from apps.ops import views_coins as c
 from apps.ops import views_dash as d
@@ -38,6 +39,7 @@ urlpatterns = [
     path(P + "coins/purchases/", c.PurchasesView.as_view(), name="ops_coin_purchases"),
     path(P + "coins/fees/", c.FeesView.as_view(), name="ops_game_fees"),
     path(P + "client-logs/", OpsClientLogView.as_view(), name="ops_client_logs"),
+    path(P + "ads/daily/", ads.AdsDailyView.as_view(), name="ops_ads_daily"),
     path(P + "coins/fees/<uuid:config_id>/", c.FeeView.as_view(), name="ops_game_fee"),
     path(P + "settings/", d.SettingsView.as_view(), name="ops_settings"),
     path(P + "settings/<str:key>/", d.SettingView.as_view(), name="ops_setting"),

@@ -1,4 +1,4 @@
-import { type AdSession, untilConfirmed } from "../ads/api";
+import { type AdSession, sdkHint, untilConfirmed } from "../ads/api";
 import type { MysteryCard } from "./mystery";
 import { call } from "@/api/games/request";
 import requester from "@/libs/http/requester";
@@ -111,7 +111,7 @@ export function useMissions() {
 	});
 }
 
-export const startMission = (id: string) => call<{ mission: Mission }>("post", `${MISSIONS}${id}/start/`, {});
+export const startMission = (id: string) => call<{ mission: Mission }>("post", `${MISSIONS}${id}/start/`, sdkHint());
 
 /** The player opened the try's link (a banner's wait starts then). */
 export const openedMission = (attemptId: string) => call<{ mission: Mission }>("post", `${MISSIONS}attempts/${attemptId}/opened/`, {});

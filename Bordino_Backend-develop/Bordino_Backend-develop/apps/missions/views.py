@@ -166,7 +166,8 @@ class MissionStartView(APIView):
     def post(self, request, mission_id):
         try:
             customer = _customer(request)
-            services.start(customer, mission_id)
+            held = request.data.get("sdk_ref", "") if isinstance(request.data, dict) else ""
+            services.start(customer, mission_id, sdk_ref=str(held or ""))
         except services.MissionError as exc:
             return _error(exc)
         return Response({"mission": _one(customer, mission_id)}, status=status.HTTP_201_CREATED)

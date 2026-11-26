@@ -28,9 +28,10 @@ export const OPS = {
 	staff: "/ops/staff",
 	audit: "/ops/audit",
 	logs: "/ops/logs",
+	ads: "/ops/ads",
 } as const;
 
-export type OpsNav = "home" | "games" | "withdrawals" | "banks" | "settings" | "coins" | "users" | "maintenance" | "staff" | "audit" | "logs";
+export type OpsNav = "home" | "games" | "withdrawals" | "banks" | "settings" | "coins" | "users" | "maintenance" | "staff" | "audit" | "logs" | "ads";
 
 /** The menu: each entry shows only for the roles that can use it ("owner" = the super admin). */
 const NAV: { key: OpsNav; icon: IconName; label: string; href: string; roles: (OpsRole | "owner" | "any")[] }[] = [
@@ -40,6 +41,7 @@ const NAV: { key: OpsNav; icon: IconName; label: string; href: string; roles: (O
 	{ key: "banks", icon: "landmark", label: "حساب‌های بانکی", href: OPS.banks, roles: ["finance"] },
 	{ key: "settings", icon: "pencil", label: "تنظیمات", href: OPS.settings, roles: ["settings"] },
 	{ key: "coins", icon: "coins", label: "سکه و هزینهٔ بازی‌ها", href: OPS.coins, roles: ["settings"] },
+	{ key: "ads", icon: "play", label: "ویدیوهای جایزه‌دار", href: OPS.ads, roles: ["finance", "settings"] },
 	{ key: "users", icon: "users", label: "کاربران", href: OPS.users, roles: ["any"] },
 	{ key: "maintenance", icon: "monitor", label: "سلامت سرور", href: OPS.maintenance, roles: ["any"] },
 	{ key: "staff", icon: "user-plus", label: "کارکنان و نقش‌ها", href: OPS.staff, roles: ["owner"] },

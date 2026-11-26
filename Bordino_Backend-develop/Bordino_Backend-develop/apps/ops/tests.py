@@ -507,3 +507,37 @@ class SettingsCacheFailureTests(OpsTestCase):
         cache.set("system_config:TEST_INVAL_FAIL", 1)  # (a value older code cached during a deploy)
         mgr.invalidate("TEST_INVAL_FAIL")
         self.assertIsNone(cache.get("system_config:TEST_INVAL_FAIL"))
+
+
+class AdsDailyReportTests(OpsTestCase):
+    """«ویدیوهای جایزه‌دار»: views, Adivery's confirmations and what was paid, per Tehran day."""
+
+    def test_the_report_counts_views_confirmations_payments_and_callbacks(self):
+        from datetime import timedelta  # pylint: disable=import-outside-toplevel
+
+        from django.utils import timezone  # pylint: disable=import-outside-toplevel
+
+        from apps.wallet.models import AdiveryCallbackAttempt, AdRewardSession  # pylint: disable=import-outside-toplevel
+
+        c = self.player.customer
+        now = timezone.now()
+        AdRewardSession.objects.create(customer=c, provider="adivery", placement="sudoku", reward_points=500, min_watch_seconds=1, status="rewarded", verified_at=now)
+        AdRewardSession.objects.create(customer=c, provider="adivery", placement="mission:x", reward_points=700, min_watch_seconds=1, status="rewarded")
+        AdRewardSession.objects.create(customer=c, provider="adivery", placement="sudoku", reward_points=500, min_watch_seconds=1)
+        AdRewardSession.objects.create(customer=c, provider="demo", placement="sudoku", reward_points=500, min_watch_seconds=1, status="rewarded")
+        old = AdRewardSession.objects.create(customer=c, provider="adivery", placement="sudoku", reward_points=500, min_watch_seconds=1)
+        AdRewardSession.objects.filter(pk=old.pk).update(create_time=now - timedelta(days=40))
+        for outcome in ("paid", "already", "refused"):
+            AdiveryCallbackAttempt.objects.create(method="GET", outcome=outcome, http_status=200)
+        r = self.ops(self.finance).get(O + "ads/daily/?days=7")
+        self.assertEqual(r.status_code, 200, r.content)
+        report = body(r)["report"]
+        self.assertEqual(len(report["days"]), 7)
+        today = report["days"][-1]
+        self.assertEqual(
+            {k: today[k] for k in ("started", "missions", "confirmed", "paid", "paid_unconfirmed", "coins", "players", "callbacks", "matched", "refused")},
+            {"started": 3, "missions": 1, "confirmed": 1, "paid": 2, "paid_unconfirmed": 1, "coins": 1200, "players": 1, "callbacks": 3, "matched": 2, "refused": 1},
+        )
+        self.assertEqual((report["total"]["started"], report["total"]["players"]), (3, 1))
+        # Only the money and settings roles see it.
+        self.assertEqual(self.ops(self.reviewer).get(O + "ads/daily/").status_code, 403)

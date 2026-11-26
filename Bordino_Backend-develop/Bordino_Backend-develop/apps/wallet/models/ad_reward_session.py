@@ -27,6 +27,10 @@ class AdRewardSession(AbstractBaseModel):
     # event id, each paid once) and when it came.
     external_event_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    # Adivery: the reference of ANOTHER player that the SDK on this phone held before this view (an
+    # account switch on one phone). The SDK loads the next ad right after a view, stamped with the
+    # player of that moment, so Adivery may confirm this view under the previous player's reference.
+    sdk_ref = models.CharField(max_length=100, blank=True, default="", db_index=True)
     activity_transaction = models.OneToOneField(
         "wallet.ActivityTransaction",
         on_delete=models.PROTECT,
