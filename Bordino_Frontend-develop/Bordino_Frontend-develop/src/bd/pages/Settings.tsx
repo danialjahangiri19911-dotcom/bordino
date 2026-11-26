@@ -294,11 +294,11 @@ const THEMES: [Appearance, string, string][] = [
 	["system", "مطابق دستگاه", "swatch-auto"],
 ];
 
-/** The design styles: neobrutalism (the default), neon (always dark), neumorphism. */
+/** The design styles: neumorphism (the default since 2026-11-26), neobrutalism, neon (always dark). */
 const STYLES: [BdStyle, string, string][] = [
+	["neu", "اسمورفی", "نرم و روشن؛ سایه‌های ملایم"],
 	["brutal", "ماجراجویانه", "پوستر قرمز؛ خط‌های پررنگ"],
 	["neon", "نئونی", "نبض بنفش؛ همیشه تیره"],
-	["neu", "اسمورفی", "نرم و روشن؛ سایه‌های ملایم"],
 ];
 
 export function AppearancePage() {

@@ -14,6 +14,7 @@ import { GlobalStyles } from "@libs/styles/GlobalStyles";
 import BackButton from "@/bd/BackButton";
 import { useApplyScheme } from "@/bd/appearance";
 import InstallPrompt from "@/bd/InstallPrompt";
+import { GameUseTracker } from "@/bd/gameUse";
 import { APP_HOME } from "@/constants/routes";
 import { useErrorListeners } from "@/libs/http/useErrorListeners";
 import ThemeProvider from "@/libs/styles/ThemeProvider";
@@ -61,6 +62,7 @@ function Layout({ children }: Readonly<Props>) {
 					{hydrated && isPwa ? <InstallPrompt /> : null}
 					{/* The Android app's Back button (does nothing in a browser). */}
 					{hydrated ? <BackButton /> : null}
+					{hydrated && isPwa ? <GameUseTracker /> : null}
 				</div>
 			</ThemeProvider>
 			<ToastContainer rtl position="top-center" theme={scheme === "dark" ? "dark" : "light"} />

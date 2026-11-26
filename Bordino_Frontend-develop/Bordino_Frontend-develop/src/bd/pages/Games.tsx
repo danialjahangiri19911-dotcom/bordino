@@ -10,6 +10,7 @@ import RewardOffer from "../ads/RewardOffer";
 import { usePlayableAdOffer } from "../ads/api";
 import { goBuyCoins } from "../entryFee";
 import { fa } from "../format";
+import { sortByUse, useGameUse } from "../gameUse";
 import { GAMES, type GameEntry } from "../games";
 import { useMissions } from "../missions/api";
 import type { MysteryCard, MysteryState } from "../missions/mystery";
@@ -91,7 +92,9 @@ export default function Games() {
 	const have = known ? Number(known.current_amount) : null;
 	const short = !!feeGame && have !== null && need > 0 && have < need;
 	const entry = feeGame && known ? { cost: need, kind: fee > 0 ? ("fee" as const) : ("bet" as const), balance: have } : null;
-	const shown = GAMES.filter((game) => group === "all" || game.group === group);
+	// The games this player opens most come first (counted on this device: gameUse.ts).
+	const use = useGameUse();
+	const shown = (use ? sortByUse(GAMES, use) : GAMES).filter((game) => group === "all" || game.group === group);
 	return (
 		<AppShell nav="games" title="گیمنت" headingExtra={<Balance />}>
 			<section className="ng-catalog">

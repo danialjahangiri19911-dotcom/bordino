@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import useThemeModeStore, { type Appearance, type BdStyle } from "@libs/uiHooks/useThemeModeStore";
+import useThemeModeStore, { type Appearance, type BdStyle, DEFAULT_STYLE } from "@libs/uiHooks/useThemeModeStore";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
@@ -12,7 +12,7 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
  * look. The design's colours switch on html[data-bd-scheme="dark"] (see bd.css) and the style on
  * html[data-bd-style] (themes.css). Neon is always dark.
  */
-export const APPEARANCE_SCRIPT = `(function(){try{var m="system",t="brutal";var s=localStorage.getItem("lt-theme-store");if(s){var v=JSON.parse(s);if(v&&v.state&&["light","dark","system"].indexOf(v.state.mode)>=0)m=v.state.mode;if(v&&v.state&&["brutal","neon","neu"].indexOf(v.state.style)>=0)t=v.state.style;}var d=t==="neon"||m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("${DARK_QUERY}").matches);var e=document.documentElement;e.setAttribute("data-bd-scheme",d?"dark":"light");e.setAttribute("data-bd-style",t);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`;
+export const APPEARANCE_SCRIPT = `(function(){try{var m="system",t="neu";var s=localStorage.getItem("lt-theme-store");if(s){var v=JSON.parse(s);if(v&&v.state&&["light","dark","system"].indexOf(v.state.mode)>=0)m=v.state.mode;if(v&&v.state&&["brutal","neon","neu"].indexOf(v.state.style)>=0)t=v.state.style;if(t==="brutal"&&!(v.version>=1))t="neu";}var d=t==="neon"||m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("${DARK_QUERY}").matches);var e=document.documentElement;e.setAttribute("data-bd-scheme",d?"dark":"light");e.setAttribute("data-bd-style",t);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`;
 
 /** The page background before and around the app, per style and scheme (the browser bar too). */
 const PAGE_COLOR: Record<BdStyle, { light: string; dark: string }> = {
@@ -32,20 +32,20 @@ function subscribeSystem(onChange: () => void) {
 	return () => query.removeEventListener("change", onChange);
 }
 
-export function resolveScheme(mode: Appearance, deviceDark: boolean, style: BdStyle = "brutal"): "light" | "dark" {
+export function resolveScheme(mode: Appearance, deviceDark: boolean, style: BdStyle = DEFAULT_STYLE): "light" | "dark" {
 	return style === "neon" || mode === "dark" || (mode === "system" && deviceDark) ? "dark" : "light";
 }
 
-const SERVER_STYLE = (): BdStyle => "brutal";
+const SERVER_STYLE = (): BdStyle => DEFAULT_STYLE;
 
 /**
- * The chosen style. The server renders the default (brutal), so the first client render matches
+ * The chosen style. The server renders the default (neumorphism), so the first client render matches
  * it and then switches (useSyncExternalStore), never a hydration mismatch.
  */
 export function useBdStyle(): BdStyle {
 	return useSyncExternalStore(
 		useThemeModeStore.subscribe,
-		() => useThemeModeStore.getState().style ?? "brutal",
+		() => useThemeModeStore.getState().style ?? DEFAULT_STYLE,
 		SERVER_STYLE,
 	);
 }

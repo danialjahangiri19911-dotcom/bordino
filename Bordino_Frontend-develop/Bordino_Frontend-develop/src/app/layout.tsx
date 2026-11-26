@@ -8,7 +8,7 @@ import { APPEARANCE_SCRIPT } from "@/bd/appearance";
 // The design's stylesheet first; app.css (production frame and additions) overrides it.
 import "@/bd/bd.css";
 import "@/bd/app.css";
-// The neon and neumorphism styles a player can pick (neobrutalism stays the default).
+// The neon and neumorphism styles a player can pick (neumorphism is the default since 2026-11-26).
 import "@/bd/themes.css";
 import Layout from "@/libs/components/layouts/Layout";
 

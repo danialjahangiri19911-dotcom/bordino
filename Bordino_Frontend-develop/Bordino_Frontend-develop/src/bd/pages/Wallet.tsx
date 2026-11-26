@@ -33,6 +33,8 @@ export default function Wallet() {
 	const recent = pointsHistory.rows.slice(0, 5);
 
 	const price = lottery ? Number(lottery.ticket_price) : null;
+	// «قرعه‌کشی‌ها» (and the ticket line) show only while a lottery is running (2026-11-26).
+	const lotteryRunning = !!lottery;
 	const progress = points.account && price ? Math.min(100, (Number(points.account.current_points) / price) * 100) : 0;
 
 	// The cash (toman) wallet is hidden for now (features.ts); its card stays here for later.
@@ -124,10 +126,12 @@ export default function Wallet() {
 							<strong className="rt-big">
 								{fa(points.points)} <small>سکه</small>
 							</strong>
-							<p>
-								{fa(points.account?.total_tickets ?? 0)} بلیت فعال
-								{price ? ` · هر بلیت ${fa(price)} سکه` : lotteriesLoaded ? " · قرعه‌کشی فعالی نیست" : ""}
-							</p>
+							{lotteryRunning ? (
+								<p>
+									{fa(points.account?.total_tickets ?? 0)} بلیت فعال
+									{price ? ` · هر بلیت ${fa(price)} سکه` : ""}
+								</p>
+							) : null}
 							{price ? (
 								<>
 									<div className="rt-track" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100} aria-label="پیشرفت تا بلیت بعدی">
@@ -147,16 +151,16 @@ export default function Wallet() {
 						</>
 					)}
 				</Panel>
-				{CASH_WALLET_VISIBLE ? cashPanel : lotteriesPanel}
+				{CASH_WALLET_VISIBLE ? cashPanel : lotteryRunning ? lotteriesPanel : historyPanel}
 			</div>
 			{CASH_WALLET_VISIBLE ? (
 				<div className="rt-two rt-gap-top">
-					{lotteriesPanel}
+					{lotteryRunning ? lotteriesPanel : null}
 					{historyPanel}
 				</div>
-			) : (
+			) : lotteryRunning ? (
 				<div className="rt-gap-top">{historyPanel}</div>
-			)}
+			) : null}
 		</AppShell>
 	);
 }

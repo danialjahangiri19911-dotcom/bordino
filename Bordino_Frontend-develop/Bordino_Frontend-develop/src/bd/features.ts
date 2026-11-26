@@ -10,3 +10,8 @@ export const CASH_WALLET_VISIBLE = false;
 /** The unit of a lottery or wheel prize: while the cash wallet is hidden, prizes are paid in coins
  * (1 coin = 1 toman, the server's CASH_PRIZES_AS_COINS), so the same number reads «سکه». */
 export const PRIZE_UNIT = CASH_WALLET_VISIBLE ? "تومان" : "سکه";
+
+/** The home dashboard (/pwa/main) is hidden for now (2026-11-26): it comes back with new content. Until
+ * then the app opens on «گیمنت», the «خانه» tab is gone and /pwa/main sends to the games. The page
+ * itself (bd/pages/Home.tsx) is kept: set this to true to show it again. */
+export const HOME_VISIBLE = false;

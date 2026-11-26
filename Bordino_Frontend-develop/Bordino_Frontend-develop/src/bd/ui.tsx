@@ -9,6 +9,7 @@ import Icon, { type IconName } from "./Icon";
 import { styleClass, useArt, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
+import { HOME_VISIBLE } from "./features";
 import { fa } from "./format";
 import { takePendingInvite, takePendingQr } from "./missions/pendingQr";
 import { reconcilePushOwner } from "./push";
@@ -20,7 +21,10 @@ import useUserStore from "@/libs/stores/userStore";
 
 export const R = {
 	landing: "/",
-	home: "/pwa/main",
+	/** Where the app opens and «home» leads: the dashboard, or «گیمنت» while it is hidden (features.ts). */
+	home: HOME_VISIBLE ? "/pwa/main" : "/pwa/gameNet",
+	/** The home dashboard itself. */
+	dashboard: "/pwa/main",
 	games: "/pwa/gameNet",
 	earn: "/pwa/earn",
 	earnQr: (token: string) => `/pwa/earn/qr/${token}`,
@@ -65,7 +69,7 @@ export const R = {
 type NavKey = "home" | "games" | "earn" | "wallet" | "profile";
 
 const NAV: { key: NavKey; icon: IconName; label: string; href: string }[] = [
-	{ key: "home", icon: "house", label: "خانه", href: R.home },
+	...(HOME_VISIBLE ? [{ key: "home" as const, icon: "house" as const, label: "خانه", href: R.dashboard }] : []),
 	{ key: "games", icon: "gamepad-2", label: "گیمنت", href: R.games },
 	{ key: "earn", icon: "coins", label: "دریافت سکه", href: R.earn },
 	{ key: "wallet", icon: "wallet", label: "کیف‌پول", href: R.wallet },
@@ -258,7 +262,7 @@ function SignedInShell({
 							key={item.key}
 							href={item.href}
 							className="bd-nav-item"
-							aria-current={item.key === nav ? "page" : undefined}
+							aria-current={item.key === (nav === "home" && !HOME_VISIBLE ? "games" : nav) ? "page" : undefined}
 						>
 							<Icon name={item.icon} />
 							{item.label}
@@ -543,7 +547,7 @@ export function useNavFromPath(): NavKey {
 	if (path.startsWith(R.profile) || path.startsWith(R.rules)) return "profile";
 	if (path.startsWith(R.games)) return "games";
 	if (path.startsWith(R.earn)) return "earn";
-	return "home";
+	return HOME_VISIBLE ? "home" : "games";
 }
 
 /** Copies `text` (the Clipboard API on https, the old select-and-copy way elsewhere) and says so. */
