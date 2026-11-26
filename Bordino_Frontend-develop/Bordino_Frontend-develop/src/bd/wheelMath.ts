@@ -7,6 +7,19 @@ export function prizeLabel(amount: number, type: WheelPrize["prize_type"]) {
 	return `${fa(amount)} ${type === "cash" ? PRIZE_UNIT : "سکه"}`;
 }
 
+/** The chance (0–100) that a spin pays nothing: the share of the wheel its «پوچ» slices take (the
+ * slices are drawn at their real chances). */
+export function emptyChance(slices: Pick<Slice, "prize" | "start" | "end">[]): number {
+	return (slices.filter((s) => s.prize.prize_type === "empty").reduce((sum, s) => sum + (s.end - s.start), 0) / 360) * 100;
+}
+
+/** «۲۵٪», «کمتر از ۱٪», «۰٪»: a chance as the player reads it. */
+export function chanceText(pct: number): string {
+	if (pct <= 0) return "۰٪";
+	if (pct < 1) return "کمتر از ۱٪";
+	return `${fa(Math.round(pct))}٪`;
+}
+
 /** What a prize pays at multiplier M and bet scale (bet / cost_per_spin), rounded down as the server does. */
 export function paid(prize: WheelPrize, M = 1, scale = 1): number {
 	return Math.floor(Number(prize.prize_amount || 0) * M * scale + 1e-9);

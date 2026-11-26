@@ -14,7 +14,7 @@ import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { fa } from "../format";
 import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
 import { R, usePoints, useRequireLogin } from "../ui";
-import { type Slice, labelPoint, landingRotation, prizeLabel, sliceAt, slicesFor, spinEasing, wedgePath } from "../wheelMath";
+import { type Slice, chanceText, emptyChance, labelPoint, landingRotation, prizeLabel, sliceAt, slicesFor, spinEasing, wedgePath } from "../wheelMath";
 import { type Soundtrack, createSoundtrack } from "./soundtrack";
 import "./wheel.css";
 
@@ -37,6 +37,24 @@ interface Outcome {
 	text: string;
 	short: string;
 	slice: number | null;
+	/** The spin's coins (product review 2026-11-26): what it took, and what it paid into the coins
+	 * (null: the server's answer did not say; a toman prize to the cash wallet is not coins). */
+	spent: number;
+	received: number | null;
+}
+
+/** Under a spin's result: what it took, what it paid, and the change to the coins. */
+function SpinCoins({ outcome }: { outcome: Outcome }) {
+	const { spent, received } = outcome;
+	if (received === null) return <small className="wh-net">خرج این چرخش: {fa(spent)} سکه</small>;
+	const net = received - spent;
+	const sign = net > 0 ? "+" : net < 0 ? "−" : "";
+	return (
+		<small className="wh-net" data-net={net > 0 ? "up" : net < 0 ? "down" : "even"}>
+			خرج {fa(spent)} · برد {fa(received)} ·{" "}
+			<b>{net === 0 ? "بدون تغییر" : <><bdi dir="ltr">{`${sign}${fa(Math.abs(net))}`}</bdi> سکه</>}</b>
+		</small>
+	);
 }
 
 const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -248,15 +266,21 @@ export default function WheelGame() {
 			const empty = !won || won.prize_type === "empty" || amount <= 0;
 			// A slice to land on: the prize's, if this page draws it at all (a 0% slice has no room).
 			const index = won ? snapshot.findIndex((s) => s.prize.id === won.id && s.end - s.start > 0) : -1;
+			// Coins in and out: the bet charged (none on a free wheel), and a prize paid as coins (a toman
+			// prize goes to the cash wallet only while that wallet is shown; otherwise it is coins 1:1).
+			const spent = free ? 0 : bet;
+			const received = !won ? null : empty ? 0 : won.prize_type === "recharge" || !CASH_WALLET_VISIBLE ? amount : 0;
 			const result: Outcome = !won
-				? { won: false, text: "نتیجه رسید؛ کیف‌پول را ببین.", short: "؟", slice: null }
+				? { won: false, text: "نتیجه رسید؛ کیف‌پول را ببین.", short: "؟", slice: null, spent, received }
 				: empty
-					? { won: false, text: "", short: "پوچ", slice: index < 0 ? null : index }
+					? { won: false, text: "", short: "پوچ", slice: index < 0 ? null : index, spent, received }
 					: {
 							won: true,
 							text: prizeLabel(amount, won.prize_type),
 							short: `${fa(amount)}${won.prize_type === "cash" && CASH_WALLET_VISIBLE ? " ت" : ""}`,
 							slice: index < 0 ? null : index,
+							spent,
+							received,
 						};
 			if (index < 0) {
 				// A prize this page does not know or draw (the wheel changed): shown as it is, no landing.
@@ -457,6 +481,7 @@ export default function WheelGame() {
 							<div className="wh-result" role="status" aria-live="polite">
 								<span>{resultLabel}</span>
 								<strong>{resultText}</strong>
+								{!spinning && phase === "result" && outcome ? <SpinCoins outcome={outcome} /> : null}
 							</div>
 							<section className="wh-controls" aria-label="کنترل گردونه">
 								<div className="wh-cost" hidden={free}>
@@ -496,6 +521,9 @@ export default function WheelGame() {
 									<Icon name={spinning ? "loader-circle" : "rotate-cw"} className={requesting ? "bd-spin" : undefined} />
 									<span>{spinning ? "داره می‌چرخه…" : "بگردون"}</span>
 								</button>
+								<p className="wh-odds">
+									{free ? "چرخش رایگان" : `این چرخش ${fa(cost)} سکه از کیف کم می‌کند`}؛ احتمال پوچ (بدون جایزه): {chanceText(emptyChance(live))}
+								</p>
 								<p className="wh-error" role="alert" hidden={!error && !betProblem && (points.points === null || enough || spinning)}>
 									{error ?? betProblem ?? `سکهٔ کافی نیست؛ شرط این چرخش ${fa(cost)} سکه است.`}
 								</p>

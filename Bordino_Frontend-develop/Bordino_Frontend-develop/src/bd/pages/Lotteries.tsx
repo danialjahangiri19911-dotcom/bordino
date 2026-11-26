@@ -66,15 +66,22 @@ export default function Lotteries() {
 							))}
 						</div>
 					) : (
-						<EmptyState
-							title="قرعه‌کشی فعالی نیست"
-							text="دورهٔ بعدی به‌زودی اعلام می‌شود."
-							action={
-								<Link className="bd-secondary" href={R.lotteryGuide}>
-									راهنمای قرعه‌کشی
-								</Link>
-							}
-						/>
+						// A compact status card, not a big empty page (product review 2026-11-26).
+						<div className="bd-lottery-idle" role="status">
+							<Icon name="ticket" />
+							<div>
+								<b>الان قرعه‌کشی فعالی نیست</b>
+								<small>دورهٔ بعدی به‌زودی اعلام می‌شود؛ تا آن موقع می‌توانی نتیجهٔ دوره‌های گذشته را ببینی.</small>
+								<div className="bd-actions">
+									<button type="button" className="bd-secondary" onClick={() => setTab("ended")}>
+										دوره‌های گذشته
+									</button>
+									<Link className="bd-text-btn" href={R.lotteryGuide}>
+										راهنمای قرعه‌کشی
+									</Link>
+								</div>
+							</div>
+						</div>
 					)
 				) : past.isLoading || past.isError ? (
 					<LoadState loading={past.isLoading} error={past.error} onRetry={() => past.refetch()} />
