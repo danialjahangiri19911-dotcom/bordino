@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
-import { type AdOffer, type AdSession, LATE_CONFIRMATION, awaitingConfirmation, claimAd, startAd } from "./api";
+import { type AdOffer, type AdSession, LATE_CONFIRMATION, awaitingConfirmation, claimAd, startAd, traceClaim } from "./api";
 import { AD_PLAYERS } from "./players";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -64,12 +64,15 @@ export default function RewardOffer({ offer, gameName, placement, onPlay, onCanc
 
 	const claim = async (session: AdSession) => {
 		setStep({ kind: "claiming", session });
+		const started = Date.now();
 		try {
 			const result = await claimAd(session.session_id);
+			traceClaim(session.session_id, started, { points: result.reward_points, already: result.already_rewarded });
 			// Balances everywhere (header, wallet) show the new points.
 			void queryClient.invalidateQueries();
 			setStep({ kind: "rewarded", points: result.reward_points });
 		} catch (e) {
+			traceClaim(session.session_id, started, null, e);
 			setStep(awaitingConfirmation(e) ? { kind: "late" } : { kind: "failed", message: gameErrorMessage(e) });
 		}
 	};

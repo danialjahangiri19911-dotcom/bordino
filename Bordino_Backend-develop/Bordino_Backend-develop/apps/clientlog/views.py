@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from apps.clientlog import services
 from apps.ops.auth import role_permission
 
-FLOWS = {"profile_photo", "mission_photo"}
+FLOWS = {"profile_photo", "mission_photo", "rewarded_ad"}
 
 
 class LogThrottle(UserRateThrottle):

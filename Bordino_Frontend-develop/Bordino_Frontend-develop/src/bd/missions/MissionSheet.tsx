@@ -4,7 +4,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
 import Icon from "../Icon";
 import { APK_URL } from "../BackButton";
-import { LATE_CONFIRMATION, awaitingConfirmation, usePlayableAdOffer } from "../ads/api";
+import { LATE_CONFIRMATION, awaitingConfirmation, traceClaim, usePlayableAdOffer } from "../ads/api";
 import { AD_PLAYERS } from "../ads/players";
 import { useBackHandler } from "../back";
 import { fa } from "../format";
@@ -153,12 +153,17 @@ export default function MissionSheet({ mission, onClose, onChanged }: { mission:
 		setProblem(null);
 		setLate(false);
 		setStep({ kind: "busy" });
+		// (a video's view id: its trace in «ردیابی برنامه»)
+		const view = m.kind === "video" ? videoAd(m.attempt?.ad)?.session_id : undefined;
+		const started = Date.now();
 		try {
 			const reward = await claimMission(attemptId);
+			traceClaim(view, started, { points: reward.points });
 			void queryClient.invalidateQueries();
 			update(reward.mission);
 			setStep({ kind: "rewarded", points: reward.points });
 		} catch (e) {
+			traceClaim(view, started, null, e);
 			if (awaitingConfirmation(e)) setLate(true);
 			else setProblem(gameErrorMessage(e));
 			setStep({ kind: "idle" });

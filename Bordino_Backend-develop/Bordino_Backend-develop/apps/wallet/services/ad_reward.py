@@ -193,7 +193,7 @@ def start(customer: Customer, placement: str, points: int | None = None, sdk_ref
     held = str(sdk_ref or "").strip()[:100]
     if held and (p.name != AdiveryProvider.name or held == player_ref(customer) or _player_from_ref(held) is None):
         held = ""
-    return AdRewardSession.objects.create(
+    session = AdRewardSession.objects.create(
         customer=customer,
         provider=p.name,
         placement=(placement or "")[:50],
@@ -201,6 +201,16 @@ def start(customer: Customer, placement: str, points: int | None = None, sdk_ref
         min_watch_seconds=p.watch_seconds(),
         sdk_ref=held,
     )
+    _trace(session, "server_view_started", placement=session.placement, provider=p.name, account_switch=bool(held))
+    return session
+
+
+def _trace(session: AdRewardSession, step: str, **data):
+    """A step of this view in «ردیابی برنامه» (flow rewarded_ad, attempt = the view's id — the app's own
+    steps of the view carry the same id)."""
+    from apps.clientlog.services import record  # pylint: disable=import-outside-toplevel  (never raises)
+
+    record(getattr(session.customer, "user", None), "rewarded_ad", step, attempt=str(session.pk), data=data)
 
 
 @dataclass
@@ -249,6 +259,7 @@ def complete(customer: Customer, session_id, evidence: dict | None = None, missi
         session.status = AdRewardSession.Status.REWARDED
         session.completed_at = timezone.now()
         session.save(update_fields=["activity_transaction", "status", "completed_at", "update_time"])
+        _trace(session, "server_paid", coins=session.reward_points, confirmed_by_adivery=session.verified_at is not None)
         return Claim(session, already=False)
 
 
@@ -397,6 +408,14 @@ def adivery_callback(secret: str, uid: str, pid: str, eid: str) -> Callback:
             session.external_event_id = f"{eid}~{session.pk.hex[:8]}" if reused else eid
             session.verified_at = timezone.now()
             session.save(update_fields=["external_event_id", "verified_at", "update_time"])
+            _trace(
+                session,
+                "adivery_confirmed",
+                event=str(eid)[:40],
+                reused_event=reused,
+                previous_player_ref=player is not None and session.customer_id != player.pk,
+                seconds_after_start=round((session.verified_at - session.create_time).total_seconds()),
+            )
         customer = session.customer
         mission_attempt = getattr(session, "mission_attempt", None) if session.placement.startswith("mission:") else None
     # Paid as the app would claim it (each path pays once and keeps its own limits).

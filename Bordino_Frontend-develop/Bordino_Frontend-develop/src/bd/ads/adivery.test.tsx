@@ -4,6 +4,9 @@ import { type Root, createRoot } from "react-dom/client";
 import AdiveryAd from "./AdiveryAd";
 import { sdkHint, untilConfirmed } from "./api";
 import { markSdkUser } from "./native";
+import { trace } from "../trace";
+
+jest.mock("../trace", () => ({ trace: jest.fn() }));
 import { AxiosError, type AxiosResponse } from "axios";
 
 jest.mock("../back", () => ({ useBackHandler: () => undefined }));
@@ -59,13 +62,19 @@ describe("AdiveryAd", () => {
 		expect(onAbort).not.toHaveBeenCalled();
 	});
 
-	it("a closed-early view asks nothing", async () => {
+	it("a closed-early view asks nothing and says why", async () => {
 		plugin(jest.fn().mockResolvedValue({ rewarded: false }));
 		const onWatched = jest.fn();
 		const onAbort = jest.fn();
 		await act(async () => root.render(<AdiveryAd session={session} onWatched={onWatched} onAbort={onAbort} />));
 		expect(onWatched).not.toHaveBeenCalled();
+		// Said, not dropped: the player closes the note.
+		expect(onAbort).not.toHaveBeenCalled();
+		expect(host.textContent).toContain("سکه‌ای اضافه نشد");
+		await act(async () => [...host.querySelectorAll("button")].find((b) => b.textContent === "باشه")?.click());
 		expect(onAbort).toHaveBeenCalledTimes(1);
+		const steps = (trace as jest.Mock).mock.calls.filter((c) => c[1] === "s-1").map((c) => c[2]);
+		expect(steps).toEqual(expect.arrayContaining(["show_asked", "closed_not_rewarded"]));
 	});
 
 	it("no ad to show: says so", async () => {

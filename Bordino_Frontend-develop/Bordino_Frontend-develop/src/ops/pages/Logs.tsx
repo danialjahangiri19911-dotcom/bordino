@@ -20,7 +20,7 @@ interface Log {
 	user_agent: string;
 }
 
-const FLOW: Record<string, string> = { profile_photo: "عکس پروفایل", mission_photo: "عکس مأموریت" };
+const FLOW: Record<string, string> = { profile_photo: "عکس پروفایل", mission_photo: "عکس مأموریت", rewarded_ad: "ویدیوی جایزه‌دار" };
 
 /** «ردیابی»: what a player's phone (and the server) did, step by step, in a traced flow — newest first. */
 export function LogsPage() {

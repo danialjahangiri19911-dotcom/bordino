@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { trace } from "../trace";
 import { heldSdkUser, inAndroidApp, sdkHoldsUser, useAdsPlugin } from "./native";
 import axios from "axios";
 
@@ -104,6 +105,15 @@ export const startAd = (placement: string) => call<AdSession>("post", SESSIONS, 
 export function sdkHint(): { sdk_ref?: string } {
 	const held = heldSdkUser();
 	return held ? { sdk_ref: held } : {};
+}
+
+/** How the app's request for a watched view's coins ended, in that view's trace. */
+export function traceClaim(sessionId: string | undefined, started: number, result: { points?: number; already?: boolean } | null, error?: unknown) {
+	if (!sessionId) return;
+	const after_ms = Date.now() - started;
+	if (result) trace("rewarded_ad", sessionId, "claim_paid", { after_ms, ...result });
+	else if (awaitingConfirmation(error)) trace("rewarded_ad", sessionId, "claim_gave_up_waiting", { after_ms }, "error");
+	else trace("rewarded_ad", sessionId, "claim_refused", { after_ms, error: axios.isAxiosError(error) ? error.response?.status ?? "network" : String(error).slice(0, 120) }, "error");
 }
 
 /** The app stopped waiting, Adivery's confirmation had not come yet: it still pays when it comes. */

@@ -387,6 +387,17 @@ class AdiveryPlayerRefTests(TestCase):
         attempt.refresh_from_db()
         self.assertEqual((attempt.status, self.points(b_user), self.points()), (MissionAttempt.Status.COMPLETED, 12, 0))
 
+    def test_each_view_is_traced_under_its_id_for_the_admin_app(self):
+        from apps.clientlog.models import ClientLog  # pylint: disable=import-outside-toplevel
+
+        view = ad_reward.start(self.customer, "sudoku")
+        self._aged(view, 30)
+        self.callback(ad_reward.player_ref(self.customer), "ev-trace")
+        steps = list(ClientLog.objects.filter(flow="rewarded_ad", attempt=str(view.pk)).order_by("create_time").values_list("step", flat=True))
+        self.assertEqual(steps, ["server_view_started", "adivery_confirmed", "server_paid"])
+        confirmed = ClientLog.objects.get(flow="rewarded_ad", attempt=str(view.pk), step="adivery_confirmed")
+        self.assertEqual((confirmed.phone, confirmed.data["seconds_after_start"]), ("9120009101", 30))
+
     def test_a_hint_that_is_not_another_real_player_is_dropped(self):
         own = ad_reward.player_ref(self.customer)
         forged = own[:-1] + ("0" if own[-1] != "0" else "1")

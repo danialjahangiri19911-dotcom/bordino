@@ -8,7 +8,7 @@ import { withAuth } from "@/libs/http/query";
 import useAuthStore from "@libs/stores/authStore";
 import requester from "@/libs/http/requester";
 
-type Flow = "profile_photo" | "mission_photo";
+type Flow = "profile_photo" | "mission_photo" | "rewarded_ad";
 type Event = { step: string; level: "info" | "error"; data: Record<string, unknown>; at: string };
 
 const queues = new Map<string, { flow: Flow; attempt: string; events: Event[]; envSent: boolean }>();
