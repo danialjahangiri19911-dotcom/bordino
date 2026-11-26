@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { entryFeeText, useEntryFee } from "../entryFee";
+import { tagCost } from "../gamePrices";
 import { installLucideShim } from "../dowr/lucide";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type SpyConfig, useSpyConfig } from "./api";
@@ -233,6 +234,8 @@ export default function SpyGame() {
 						}
 						if (note.textContent !== entryFeeText(fee)) note.textContent = entryFeeText(fee);
 					} else if (note && (!fee || !hero)) note.remove();
+					// The start buttons repeat the exact cost (product review 2026-11-26).
+					root.querySelectorAll('[data-a="start"], [data-a="next-round"]').forEach((b) => tagCost(b, fee));
 					persianSeparators(root);
 					// The design's note «this design version has N sample word pairs» is about the
 					// prototype, not the app (whose bank Bordino keeps growing): not shown.

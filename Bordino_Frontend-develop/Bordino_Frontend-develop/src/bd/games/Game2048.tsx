@@ -8,6 +8,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
+import { withCost } from "../gamePrices";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { EntryFeeNote, askBuyCoins } from "../entryFee";
@@ -304,7 +305,7 @@ function View() {
 										<div className="g48-dialog-actions">
 											<>
 													<button type="button" className="g48-primary" disabled={game.isCharging} onClick={() => void start()}>
-														{game.isCharging ? "در حال شروع…" : modal === "reset" ? "شروع دوباره" : modal === "ready" ? "شروع بازی" : "بازی تازه"}
+														{game.isCharging ? "در حال شروع…" : withCost(modal === "reset" ? "شروع دوباره" : modal === "ready" ? "شروع بازی" : "بازی تازه", playCost)}
 													</button>
 													{modal === "reset" ? (
 														<button type="button" className="g48-secondary" onClick={() => setConfirm("")}>

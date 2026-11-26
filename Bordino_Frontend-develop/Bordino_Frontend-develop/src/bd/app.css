@@ -902,3 +902,10 @@ body { margin: 0; }
 #bordino-directions .ops-log-steps { margin: 0; padding: 0 18px 0 0; display: grid; gap: 8px; }
 #bordino-directions .ops-log-steps li[data-level="error"] b { color: var(--bd-accent); }
 #bordino-directions .ops-log-steps pre { margin: 4px 0 0; padding: 8px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; background: var(--bd-bg); border-radius: 8px; max-height: 220px; overflow: auto; }
+
+/* 2026-11-26 product review: a game card says what it costs and what it pays before it opens. */
+#bordino-directions .ng-game-price { display: flex; flex-direction: column; gap: 2px; padding: 0 12px 10px; min-height: 34px; }
+#bordino-directions .ng-game-price .ng-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--bd-fg); }
+#bordino-directions .ng-game-price .ng-cost svg { width: 14px; height: 14px; flex: none; color: var(--bd-accent, currentColor); }
+#bordino-directions .ng-game-price small { font-size: 11px; color: var(--bd-muted); }
+@media (max-width: 750px) { #bordino-directions .ng-game-price { padding: 0 9px 9px; } }

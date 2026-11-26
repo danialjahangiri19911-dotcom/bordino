@@ -10,6 +10,7 @@ import RewardOffer from "../ads/RewardOffer";
 import { usePlayableAdOffer } from "../ads/api";
 import { goBuyCoins } from "../entryFee";
 import { fa } from "../format";
+import { priceLines, useGamePrices } from "../gamePrices";
 import { sortByUse, useGameUse } from "../gameUse";
 import { GAMES, type GameEntry } from "../games";
 import { useMissions } from "../missions/api";
@@ -69,6 +70,23 @@ function Cover({ game }: { game: GameEntry }) {
 
 type Group = "all" | GameEntry["group"] | "city";
 
+/** What a screen reader says for a card: the game, then its cost and what it pays. */
+const cardLabel = (game: GameEntry, lines: { cost: string; pays: string } | null) =>
+	lines ? `${game.pays === "free" ? "" : "بازی "}${game.name}، ${lines.cost}، ${lines.pays}` : `بازی ${game.name}`;
+
+/** Under a card's name: the cost (a coin chip) and what playing does to the coins. */
+function PriceLines({ lines }: { lines: { cost: string; pays: string } | null }) {
+	if (!lines) return <div className="ng-game-price" aria-hidden="true" />;
+	return (
+		<div className="ng-game-price">
+			<span className="ng-cost">
+				<Icon name="coins" /> {lines.cost}
+			</span>
+			<small>{lines.pays}</small>
+		</div>
+	);
+}
+
 export default function Games() {
 	const [group, setGroup] = useState<Group>("all");
 	// «معمای شهری»: hunts at real places (the mystery list comes with the missions).
@@ -94,6 +112,8 @@ export default function Games() {
 	const entry = feeGame && known ? { cost: need, kind: fee > 0 ? ("fee" as const) : ("bet" as const), balance: have } : null;
 	// The games this player opens most come first (counted on this device: gameUse.ts).
 	const use = useGameUse();
+	// What each game costs and pays, from the server (shown on the cards before a game opens).
+	const prices = useGamePrices().data?.result?.games;
 	const shown = (use ? sortByUse(GAMES, use) : GAMES).filter((game) => group === "all" || game.group === group);
 	return (
 		<AppShell nav="games" title="گیمنت" headingExtra={<Balance />}>
@@ -112,6 +132,7 @@ export default function Games() {
 						["puzzle", "فکری"],
 						["arcade", "آرکید"],
 						["party", "دورهمی"],
+						["fal", "فال"],
 						...(mysteries.length ? ([["city", "معمای شهری"]] as [Group, string][]) : []),
 					]}
 				/>
@@ -122,10 +143,10 @@ export default function Games() {
 							href={game.href}
 							className="ng-game"
 							data-game={game.id}
-							aria-label={`بازی ${game.name}`}
+							aria-label={cardLabel(game, priceLines(game, game.price ? prices?.[game.price] : undefined))}
 							onClick={(event) => {
 								// A plain tap with an offer available: the offer first, then the game.
-								if (!offer?.available || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+								if (!offer?.available || game.pays === "free" || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
 								event.preventDefault();
 								setPicked(game);
 							}}
@@ -137,6 +158,7 @@ export default function Games() {
 								<b>{game.name}</b>
 								<small>{game.tag}</small>
 							</div>
+							<PriceLines lines={priceLines(game, game.price ? prices?.[game.price] : undefined)} />
 						</Link>
 					))}
 					{group === "all" || group === "city"

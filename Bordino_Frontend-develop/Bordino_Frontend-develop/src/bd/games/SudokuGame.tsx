@@ -8,6 +8,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
+import { withCost } from "../gamePrices";
 import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
 import { EntryFeeNote, askBuyCoins } from "../entryFee";
@@ -470,7 +471,7 @@ export default function SudokuGame() {
 													))}
 												</div>
 												<button type="button" className="sd-primary" disabled={isCharging || game.isLoadingConfig} onClick={() => { interacted.current = true; void start(level); }}>
-													{isCharging || game.isLoadingConfig ? "در حال شروع…" : `شروع بازی · ${label(level)}`}
+													{isCharging || game.isLoadingConfig ? "در حال شروع…" : withCost(`شروع بازی · ${label(level)}`, playCost)}
 												</button>
 											</>
 										) : modal === "pause" ? (

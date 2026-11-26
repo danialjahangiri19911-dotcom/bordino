@@ -12,6 +12,7 @@ import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../b
 import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
+import { withCost } from "../gamePrices";
 import { R, useRequireLogin } from "../ui";
 import "./crash.css";
 import { type AutoRun, type CrashForm, DEFAULT_FORM, afterAutoRound, autoCashout, num, plot, validate } from "./logic";
@@ -290,7 +291,8 @@ export default function CrashGame() {
 
 	// ── the main button ──
 	let main: { label: string; disabled: boolean; cash?: boolean; run: () => void } = {
-		label: mode === "auto" ? "شروع دورهای خودکار" : "شروع دور",
+		// The exact stake on the button (product review 2026-11-26): what this round takes from the coins.
+		label: mode === "auto" ? withCost("شروع دورهای خودکار", num(form.stake)) : withCost("شروع دور", num(form.stake)),
 		disabled: !config || !!problem || busy || !online || game.loading,
 		run: () => (mode === "auto" ? void startAuto() : void bet(num(form.stake), false)),
 	};

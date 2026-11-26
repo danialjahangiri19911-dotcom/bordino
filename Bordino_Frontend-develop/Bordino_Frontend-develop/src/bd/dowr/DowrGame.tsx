@@ -10,6 +10,7 @@ import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import GameSettings from "../GameSettings";
 import { entryFeeText, useEntryFee } from "../entryFee";
+import { tagCost } from "../gamePrices";
 import { fa } from "../format";
 import { EmptyState, LoadState, R, useRequireLogin } from "../ui";
 import { type DowrConfig, type DowrResult, report, saveGame, useDowrConfig, useDowrHistory } from "./api";
@@ -285,6 +286,8 @@ export default function DowrGame() {
 						}
 						if (note.textContent !== entryFeeText(fee)) note.textContent = entryFeeText(fee);
 					} else if (note && !fee) note.remove();
+					// The start button repeats the exact cost (product review 2026-11-26).
+					root.querySelectorAll('[data-act="start"]').forEach((b) => tagCost(b, fee));
 					chosen = readChosen(root) ?? chosen;
 					blockStart(root, !playable(now));
 					polishTeams(root);

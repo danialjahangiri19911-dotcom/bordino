@@ -530,7 +530,7 @@ export default function ChickenGame() {
 										<Icon name={active ? "arrow-left" : finished ? "rotate-ccw" : "play"} />
 										<span className="ck-action-label">{loadFailed ? "تلاش دوباره" : active ? "پرش" : finished ? "دور تازه" : game.busy ? "…" : "شروع"}</span>
 									</button>
-									<small className="ck-action-caption">{active ? `خط بعدی ${fa(view.lane + 1)}` : "شروع از پیاده‌رو"}</small>
+									<small className="ck-action-caption">{active ? `خط بعدی ${fa(view.lane + 1)}` : !finished && !amountError && Number.isInteger(amount) && amount > 0 ? `شرط ${fa(amount)} سکه` : "شروع از پیاده‌رو"}</small>
 								</div>
 								<div className="ck-settings">
 									<div className="ck-setting">

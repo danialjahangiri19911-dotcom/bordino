@@ -15,7 +15,7 @@ export function Hafez() {
 	const { fortune, loading, error, fetchFortune } = useGetFortuneReading();
 	const poem = fortune ? parseHafezResult(fortune.result) : null;
 	return (
-		<AppShell nav="home" title="فال حافظ">
+		<AppShell nav="games" title="فال حافظ">
 			<div className="rt-game-layout">
 				<div className="rt-book bi-literary">
 					<Art name="hafez" />
@@ -76,7 +76,7 @@ export function Tarot() {
 	};
 	const card = open !== null ? cards?.[open] : null;
 	return (
-		<AppShell nav="home" title="فال تاروت">
+		<AppShell nav="games" title="فال تاروت">
 			<div className="rt-tarot-stage">
 				<Art name="tarot" />
 				<Chips

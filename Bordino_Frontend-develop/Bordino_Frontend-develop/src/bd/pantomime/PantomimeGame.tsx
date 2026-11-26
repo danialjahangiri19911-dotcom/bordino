@@ -11,6 +11,7 @@ import { GameBar } from "../autoHide";
 import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
 import { EntryFeeNote, useEntryFee } from "../entryFee";
 import { fa, faDate } from "../format";
+import { withCost } from "../gamePrices";
 import { ICONS } from "../icons";
 import { R, useRequireLogin } from "../ui";
 import { type PantomimeConfig, type Topic, gameReport, saveGame, usePantomimeConfig, useRecentGames } from "./api";
@@ -782,7 +783,7 @@ export default function PantomimeGame() {
 				</p>
 				{button(
 					<>
-						شروع بازی <Icon name="arrow-right" />
+						{withCost("شروع بازی", entry.fee)} <Icon name="arrow-right" />
 					</>,
 					"start",
 					startPaidGame,
@@ -1257,7 +1258,7 @@ export default function PantomimeGame() {
 					</div>
 					{button(
 						<>
-							یه دست دیگه <Icon name="rotate-ccw" />
+							{withCost("یه دست دیگه", entry.fee)} <Icon name="rotate-ccw" />
 						</>,
 						"rematch",
 						startPaidGame,
