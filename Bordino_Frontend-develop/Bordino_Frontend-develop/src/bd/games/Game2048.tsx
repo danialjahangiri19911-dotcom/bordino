@@ -10,7 +10,7 @@ import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { withCost } from "../gamePrices";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { EntryFeeNote, askBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -65,7 +65,7 @@ function View() {
 		askLeave(
 			{
 				title: "از بازی خارج می‌شوی؟",
-				text: "بازی روی همین دستگاه نگه داشته می‌شود و هر وقت برگردی ادامه دارد.",
+				text: "بازی روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی از همین صفحه ادامه می‌دهی و ورودی دوباره کم نمی‌شود.",
 				yes: "خروج",
 				no: "ادامهٔ بازی",
 			},
@@ -74,11 +74,11 @@ function View() {
 				push(R.games);
 			},
 		);
-	const quit = () =>
-		askLeave(PLAIN_LEAVE, () => {
-			music.current?.stop();
-			push(R.games);
-		});
+	// Nothing at stake (no game running): leave at once (product review 2026-11-26, the owner's choice).
+	const quit = () => {
+		music.current?.stop();
+		push(R.games);
+	};
 	useBackHandler(true, () => (game.isCharging ? undefined : confirm ? setConfirm("") : playing ? askExit() : quit()));
 	const modal: "" | "ready" | "win" | "lost" | Confirm = confirm || (game.needsStart ? "ready" : game.status === "won" ? "win" : game.status === "lost" ? "lost" : "");
 	// A tap outside a question answers «stay» (its second button); start, win and loss need a choice.

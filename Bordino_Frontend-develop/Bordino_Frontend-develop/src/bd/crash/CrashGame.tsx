@@ -8,7 +8,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { fa } from "../format";
@@ -346,7 +346,8 @@ export default function CrashGame() {
 			},
 			leave,
 		);
-	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? askExit() : askLeave(PLAIN_LEAVE, leave)));
+	// Nothing in the air: leave at once (product review 2026-11-26).
+	useBackHandler(true, () => (panel ? setPanel("") : inPlay ? askExit() : leave()));
 	useBrowserBackGuard(inPlay, askExit);
 	const panelBox = useRef<HTMLElement>(null);
 	useDismissOutside(!!panel, panelBox, () => setPanel(""));
@@ -437,7 +438,7 @@ export default function CrashGame() {
 						<button type="button" className="cr-icon" aria-label="اطلاعات بازی" aria-expanded={panel === "help"} onClick={() => setPanel(panel === "help" ? "" : "help")}>
 							<Icon name="circle-help" />
 						</button>
-						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? askExit() : askLeave(PLAIN_LEAVE, leave))}>
+						<button type="button" className="cr-icon" aria-label="خروج از بازی" onClick={() => (inPlay ? askExit() : leave())}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>

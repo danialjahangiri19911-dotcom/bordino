@@ -9,6 +9,7 @@ import Icon from "../Icon";
 import { normalizePhone } from "../format";
 import { useArt } from "../appearance";
 import { AuthShell, R } from "../ui";
+import { takeDestination } from "../afterLogin";
 
 import { authErrorMessage } from "@/api/login/errorMessage";
 import useResendOtp from "@/api/login/hooks/useResendOtp";
@@ -29,7 +30,7 @@ export default function Login() {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (isLoggedIn) replace(R.home);
+		if (isLoggedIn) replace(takeDestination() ?? R.home);
 	}, [isLoggedIn, replace]);
 
 	const { submitHandler, isSending } = useMutate<RegisterApiDataResponse, { phone_number: string }>({

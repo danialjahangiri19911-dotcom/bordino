@@ -8,7 +8,7 @@ import Icon, { type IconName } from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import { EntryFeeNote, useEntryFee } from "../entryFee";
 import { fa, faDate } from "../format";
 import { withCost } from "../gamePrices";
@@ -31,7 +31,7 @@ const LEVELS = ["ترکیبی", "آسان", "متوسط", "سخت"];
 const FORMAT_NAME: Record<Format, string> = { challenge: "چالش با کارت‌های خودتان", duel: "تک‌کلمه‌ای نوبتی", marathon: "رکورد در زمان" };
 const LEAVE = {
 	title: "از پانتومیم خارج می‌شوی؟",
-	text: "بازی این دست و امتیازهایش پاک می‌شود؛ نام تیم‌ها و بازیکن‌ها برای دست بعد می‌ماند.",
+	text: "بازی این دست و امتیازهایش پاک می‌شود و سکهٔ ورودی‌اش برنمی‌گردد؛ نام تیم‌ها و بازیکن‌ها برای دست بعد می‌ماند.",
 	yes: "خروج",
 	no: "ادامهٔ بازی",
 };
@@ -303,8 +303,9 @@ export default function PantomimeGame() {
 	};
 	const leave = () => {
 		const g = gameRef.current;
+		// No game under way: leave at once (product review 2026-11-26).
 		if (!g || g.phase === "finished") {
-			askLeave(PLAIN_LEAVE, go);
+			go();
 			return;
 		}
 		const wasPlaying = g.phase === "playing";

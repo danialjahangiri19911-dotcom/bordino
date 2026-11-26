@@ -909,3 +909,7 @@ body { margin: 0; }
 #bordino-directions .ng-game-price .ng-cost svg { width: 14px; height: 14px; flex: none; color: var(--bd-accent, currentColor); }
 #bordino-directions .ng-game-price small { font-size: 11px; color: var(--bd-muted); }
 @media (max-width: 750px) { #bordino-directions .ng-game-price { padding: 0 9px 9px; } }
+
+/* Landing: the sign-in said beside «شروع یک بازی» (product review 2026-11-26). */
+#bordino-directions .bd-login-note { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13px; color: var(--bd-muted); }
+#bordino-directions .bd-login-note svg { width: 16px; height: 16px; flex: none; }

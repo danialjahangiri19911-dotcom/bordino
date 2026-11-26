@@ -9,6 +9,7 @@ import JalaliDateField from "../JalaliDateField";
 import { useArt } from "../appearance";
 import { fa } from "../format";
 import { AuthShell, LoadState, Notice, Panel, R, usePoints } from "../ui";
+import { takeDestination } from "../afterLogin";
 import { usernameProblem } from "./Personal";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -232,7 +233,7 @@ export default function Onboarding() {
 		if (phase !== null) return;
 		if (profile) {
 			if (profile.registration_step !== "ProfileSetup") {
-				replace(R.home);
+				replace(takeDestination() ?? R.home);
 				return;
 			}
 			mustCreate.current = !(profile.birthdate && profile.username);
@@ -293,7 +294,7 @@ export default function Onboarding() {
 							? `${welcome} موجودی سکهٔ تو: ${fa(points.points)}`
 							: welcome
 					}
-					onDone={() => replace(R.home)}
+					onDone={() => replace(takeDestination() ?? R.home)}
 				/>
 			</AuthShell>
 		);

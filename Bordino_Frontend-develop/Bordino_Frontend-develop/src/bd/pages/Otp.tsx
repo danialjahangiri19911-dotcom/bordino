@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Icon from "../Icon";
 import { fa } from "../format";
 import { AuthShell, R } from "../ui";
+import { takeDestination } from "../afterLogin";
 
 import useGetCustomerProfile from "@/api/customer/hooks/useGetCustomerProfile";
 import { authErrorMessage } from "@/api/login/errorMessage";
@@ -58,7 +59,8 @@ export default function Otp() {
 			image_url: p.image_url ?? "",
 			registrationStep: p.registration_step ?? "",
 		});
-		replace(p.registration_step === "ProfileSetup" ? R.onboarding : R.home);
+		// A new player completes the profile first (the remembered page waits for the end of it).
+		replace(p.registration_step === "ProfileSetup" ? R.onboarding : (takeDestination() ?? R.home));
 	}, [profile?.result, isLoggedIn, replace, setUser]);
 
 	const { submitHandler, isSending } = useMutate<LoginApiDataResponse, { phone_number: string; otp: string; referral_code?: string }>({

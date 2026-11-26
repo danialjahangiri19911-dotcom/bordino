@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import Icon from "../Icon";
+import { rememberDestination } from "../afterLogin";
 import { Art, Brand, R } from "../ui";
 
 import useAuthStore from "@/libs/stores/authStore";
@@ -65,13 +66,19 @@ export default function Landing() {
 						</h1>
 						<p>بازی کن، سکه جمع کن و سکه‌هایت را به بلیت قرعه‌کشی یا فرصت گردونه تبدیل کن.</p>
 						<div className="bd-actions">
-							<Link className="bd-action" href={appHref}>
+							<Link className="bd-action" href={appHref} onClick={() => !isLoggedIn && rememberDestination(R.games)}>
 								شروع یک بازی <Icon name="arrow-right" />
 							</Link>
 							<a className="bd-secondary" href="#how">
 								بردینو چطور کار می‌کند؟
 							</a>
 						</div>
+						{!isLoggedIn ? (
+							// Product review 2026-11-26: the sign-in is said before the tap, not discovered after it.
+							<p className="bd-login-note">
+								<Icon name="smartphone" /> برای بازی، با شمارهٔ موبایل وارد شو؛ بعد از کد پیامکی مستقیم به گیمنت می‌روی.
+							</p>
+						) : null}
 						<span className="bd-note">وب‌اپلیکیشن بردینو · همراهت در موبایل و مرورگر</span>
 					</div>
 					<Art name="hero" eager />

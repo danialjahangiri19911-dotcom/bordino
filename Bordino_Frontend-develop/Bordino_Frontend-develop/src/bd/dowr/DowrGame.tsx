@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import Icon from "../Icon";
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
-import { askLeave, PLAIN_LEAVE, useBackHandler, useBrowserBackGuard } from "../back";
+import { askLeave, useBackHandler, useBrowserBackGuard } from "../back";
 import GameSettings from "../GameSettings";
 import { entryFeeText, useEntryFee } from "../entryFee";
 import { tagCost } from "../gamePrices";
@@ -29,7 +29,7 @@ type Globals = { BordinoDowr?: DowrApi; BordinoDowrDecks?: { categories: unknown
 
 const LEAVE = {
 	title: "از دُور خارج می‌شوی؟",
-	text: "امتیازهای این بازی پاک می‌شوند.",
+	text: "این بازی و امتیازهایش پاک می‌شود و سکهٔ ورودی‌اش برنمی‌گردد.",
 	yes: "خروج",
 	no: "ادامهٔ بازی",
 };
@@ -401,8 +401,9 @@ export default function DowrGame() {
 		const go = () => router.push(R.games);
 		// (the game's phase now, not the last poll's: a game may have started a moment ago)
 		const now = game.current?.getState()?.phase ?? "setup";
+		// No game under way (setup, or finished): leave at once (product review 2026-11-26).
 		if (!RUNNING.includes(now)) {
-			askLeave(PLAIN_LEAVE, go);
+			go();
 			return;
 		}
 		// Pause while asking; resume on «stay» only if this question is what paused it.

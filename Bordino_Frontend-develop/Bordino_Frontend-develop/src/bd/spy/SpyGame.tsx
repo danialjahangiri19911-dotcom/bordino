@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { styleClass, useBdStyle, useResolvedScheme } from "../appearance";
-import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { entryFeeText, useEntryFee } from "../entryFee";
 import { tagCost } from "../gamePrices";
 import { installLucideShim } from "../dowr/lucide";
@@ -321,7 +321,8 @@ export default function SpyGame() {
 
 	// Back / exit: on one of the game's inner screens, first to the game's own home (its «back home»
 	// pauses and keeps a round under way: card hidden, time stopped); from its home, back to the games.
-	// Leaving the game itself is always asked (as in every game).
+	// Leaving the game itself: at once when no game is under way; with one, it is saved on this device
+	// (product review 2026-11-26: say what happens to it and to the coins already spent).
 	const leave = () => {
 		const back = host.current?.querySelector<HTMLButtonElement>('.sp-header-back[data-a="home-confirm"]');
 		if (back && game.current?.getState().screen !== "home") {
@@ -338,7 +339,19 @@ export default function SpyGame() {
 			);
 			return;
 		}
-		askLeave(PLAIN_LEAVE, go);
+		if (!game.current?.getState().phase) {
+			go();
+			return;
+		}
+		askLeave(
+			{
+				title: "از جاسوس خارج می‌شوی؟",
+				text: "بازی روی همین دستگاه ذخیره می‌شود؛ با «ادامهٔ بازی» از همین‌جا ادامه می‌دهی و ورودی دوباره کم نمی‌شود.",
+				yes: "خروج",
+				no: "ادامهٔ بازی",
+			},
+			go,
+		);
 	};
 	leaveRef.current = leave;
 	useBackHandler(true, leave);

@@ -9,7 +9,7 @@ import Icon from "../Icon";
 import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { useBackHandler } from "../back";
 import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { fa } from "../format";
 import { persianNumberConverter } from "@/libs/utils/persianNumberConverter";
@@ -293,7 +293,8 @@ export default function WheelGame() {
 		music.current?.stop();
 		push(R.home);
 	};
-	const quit = () => askLeave(PLAIN_LEAVE, leave);
+	// Between spins nothing is at stake: leave at once (a spin under way disables the exit).
+	const quit = () => leave();
 	useBackHandler(true, () => (help ? setHelp(false) : spinning ? undefined : quit()));
 
 	if (!allowed) return null;

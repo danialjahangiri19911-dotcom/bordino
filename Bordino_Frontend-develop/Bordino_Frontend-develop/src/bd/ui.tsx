@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import Icon, { type IconName } from "./Icon";
+import { rememberDestination } from "./afterLogin";
 import { styleClass, useArt, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
@@ -141,12 +142,16 @@ function Avatar() {
 	);
 }
 
-/** Sends a guest to the phone page; renders nothing until the session is known to exist. */
+/** Sends a guest to the phone page (remembering this page: they come back to it after the code);
+ * renders nothing until the session is known to exist. */
 export function useRequireLogin(allowGuest = false) {
 	const { isLoggedIn } = useAuthStore();
 	const { replace } = useRouter();
 	useEffect(() => {
-		if (!isLoggedIn && !allowGuest) replace(R.login);
+		if (!isLoggedIn && !allowGuest) {
+			rememberDestination(window.location.pathname + window.location.search);
+			replace(R.login);
+		}
 	}, [isLoggedIn, allowGuest, replace]);
 	return isLoggedIn;
 }

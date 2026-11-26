@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -87,8 +87,35 @@ function PriceLines({ lines }: { lines: { cost: string; pays: string } | null })
 	);
 }
 
+/** The catalog as the player left it (category and scroll), for this visit of the app (product review
+ * 2026-11-26: coming back from a game opens the list where it was, not at the top of «همه»). */
+const VIEW_KEY = "bd-games-view";
+function savedView(): { group: Group; y: number } | null {
+	try {
+		const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) ?? "null") as { group?: unknown; y?: unknown } | null;
+		if (!v || typeof v.group !== "string" || typeof v.y !== "number") return null;
+		return { group: v.group as Group, y: v.y };
+	} catch {
+		return null;
+	}
+}
+function saveView(group: Group) {
+	try {
+		sessionStorage.setItem(VIEW_KEY, JSON.stringify({ group, y: Math.round(window.scrollY) }));
+	} catch {
+		// storage blocked: the list opens at the top
+	}
+}
+
 export default function Games() {
-	const [group, setGroup] = useState<Group>("all");
+	// (read after the first render: the server's render cannot see this device's storage)
+	const [group, setGroupState] = useState<Group>("all");
+	const groupRef = useRef<Group>("all");
+	const setGroup = (g: Group) => {
+		groupRef.current = g;
+		setGroupState(g);
+		saveView(g);
+	};
 	// «معمای شهری»: hunts at real places (the mystery list comes with the missions).
 	const mysteries = useMissions().data?.result?.mysteries ?? [];
 	const router = useRouter();
@@ -115,6 +142,45 @@ export default function Games() {
 	// What each game costs and pays, from the server (shown on the cards before a game opens).
 	const prices = useGamePrices().data?.result?.games;
 	const shown = (use ? sortByUse(GAMES, use) : GAMES).filter((game) => group === "all" || game.group === group);
+	// Back to where the player was: the category at once, the scroll once the order has settled.
+	const restored = useRef(false);
+	const restoring = useRef(false);
+	useEffect(() => {
+		const v = savedView();
+		if (v && v.group !== "all") {
+			groupRef.current = v.group;
+			setGroupState(v.group);
+		}
+	}, []);
+	useEffect(() => {
+		if (restored.current || use === null) return;
+		restored.current = true;
+		const v = savedView();
+		if (!v || v.y <= 0) return;
+		// The page grows as covers and prices arrive: scroll again until it reaches the place (≤ 2 s).
+		restoring.current = true;
+		let tries = 0;
+		const tick = () => {
+			window.scrollTo(0, v.y);
+			if (Math.abs(window.scrollY - v.y) > 2 && tries++ < 20) window.setTimeout(tick, 100);
+			else restoring.current = false;
+		};
+		requestAnimationFrame(tick);
+	}, [use]);
+	// Kept as the player scrolls and when the page is left (for a game, the coin shop, Back).
+	useEffect(() => {
+		let t = 0;
+		const onScroll = () => {
+			if (restoring.current) return; // (its own scrolling while restoring is not the player's)
+			window.clearTimeout(t);
+			t = window.setTimeout(() => saveView(groupRef.current), 150);
+		};
+		window.addEventListener("scroll", onScroll, { passive: true });
+		return () => {
+			window.removeEventListener("scroll", onScroll);
+			window.clearTimeout(t);
+		};
+	}, []);
 	return (
 		<AppShell nav="games" title="گیمنت" headingExtra={<Balance />}>
 			<section className="ng-catalog">
@@ -145,6 +211,7 @@ export default function Games() {
 							data-game={game.id}
 							aria-label={cardLabel(game, priceLines(game, game.price ? prices?.[game.price] : undefined))}
 							onClick={(event) => {
+								saveView(groupRef.current);
 								// A plain tap with an offer available: the offer first, then the game.
 								if (!offer?.available || game.pays === "free" || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
 								event.preventDefault();
@@ -163,7 +230,7 @@ export default function Games() {
 					))}
 					{group === "all" || group === "city"
 						? mysteries.map((m) => (
-								<Link key={m.id} href={R.mystery(m.id)} className="ng-game" data-game="mystery" data-state={m.state} aria-label={`معمای شهری ${m.title}`}>
+								<Link key={m.id} href={R.mystery(m.id)} onClick={() => saveView(groupRef.current)} className="ng-game" data-game="mystery" data-state={m.state} aria-label={`معمای شهری ${m.title}`}>
 									<div className="ng-cover">
 										{m.cover ? <img className="ng-mystery-cover" src={m.cover} alt="" loading="lazy" /> : <Icon name="map-pin" />}
 									</div>

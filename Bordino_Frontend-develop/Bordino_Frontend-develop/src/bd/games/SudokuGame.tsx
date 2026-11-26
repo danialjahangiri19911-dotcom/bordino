@@ -10,7 +10,7 @@ import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { withCost } from "../gamePrices";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { EntryFeeNote, askBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -98,7 +98,7 @@ export default function SudokuGame() {
 		askLeave(
 			{
 				title: "از بازی خارج می‌شوی؟",
-				text: "بازی متوقف و روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی ادامه می‌دهی.",
+				text: "بازی متوقف و روی همین دستگاه نگه داشته می‌شود؛ هر وقت برگردی ادامه می‌دهی و ورودی دوباره کم نمی‌شود.",
 				yes: "خروج",
 				no: "ادامهٔ بازی",
 			},
@@ -112,11 +112,11 @@ export default function SudokuGame() {
 			},
 		);
 	};
-	const quit = () =>
-		askLeave(PLAIN_LEAVE, () => {
-			music.current?.stop();
-			push(R.games);
-		});
+	// Nothing at stake (no game running): leave at once (product review 2026-11-26, the owner's choice).
+	const quit = () => {
+		music.current?.stop();
+		push(R.games);
+	};
 	useBackHandler(true, () => (busy.current ? undefined : confirm ? setConfirm("") : playing ? askExit() : quit()));
 	// A tap outside the box: a question is answered «stay» (as its second button), a pause ends.
 	// The start, win and loss boxes stay: each needs a choice.

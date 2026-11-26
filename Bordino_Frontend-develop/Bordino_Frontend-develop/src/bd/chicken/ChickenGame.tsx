@@ -9,7 +9,7 @@ import { gameStyleClass, useBdStyle, useResolvedScheme } from "../appearance";
 import GameSettings, { GameSettingsButton } from "../GameSettings";
 import { fa } from "../format";
 import { GameBar } from "../autoHide";
-import { askLeave, PLAIN_LEAVE, useBackHandler } from "../back";
+import { askLeave, useBackHandler } from "../back";
 import { BetFeeNote, goBuyCoins } from "../entryFee";
 import { useDismissOutside } from "../dismiss";
 import { R, useRequireLogin } from "../ui";
@@ -46,7 +46,7 @@ interface View {
 const READY: View = { phase: "ready", lane: 0, target: 0, secured: 0, landed: false };
 const LEAVE = {
 	title: "از بازی خارج می‌شوی؟",
-	text: "دور تو باز می‌ماند و وقتی برگردی از همین خط ادامه می‌دهی.",
+	text: "دور تو و شرطت سر جایشان می‌مانند؛ وقتی برگردی از همین خط ادامه می‌دهی.",
 	yes: "خروج",
 	no: "ادامهٔ بازی",
 };
@@ -297,7 +297,8 @@ export default function ChickenGame() {
 	// Android Back: closes the open panel, asks before leaving a round in play, else leaves (as the
 	// header's exit button does).
 	const inRound = (round?.status === "active" && round.id !== acknowledged.current) || view.phase === "jumping" || view.phase === "colliding" || game.busy;
-	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? askLeave(LEAVE, leave) : askLeave(PLAIN_LEAVE, leave)));
+	// No round under way: leave at once (product review 2026-11-26).
+	useBackHandler(true, () => (dialog ? setDialog("") : inRound ? askLeave(LEAVE, leave) : leave()));
 	const dialogBox = useRef<HTMLDivElement>(null);
 	useDismissOutside(!!dialog, dialogBox, () => setDialog(""));
 	// The top bar is out of the way while a round is in play (GameBar: handle / pull at the top).
@@ -379,7 +380,7 @@ export default function ChickenGame() {
 						<button className="ck-icon-button" type="button" aria-label="راهنمای بازی" aria-expanded={dialog === "fair"} onClick={() => setDialog(dialog === "fair" ? "" : "fair")}>
 							<Icon name="circle-help" />
 						</button>
-						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : askLeave(PLAIN_LEAVE, leave))}>
+						<button className="ck-icon-button" type="button" aria-label="خروج از بازی" onClick={() => (roundActive || busy ? askLeave(LEAVE, leave) : leave())}>
 							<Icon name="arrow-left" />
 						</button>
 					</div>
