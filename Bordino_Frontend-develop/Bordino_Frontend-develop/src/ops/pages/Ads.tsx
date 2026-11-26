@@ -26,7 +26,7 @@ interface Day {
 
 type Total = Omit<Day, "day">;
 
-const dayText = (iso: string) => new Intl.DateTimeFormat("fa-IR", { weekday: "short", month: "short", day: "numeric" }).format(new Date(iso + "T12:00:00"));
+const dayText = (iso: string) => new Intl.DateTimeFormat("fa-IR", { month: "short", day: "numeric" }).format(new Date(iso + "T12:00:00"));
 const share = (part: number, whole: number) => (whole ? `${fa(Math.round((part / whole) * 100))}٪` : "—");
 
 /**
@@ -77,11 +77,11 @@ export function AdsPage() {
 									<tr>
 										<th scope="col">روز</th>
 										<th scope="col">شروع</th>
-										<th scope="col">تأیید ادیوری</th>
+										<th scope="col">تأیید</th>
 										<th scope="col">پرداخت</th>
 										<th scope="col">سکه</th>
 										<th scope="col">بی‌تأیید</th>
-										<th scope="col">خبر (رد)</th>
+										<th scope="col">خبر</th>
 										<th scope="col">بازیکن</th>
 									</tr>
 								</thead>
@@ -91,7 +91,7 @@ export function AdsPage() {
 											<th scope="row">{dayText(d.day)}</th>
 											<td>{fa(d.started)}</td>
 											<td>
-												{fa(d.confirmed)} <small className="bd-muted">{share(d.confirmed, d.started)}</small>
+												{fa(d.confirmed)}
 											</td>
 											<td>{fa(d.paid)}</td>
 											<td>{fa(d.coins)}</td>
@@ -105,6 +105,7 @@ export function AdsPage() {
 								</tbody>
 							</table>
 						</div>
+						<small className="bd-muted">«بی‌تأیید»: پرداخت با گزارش خود اپ، بدون تأیید ادیوری. «خبر»: تماس‌های سرور ادیوری؛ داخل پرانتز ردشده‌ها.</small>
 					</Panel>
 				</>
 			) : null}

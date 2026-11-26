@@ -39,11 +39,11 @@ export default function DayBars({ title, days, values, unit }: { title: string; 
 			<figcaption id={`${tableId}-t`}>
 				<b>{title}</b>
 				<small className="bd-muted">
-					۳۰ روز گذشته، جمع {fa(total)} {unit}، امروز {fa(values[last] ?? 0)}
+					{fa(values.length)} روز گذشته، جمع {fa(total)} {unit}، امروز {fa(values[last] ?? 0)}
 				</small>
 			</figcaption>
 			<div className="ops-chart-plot" dir="ltr" onPointerLeave={() => setActive(null)}>
-				<svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${title}: ${fa(total)} ${unit} در ۳۰ روز`}>
+				<svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${title}: ${fa(total)} ${unit} در ${fa(values.length)} روز`}>
 					{[0, 0.5, 1].map((f) => (
 						<line key={f} x1={0} x2={W} y1={y(ceil * f)} y2={y(ceil * f)} className="ops-grid" vectorEffect="non-scaling-stroke" />
 					))}
