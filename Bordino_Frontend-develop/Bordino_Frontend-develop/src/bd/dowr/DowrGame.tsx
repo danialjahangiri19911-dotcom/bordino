@@ -23,7 +23,7 @@ import { gameErrorMessage } from "@/api/games/request";
 /** What the design module exposes once its scripts have run (vendor/*.js). */
 interface DowrApi {
 	markup(style: "neu" | "brutal" | "neon"): string;
-	mount(root: Element, options?: { onComplete?: (result: DowrResult) => void }): { getState(): { phase: string } | null; destroy(): void };
+	mount(root: Element, options?: { onComplete?: (result: DowrResult) => void }): { getState(): { phase: string } | null; getSettings?(): Chosen; destroy(): void };
 }
 type Globals = { BordinoDowr?: DowrApi; BordinoDowrDecks?: { categories: unknown[]; cards: unknown[] } };
 
@@ -300,7 +300,11 @@ export default function DowrGame() {
 					(e) => {
 						const start = (e.target as Element | null)?.closest?.('[data-act="start"]');
 						const now = cfgRef.current;
-						if (!start || !now || readChosen(root) || !chosen || !beyond(chosen, now.limits)) return;
+						if (!start || !now || readChosen(root)) return;
+						// (the settings page's selects are capped already; elsewhere — «یک دست دیگر», or the
+						// teams page's quick start — what the game would start with)
+						const c = chosen ?? game.current?.getSettings?.() ?? null;
+						if (!c || !beyond(c, now.limits)) return;
 						// Bordino lowered the limits since that choice: back to the setup page with them applied.
 						e.stopPropagation();
 						e.preventDefault();

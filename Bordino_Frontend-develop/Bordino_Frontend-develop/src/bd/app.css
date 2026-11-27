@@ -929,3 +929,14 @@ body { margin: 0; }
 #bordino-directions .bd-lottery-idle b { display: block; font-size: 14px; }
 #bordino-directions .bd-lottery-idle small { display: block; margin-top: 2px; font-size: 12px; color: var(--bd-muted); }
 #bordino-directions .bd-lottery-idle .bd-actions { margin-top: 10px; flex-wrap: wrap; gap: 8px; }
+
+/* Game Master: the template a link asked for, first and marked (product review 2026-11-27). */
+#bordino-directions .gm-template-suggested { outline: 2px solid var(--bd-accent); outline-offset: 2px; }
+#bordino-directions .gm-template-suggested .bd-tag { align-self: flex-start; font-size: 10px; padding: 2px 8px; }
+/* «گیمنت»: a creator's unfinished games, one tap away. */
+#bordino-directions .ng-gm-drafts { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--bd-border); border-radius: 14px; background: var(--bd-surface); color: var(--bd-fg); text-decoration: none; font-size: 13px; }
+#bordino-directions .ng-gm-drafts svg { flex: none; width: 18px; height: 18px; color: var(--bd-accent); }
+#bordino-directions .ng-gm-drafts b { margin-inline-start: auto; color: var(--bd-accent); font-weight: 600; white-space: nowrap; }
+/* A cost tag sits right after the button's label (the buttons lay their parts out with a gap). */
+#bordino-directions .dr button > .bd-cost-tag { margin-inline-start: -8px; }
+#bordino-directions .sp button > .bd-cost-tag { margin-inline-start: -10px; }

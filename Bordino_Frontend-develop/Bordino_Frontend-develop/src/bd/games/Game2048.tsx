@@ -144,6 +144,29 @@ function View() {
 		interacted.current = true;
 		game.move(dir);
 	};
+	// Undo, then the keyboard is the board's again (playtest 2026-11-27: the undo button disables
+	// itself once there is nothing left to undo, the focus fell to the page, and the next arrow did nothing).
+	const undo = () => {
+		interacted.current = true;
+		game.undo();
+		requestAnimationFrame(() => boardRef.current?.focus({ preventScroll: true }));
+	};
+	// Arrows also work when the focus is on nothing in particular (the page itself).
+	const moveRef = useRef(move);
+	moveRef.current = move;
+	useEffect(() => {
+		const onWindowKey = (e: globalThis.KeyboardEvent) => {
+			const active = document.activeElement;
+			if (e.defaultPrevented || (active && active !== document.body)) return;
+			const dir = KEYS[e.key];
+			if (dir && !e.ctrlKey && !e.metaKey && !e.altKey) {
+				e.preventDefault();
+				moveRef.current(dir);
+			}
+		};
+		window.addEventListener("keydown", onWindowKey);
+		return () => window.removeEventListener("keydown", onWindowKey);
+	}, []);
 
 	const onKey = (e: KeyboardEvent<HTMLElement>) => {
 		if (modal) {
@@ -206,6 +229,7 @@ function View() {
 			<article className={`g48 ${gameStyleClass("g48", bdStyle)} ${scheme === "dark" ? "g48-dark" : ""}`} dir="rtl" aria-label="بازی ۲۰۴۸" onKeyDown={onKey}>
 				<GameSettings open={showSettings} onClose={() => setShowSettings(false)} game="۲۰۴۸" look={bdStyle} dark={scheme === "dark"} rows={[
 					{ kind: "toggle", id: "sound", label: "موسیقی و افکت‌ها", on: sound, onChange: (on) => { interacted.current = true; setSound(on); } },
+					{ kind: "action", id: "new", label: "بازی تازه", hint: `صفحهٔ فعلی پاک می‌شود${playCost ? ` و بازی تازه ${fa(playCost)} سکه هزینه دارد` : ""}؛ رکوردت می‌ماند.`, button: "شروع دوباره…", disabled: game.isCharging || game.needsStart, onClick: () => { setShowSettings(false); setConfirm("reset"); } },
 					{ kind: "action", id: "best", label: "بهترین امتیاز", hint: `بهترین امتیاز تو روی این دستگاه: ${best.toLocaleString("fa-IR")}`, button: "صفر کردن", confirm: "بهترین امتیاز پاک شود؟", disabled: best === 0, onClick: () => { try { localStorage.setItem(bestKey(), "0"); } catch { /* not remembered */ } setBest(0); } },
 				]} />
 				<GameBar playing={barPlaying}>
@@ -312,7 +336,7 @@ function View() {
 															ادامهٔ همین بازی
 														</button>
 													) : modal === "lost" && game.canUndo ? (
-														<button type="button" className="g48-secondary" onClick={game.undo}>
+														<button type="button" className="g48-secondary" onClick={undo}>
 															برگشت یک حرکت
 														</button>
 													) : null}
@@ -325,14 +349,16 @@ function View() {
 						<p className="g48-hint">برای حرکت، روی زمین بکش یا از کلیدهای جهت‌نما استفاده کن.</p>
 					</section>
 					<aside className="g48-side" {...inertIf(!!modal)}>
+						{/* During a game: undo first, a labelled way out second; «بازی تازه» lives in the game's
+						    menu, behind its own question (it clears the board and costs a new entry). */}
 						<div className="g48-main-actions">
-							<button type="button" className="g48-primary" disabled={game.isCharging || game.needsStart} onClick={() => setConfirm("reset")}>
-								<Icon name="rotate-cw" />
-								بازی تازه
-							</button>
-							<button type="button" className="g48-secondary" disabled={!game.canUndo || !playing} onClick={game.undo}>
+							<button type="button" className="g48-primary" disabled={!game.canUndo || !playing} onClick={undo}>
 								<Icon name="undo-2" />
 								یک حرکت عقب
+							</button>
+							<button type="button" className="g48-secondary" disabled={game.isCharging} onClick={() => (playing ? askExit() : quit())}>
+								<Icon name="log-out" />
+								{playing ? "خروج (بازی ذخیره می‌شود)" : "خروج از بازی"}
 							</button>
 						</div>
 					</aside>

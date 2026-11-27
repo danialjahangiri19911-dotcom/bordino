@@ -11,6 +11,7 @@ import { usePlayableAdOffer } from "../ads/api";
 import { goBuyCoins } from "../entryFee";
 import { fa } from "../format";
 import { priceLines, useGamePrices } from "../gamePrices";
+import { useCreatorDrafts } from "../gm/drafts";
 import { sortByUse, useGameUse } from "../gameUse";
 import { GAMES, type GameEntry } from "../games";
 import { useMissions } from "../missions/api";
@@ -141,6 +142,8 @@ export default function Games() {
 	const use = useGameUse();
 	// What each game costs and pays, from the server (shown on the cards before a game opens).
 	const prices = useGamePrices().data?.result?.games;
+	// A creator's unfinished games (Game Master), one tap away (product review 2026-11-27).
+	const drafts = useCreatorDrafts();
 	const shown = (use ? sortByUse(GAMES, use) : GAMES).filter((game) => group === "all" || game.group === group);
 	// Back to where the player was: the category at once, the scroll once the order has settled.
 	const restored = useRef(false);
@@ -189,6 +192,13 @@ export default function Games() {
 						<Icon name="gamepad-2" /> گیمنت بردینو
 					</h3>
 				</div>
+				{drafts > 0 ? (
+					<Link className="ng-gm-drafts" href="/pwa/gm/games?filter=draft">
+						<Icon name="pencil" />
+						<span>{fa(drafts)} بازیِ ساخت خودت نیمه‌کاره مانده است.</span>
+						<b>ادامهٔ ساخت ←</b>
+					</Link>
+				) : null}
 				<Chips
 					label="دسته‌بندی بازی‌ها"
 					value={group}

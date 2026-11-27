@@ -17,7 +17,7 @@ describe("game card prices", () => {
 		expect(withCost("شروع بازی", 5000)).toBe("شروع بازی · ۵٬۰۰۰ سکه");
 		expect(withCost("شروع بازی", 0)).toBe("شروع بازی");
 		const b = document.createElement("button");
-		b.textContent = "شروع";
+		b.textContent = "شروع ";
 		tagCost(b, 5000);
 		tagCost(b, 5000);
 		expect(b.textContent).toBe("شروع، ۵٬۰۰۰ سکه");

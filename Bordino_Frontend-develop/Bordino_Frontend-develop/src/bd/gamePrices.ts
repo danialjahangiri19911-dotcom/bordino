@@ -61,5 +61,8 @@ export function tagCost(button: Element | null, cost: number | null | undefined,
 		tag.className = "bd-cost-tag";
 		button.append(tag);
 	}
+	// The button's own text often ends in a space (before an icon): no space before the «،».
+	const before = tag.previousSibling;
+	if (before?.nodeType === Node.TEXT_NODE && /\s$/.test(before.nodeValue ?? "")) before.nodeValue = (before.nodeValue ?? "").trimEnd();
 	if (tag.textContent !== text) tag.textContent = text;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -223,6 +223,20 @@ export function NewGame() {
 	const [category, setCategory] = useState<Category | null>(null);
 	const [busy, setBusy] = useState<string | null>(null);
 	const [problem, setProblem] = useState<string | null>(null);
+	// A link to one template (the public «ساخت بازی تولد»: ?template=birthday): its kind is chosen and the
+	// template shown first, ready to tap (2026-11-27, product review). Nothing is created by opening it.
+	const [suggested, setSuggested] = useState<string | null>(null);
+	const suggestedRef = useRef<HTMLButtonElement | null>(null);
+	useEffect(() => {
+		const id = new URLSearchParams(window.location.search).get("template");
+		const t = id ? templates.data?.result?.templates?.find((x) => x.id === id) : undefined;
+		if (!t || suggested) return;
+		setSuggested(t.id);
+		setCategory((c) => c ?? (t.category as Category));
+	}, [templates.data, suggested]);
+	useEffect(() => {
+		if (suggested) suggestedRef.current?.scrollIntoView({ block: "center" });
+	}, [suggested, category]);
 	const create = async (template: string | null) => {
 		if (!category) return;
 		setBusy(template ?? "empty");
@@ -235,7 +249,9 @@ export function NewGame() {
 			setBusy(null);
 		}
 	};
-	const shown = (templates.data?.result?.templates ?? []).filter((t) => !category || t.category === category || category === "pro");
+	const shown = (templates.data?.result?.templates ?? [])
+		.filter((t) => !category || t.category === category || category === "pro")
+		.sort((a, b) => Number(b.id === suggested) - Number(a.id === suggested));
 	return (
 		<CreatorShell nav="create" title="ساخت بازی">
 			<Panel title="۱. چه نوع بازی‌ای؟">
@@ -254,8 +270,16 @@ export function NewGame() {
 					<LoadState loading={templates.isLoading} error={templates.error} onRetry={templates.refetch} />
 					<div className="gm-choice-grid">
 						{shown.map((t) => (
-							<button key={t.id} type="button" className="gm-choice gm-template" disabled={!!busy} onClick={() => void create(t.id)}>
+							<button
+								key={t.id}
+								ref={t.id === suggested ? suggestedRef : undefined}
+								type="button"
+								className={`gm-choice gm-template${t.id === suggested ? " gm-template-suggested" : ""}`}
+								disabled={!!busy}
+								onClick={() => void create(t.id)}
+							>
 								<Icon name={(t.icon as IconName) ?? "sparkles"} />
+								{t.id === suggested ? <span className="bd-tag">آمادهٔ ساخت</span> : null}
 								<b>{t.name}</b>
 								<small>
 									{t.summary} · {fa(t.stages)} مرحله

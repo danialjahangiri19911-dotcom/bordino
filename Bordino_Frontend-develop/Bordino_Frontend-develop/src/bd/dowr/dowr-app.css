@@ -64,3 +64,12 @@
 #bordino-directions .dr .dr-seat-number { display: none; }
 /* The last seconds' clock on a dark surface: the neon pink, like the ring and the bar. */
 :root[data-bd-scheme="dark"] #bordino-directions :is(.dr.dr-brutal, .dr.dr-neu).dr-urgent .dr-time { color: #ff718c; }
+
+/* Private handoff (2026-11-27 playtest): the bomb's state said on the «گوشی را بده به …» screen. */
+.dr-handoff-private .dr-handoff-bomb { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 10px 0 0; font-size: 13px; }
+.dr-handoff-private .dr-primary { margin-top: 16px; }
+
+/* Quick start on the teams page (2026-11-27 playtest): the rules in one line, start or change them. */
+.dr-quick-summary { display: flex; gap: 6px; align-items: flex-start; margin: 14px 0 10px; font-size: 13px; line-height: 1.7; opacity: .85; }
+.dr-quick-summary svg { flex: none; margin-top: 3px; }
+.dr-quick-actions { display: grid; gap: 10px; }

@@ -30,6 +30,9 @@ function useInstalled() {
 	return installed;
 }
 
+/** The birthday template, ready to make (the public «ساخت بازی تولد» button). */
+const BIRTHDAY = "/pwa/gm/new?template=birthday";
+
 export default function Landing() {
 	const st = styleClass(useBdStyle());
 	const installed = useInstalled();
@@ -137,7 +140,7 @@ export default function Landing() {
 							</p>
 							<ol className="bd-make-steps">
 								<li>
-									<b>۱</b> در پروفایل «گیم مستر» را بزن و قالب «تولد معمایی» را بردار.
+									<b>۱</b> «ساخت بازی تولد» را بزن؛ قالب «تولد معمایی» آماده است.
 								</li>
 								<li>
 									<b>۲</b> سرنخ‌ها، پیام خودت و جای هدیه را بنویس و امتحانش کن.
@@ -149,7 +152,8 @@ export default function Landing() {
 									<b>۴</b> لینک دعوت یا QR را برای دوستت بفرست.
 								</li>
 							</ol>
-							<Link className="bd-action" href={isLoggedIn ? R.gm : R.login}>
+							{/* Straight to the birthday template (after the sign-in, when needed): product review 2026-11-27. */}
+							<Link className="bd-action" href={isLoggedIn ? BIRTHDAY : R.login} onClick={() => !isLoggedIn && rememberDestination(BIRTHDAY)}>
 								ساخت بازی تولد <Icon name="gift" />
 							</Link>
 						</div>
