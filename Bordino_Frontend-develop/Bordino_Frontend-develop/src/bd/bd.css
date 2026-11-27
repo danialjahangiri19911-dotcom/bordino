@@ -20,7 +20,7 @@
 #bordino-directions .bd-actions{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:23px}
 #bordino-directions .bd-muted{ color:var(--bd-muted)}
 #bordino-directions .bd-overline{ color:var(--bd-accent); font-size:12px; letter-spacing:.2px; margin-bottom:14px !important; display:flex; align-items:center; gap:7px}
-#bordino-directions .bd-tag{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:30px; background:var(--bd-tint); color:var(--bd-accent); font-size:11px}
+#bordino-directions .bd-tag{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:30px; background:var(--bd-tint); color:var(--bd-accent-ink, var(--bd-accent)); font-size:11px}
 #bordino-directions .bd-hero{ display:grid; grid-template-columns:1.06fr 1fr; align-items:center; gap:38px; padding:48px 38px 35px}
 #bordino-directions .bd-hero-copy>p:not(.bd-overline){ color:var(--bd-muted); margin-top:16px; font-size:13px; max-width:440px}
 #bordino-directions .bd-em{ color:var(--bd-accent)}

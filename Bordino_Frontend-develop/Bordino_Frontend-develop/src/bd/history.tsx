@@ -96,7 +96,9 @@ export function HistoryFooter({
 	empty: boolean;
 	emptyTitle?: string;
 }) {
-	if (history.isLoading) return <LoadState loading />;
+	// No answer yet — also while the query still waits for the account it belongs to (it is not
+	// «loading» then, only pending): never «no transactions» before the server has said so (2026-11-27 audit).
+	if (history.isLoading || (history.isPending && !history.isError)) return <LoadState loading />;
 	if (history.isError) return <LoadState error onRetry={() => history.refetch()} errorText="تاریخچه بارگذاری نشد." />;
 	if (empty) {
 		return <EmptyState title={emptyTitle} text="زمان، نوع و مبلغ هر تراکنش پس از ثبت در این قسمت نمایش داده می‌شود." />;

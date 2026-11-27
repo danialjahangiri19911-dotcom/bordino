@@ -8,11 +8,13 @@ body { margin: 0; }
 
 /* brutal-a palette (reference ui.js palette(): --bd-* as light-dark pairs on the article) */
 #bordino-directions .bd-product.st-brutal {
-	--bd-accent: #d64142; --bd-tint: #f4c8bd; --bd-bg: #fff8eb; --bd-surface: #fffdf5;
-	--bd-on: #ffffff; --bd-hi: #ffffff; --bd-lo: #d5d7de;
+	/* accent #d64142 → #c7393b (2026-11-27 contrast audit): white on it 4.47 → 5.15:1, it as text on the
+	   surface 4.39 → 5.0:1. --bd-accent-ink: the accent as text on its own tint (labels, tags). */
+	--bd-accent: #c7393b; --bd-tint: #f4c8bd; --bd-bg: #fff8eb; --bd-surface: #fffdf5;
+	--bd-on: #ffffff; --bd-hi: #ffffff; --bd-lo: #d5d7de; --bd-accent-ink: #9b262e;
 }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-product.st-brutal {
-	--bd-accent: #ff9995; --bd-tint: #59322d; --bd-bg: #24211e; --bd-surface: #34302a;
+	--bd-accent: #ff9995; --bd-tint: #59322d; --bd-bg: #24211e; --bd-surface: #34302a; --bd-accent-ink: #ff9995;
 	--bd-on: #221d29; --bd-hi: #55556b; --bd-lo: #12131b;
 }
 
@@ -33,7 +35,7 @@ body { margin: 0; }
 /* Five tabs do not fit side by side on a phone with their labels: icon above label, one line each. */
 @media (max-width: 480px) {
 	#bordino-directions .bd-page .bd-sidebar { gap: 2px; padding-inline: 8px; }
-	#bordino-directions .bd-page .bd-nav-item { flex-direction: column; gap: 3px; min-height: 0; padding: 6px 2px !important; font-size: 10.5px !important; white-space: nowrap; text-align: center; }
+	#bordino-directions .bd-page .bd-nav-item { flex-direction: column; gap: 3px; min-height: 0; padding: 6px 2px !important; font-size: 12px !important; white-space: nowrap; text-align: center; }
 }
 
 /* Links styled as the reference's buttons. */
@@ -41,7 +43,7 @@ body { margin: 0; }
 #bordino-directions .bd-product a.bd-action,
 #bordino-directions .bd-product a.bd-secondary,
 #bordino-directions .bd-product a.bd-text-btn { cursor: pointer; }
-#bordino-directions .bd-nav-item[aria-current="page"] { color: var(--bd-accent) !important; background: var(--bd-tint) !important; }
+#bordino-directions .bd-nav-item[aria-current="page"] { color: var(--bd-accent-ink, var(--bd-accent)) !important; background: var(--bd-tint) !important; }
 #bordino-directions .bd-text-btn { cursor: pointer; }
 #bordino-directions .bd-product :is(button, a, input, select, summary, [tabindex]):focus-visible {
 	outline: 3px solid var(--bd-accent); outline-offset: 2px;
@@ -71,7 +73,8 @@ body { margin: 0; }
 #bordino-directions .bd-row b { font-weight: 500; overflow-wrap: anywhere; }
 #bordino-directions .bd-row small { color: var(--bd-muted); }
 #bordino-directions .bd-row .bd-amount { white-space: nowrap; font-weight: 500; }
-#bordino-directions .bd-amount.is-plus { color: #2f8f5b; }
+/* Money in: #2f8f5b measured 3.48:1 (Soft Light) and 3.96:1 (Adventure Light); #236f46 is 5.3–6.0:1. */
+#bordino-directions .bd-amount.is-plus { color: #236f46; }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-amount.is-plus { color: #7fd6a3; }
 #bordino-directions .bd-amount.is-minus { color: var(--bd-accent); }
 #bordino-directions .bd-more { align-self: center; margin-top: 12px; }
@@ -905,9 +908,16 @@ body { margin: 0; }
 
 /* 2026-11-26 product review: a game card says what it costs and what it pays before it opens. */
 #bordino-directions .ng-game-price { display: flex; flex-direction: column; gap: 2px; padding: 0 12px 10px; min-height: 34px; }
-#bordino-directions .ng-game-price .ng-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--bd-fg); }
+#bordino-directions .ng-game-price .ng-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; line-height: 1.6; color: var(--bd-fg); }
 #bordino-directions .ng-game-price .ng-cost svg { width: 14px; height: 14px; flex: none; color: var(--bd-accent, currentColor); }
-#bordino-directions .ng-game-price small { font-size: 11px; color: var(--bd-muted); }
+#bordino-directions .ng-game-price small { font-size: 13px; line-height: 1.6; color: var(--bd-muted); }
+/* Narrow cards (2026-11-27 audit): the line that helps choose stays — a city mystery's place and
+   progress («۰ از ۳ مرحله» was hidden at 334 and 448 px) and a party game's players; the other
+   games' kind tag stays hidden (their cost and scoring lines say more). */
+@media (max-width: 750px) {
+	#bordino-directions .ng-game:is([data-game="mystery"], [data-game="pantomime"], [data-game="dowr"], [data-game="spy"]) .ng-game-name { flex-wrap: wrap; }
+	#bordino-directions .ng-game:is([data-game="mystery"], [data-game="pantomime"], [data-game="dowr"], [data-game="spy"]) .ng-game-name small { display: block; flex-basis: 100%; font-size: 13px; line-height: 1.6; }
+}
 @media (max-width: 750px) { #bordino-directions .ng-game-price { padding: 0 9px 9px; } }
 
 /* Landing: the sign-in said beside «شروع یک بازی» (product review 2026-11-26). */

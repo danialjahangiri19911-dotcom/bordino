@@ -213,11 +213,34 @@ export default function BackButton() {
 	if (!question) return null;
 	return (
 		<div ref={sheet} className="bd-sheet-backdrop" role="presentation" onClick={(e) => e.target === e.currentTarget && stay()}>
-			<div className={`bd-product ${st} bd-sheet bd-leave`} role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
+			<div
+				className={`bd-product ${st} bd-sheet bd-leave`}
+				role="alertdialog"
+				aria-modal="true"
+				aria-labelledby="leave-title"
+				aria-describedby="leave-text"
+				onKeyDown={(e) => {
+					// Escape is the safe answer, as the button that has the focus first (2026-11-27 audit:
+					// Escape left 2048's exit question open). Tab stays inside the two answers.
+					if (e.key === "Escape") {
+						e.preventDefault();
+						e.stopPropagation();
+						stay();
+					} else if (e.key === "Tab") {
+						const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
+						const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+						const next = e.shiftKey ? (at <= 0 ? buttons.length - 1 : at - 1) : at === buttons.length - 1 ? 0 : at + 1;
+						e.preventDefault();
+						buttons[next]?.focus();
+					}
+				}}
+			>
 				<p className="bd-leave-title" id="leave-title">
 					{question.title}
 				</p>
-				<p className="bd-leave-text">{question.text}</p>
+				<p className="bd-leave-text" id="leave-text">
+					{question.text}
+				</p>
 				<button
 					type="button"
 					className="bd-sheet-item bd-sheet-danger"
