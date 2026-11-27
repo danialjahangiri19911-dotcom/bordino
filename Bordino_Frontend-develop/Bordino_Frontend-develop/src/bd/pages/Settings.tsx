@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 
-import { useBdStyle } from "../appearance";
+import { useResolvedScheme } from "../appearance";
 import Icon from "../Icon";
+import { PALETTES } from "../palettes";
 import { BadgeArt, type BadgeFacts, badgeStates } from "../achievements";
 import {
 	type NotificationPrefs,
@@ -23,7 +24,7 @@ import {
 } from "../push";
 import { fa } from "../format";
 import { type Entry, HistoryRow, PartialHistoryNotice, withSummary, rowsOf } from "../history";
-import { AppShell, CopyButton, EmptyState, Facts, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
+import { AppShell, CopyButton, EmptyState, LoadState, Notice, Panel, R, usePoints, useProfileSync } from "../ui";
 import { useCashAccount } from "./Wallet";
 
 import { gameErrorMessage } from "@/api/games/request";
@@ -294,17 +295,33 @@ const THEMES: [Appearance, string, string][] = [
 	["system", "مطابق دستگاه", "swatch-auto"],
 ];
 
-/** The design styles: neumorphism (the default since 2026-11-26), neobrutalism, neon (always dark). */
+/** The design styles: neumorphism (the default since 2026-11-26), neobrutalism, neon — each light or dark. */
 const STYLES: [BdStyle, string, string][] = [
-	["neu", "اسمورفی", "نرم و روشن؛ سایه‌های ملایم"],
+	["neu", "اسمورفی", "نرم؛ سایه‌های ملایم"],
 	["brutal", "ماجراجویانه", "پوستر قرمز؛ خط‌های پررنگ"],
-	["neon", "نئونی", "نبض بنفش؛ همیشه تیره"],
+	["neon", "نئونی", "نبض بنفش و فیروزه‌ای؛ روشن یا تیره"],
 ];
+
+/** A style's look in the scheme on screen now, drawn from the same palette as the app (bd/palettes.ts). */
+function StylePreview({ style, scheme }: { style: BdStyle; scheme: "light" | "dark" }) {
+	const pal = PALETTES[style][scheme];
+	return (
+		<span className={`rt-style-preview pv-${style}`} aria-hidden="true" style={{ background: pal.page, color: pal.text }}>
+			<span className="rt-pv-card" style={{ background: pal.card, color: pal.text }}>
+				<b>سکه‌های تو</b>
+				<small style={{ color: pal.muted }}>۲٬۰۰۰ سکه</small>
+			</span>
+			<span className="rt-pv-button" style={{ background: pal.primary, color: pal.onPrimary }}>
+				شروع
+			</span>
+		</span>
+	);
+}
 
 export function AppearancePage() {
 	const { mode, setMode, style, setStyle } = useThemeModeStore();
-	const bdStyle = useBdStyle();
-	const neon = bdStyle === "neon";
+	// The previews follow the light/dark on screen now (the chosen mode, or the device's).
+	const scheme = useResolvedScheme();
 	return (
 		<AppShell nav="profile" title="ظاهر برنامه">
 			<Panel title="طرح برنامه">
@@ -318,12 +335,11 @@ export function AppearancePage() {
 							aria-checked={style === value}
 							onClick={() => setStyle(value)}
 						>
-							<span className={`rt-style-swatch sw-${value}`} aria-hidden="true">
-								<i />
-								<i />
-								<i />
+							<StylePreview style={value} scheme={scheme} />
+							<span className="rt-style-name">
+								<Icon name={style === value ? "circle-check" : "circle"} className="rt-style-mark" />
+								<b>{label}</b>
 							</span>
-							<b>{label}</b>
 							<small>{note}</small>
 						</button>
 					))}
@@ -338,22 +354,23 @@ export function AppearancePage() {
 							type="button"
 							className="rt-theme-option"
 							role="radio"
-							aria-checked={neon ? value === "dark" : mode === value}
-							aria-pressed={neon ? value === "dark" : mode === value}
-							aria-disabled={neon && value !== "dark"}
-							onClick={() => !neon && setMode(value)}
+							aria-checked={mode === value}
+							onClick={() => setMode(value)}
 						>
 							<span className={`rt-theme-swatch ${swatch}`}>
 								<i />
 								<i />
 								<i />
 							</span>
-							{label}
+							<span className="rt-style-name">
+								<Icon name={mode === value ? "circle-check" : "circle"} className="rt-style-mark" />
+								{label}
+							</span>
 						</button>
 					))}
 				</div>
 				<small className="bd-muted">
-					{neon ? "طرح نئونی همیشه تیره است. " : ""}انتخاب روی همین دستگاه ذخیره می‌شود و برای همهٔ صفحه‌ها اعمال می‌شود.
+					طرح و روشن/تیره جدا از هم انتخاب می‌شوند؛ «مطابق دستگاه» با عوض شدن تنظیم گوشی همان لحظه عوض می‌شود. انتخاب روی همین دستگاه ذخیره می‌شود.
 				</small>
 			</Panel>
 		</AppShell>

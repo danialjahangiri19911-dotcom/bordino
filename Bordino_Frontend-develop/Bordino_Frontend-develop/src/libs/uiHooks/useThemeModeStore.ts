@@ -5,8 +5,8 @@ import { persist } from "zustand/middleware";
 export type Appearance = "light" | "dark" | "system";
 
 /**
- * The app's look (its design style): neobrutalism «پوستر قرمز» (brutal-a), neon «نبض بنفش» (neon-a,
- * always dark) or neumorphism «نرم و روشن» / «اسمورفی» (neu-a, the default since 2026-11-26).
+ * The app's look (its design style): neobrutalism «پوستر قرمز» (brutal-a), neon «نبض بنفش» (neon-a)
+ * or neumorphism «نرم و روشن» / «اسمورفی» (neu-a, the default since 2026-11-26) — each light or dark.
  */
 export type BdStyle = "brutal" | "neon" | "neu";
 export const BD_STYLES: readonly BdStyle[] = ["brutal", "neon", "neu"];
@@ -36,10 +36,13 @@ const useThemeModeStore = create(
 			// v1 (2026-11-26): the default became neumorphism. A stored «brutal» from before was the old
 			// default for nearly everyone (changing only light/dark stored it too): it moves to the new
 			// default; a picked neon or neumorphism stays. (APPEARANCE_SCRIPT does the same before React.)
-			version: 1,
+			// v2 (2026-11-27): Neon has light and dark; it was always dark before, so a Neon store from
+			// then keeps dark (its «روشن»/«مطابق دستگاه» never applied). Theme and mode are independent.
+			version: 2,
 			migrate: (stored, version) => {
 				const state = (stored ?? {}) as ThemeModeProps;
 				if (version < 1 && (state.style === "brutal" || !state.style)) state.style = DEFAULT_STYLE;
+				if (version < 2 && state.style === "neon") state.mode = "dark";
 				return state;
 			},
 		},

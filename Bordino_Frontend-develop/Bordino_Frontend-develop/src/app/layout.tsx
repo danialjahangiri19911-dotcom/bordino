@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from "next";
 import QueryProvider from "@libs/http/Provider";
 
 import { APPEARANCE_SCRIPT } from "@/bd/appearance";
+import { PALETTE_CSS } from "@/bd/palettes";
 // The design's stylesheet first; app.css (production frame and additions) overrides it.
 import "@/bd/bd.css";
 import "@/bd/app.css";
@@ -45,6 +46,8 @@ export default function RootLayout({
 			<head>
 				{/* Applies the stored light/dark choice before the first paint (no light flash). */}
 				<script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+				{/* The approved palettes (bd/palettes.ts), the one source of every theme's colours. */}
+				<style id="bd-palettes" dangerouslySetInnerHTML={{ __html: PALETTE_CSS }} />
 			</head>
 			<body dir="rtl">
 				<QueryProvider>

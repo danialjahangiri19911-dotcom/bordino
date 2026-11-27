@@ -8,14 +8,11 @@ body { margin: 0; }
 
 /* brutal-a palette (reference ui.js palette(): --bd-* as light-dark pairs on the article) */
 #bordino-directions .bd-product.st-brutal {
-	/* accent #d64142 → #c7393b (2026-11-27 contrast audit): white on it 4.47 → 5.15:1, it as text on the
-	   surface 4.39 → 5.0:1. --bd-accent-ink: the accent as text on its own tint (labels, tags). */
-	--bd-accent: #c7393b; --bd-tint: #f4c8bd; --bd-bg: #fff8eb; --bd-surface: #fffdf5;
-	--bd-on: #ffffff; --bd-hi: #ffffff; --bd-lo: #d5d7de; --bd-accent-ink: #9b262e;
+	/* The colours come from bd/palettes.ts (PALETTE_CSS); the rest of the style here. */
+	--bd-hi: #ffffff; --bd-lo: #d5d7de;
 }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-product.st-brutal {
-	--bd-accent: #ff9995; --bd-tint: #59322d; --bd-bg: #24211e; --bd-surface: #34302a; --bd-accent-ink: #ff9995;
-	--bd-on: #221d29; --bd-hi: #55556b; --bd-lo: #12131b;
+	--bd-hi: #55556b; --bd-lo: #12131b;
 }
 
 /* The reference draws each screen as a framed card; in the app a page is the whole viewport. */
@@ -46,7 +43,7 @@ body { margin: 0; }
 #bordino-directions .bd-nav-item[aria-current="page"] { color: var(--bd-accent-ink, var(--bd-accent)) !important; background: var(--bd-tint) !important; }
 #bordino-directions .bd-text-btn { cursor: pointer; }
 #bordino-directions .bd-product :is(button, a, input, select, summary, [tabindex]):focus-visible {
-	outline: 3px solid var(--bd-accent); outline-offset: 2px;
+	outline: 3px solid var(--bd-focus, var(--bd-accent)); outline-offset: 2px;
 }
 #bordino-directions .bd-product button:disabled,
 #bordino-directions .bd-product .bd-action[aria-disabled="true"] { opacity: .55; cursor: not-allowed; box-shadow: none !important; }
@@ -57,12 +54,12 @@ body { margin: 0; }
 #bordino-directions .bd-avatar-img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Notices: the reference has one tone (warn); success and info reuse its block. */
-#bordino-directions .rt-notice.bd-notice-ok { background: color-mix(in srgb, #2f8f5b 18%, var(--bd-surface)); color: var(--bd-fg); }
+#bordino-directions .rt-notice.bd-notice-ok { background: color-mix(in srgb, var(--bd-positive, #2f8f5b) 18%, var(--bd-surface)); color: var(--bd-fg); }
 #bordino-directions .rt-notice.bd-notice-info { background: var(--bd-surface); color: var(--bd-fg); border: 2px solid var(--bd-outline); }
 
 /* Field errors and selects (the reference fields are inputs only). */
 #bordino-directions .rt-field .bd-field-error,
-#bordino-directions .bd-field-error { color: var(--bd-accent); font-size: 12px; margin: 4px 0 0; }
+#bordino-directions .bd-field-error { color: var(--bd-negative, var(--bd-accent)); font-size: 13px; margin: 4px 0 0; }
 #bordino-directions .bd-date-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr; gap: 8px; }
 
 /* Lists of real rows (transactions, tickets, prizes, bank accounts). */
@@ -73,10 +70,9 @@ body { margin: 0; }
 #bordino-directions .bd-row b { font-weight: 500; overflow-wrap: anywhere; }
 #bordino-directions .bd-row small { color: var(--bd-muted); }
 #bordino-directions .bd-row .bd-amount { white-space: nowrap; font-weight: 500; }
-/* Money in: #2f8f5b measured 3.48:1 (Soft Light) and 3.96:1 (Adventure Light); #236f46 is 5.3–6.0:1. */
-#bordino-directions .bd-amount.is-plus { color: #236f46; }
-:root[data-bd-scheme="dark"] #bordino-directions .bd-amount.is-plus { color: #7fd6a3; }
-#bordino-directions .bd-amount.is-minus { color: var(--bd-accent); }
+/* Money in and out: the palette's positive and debit colours (bd/palettes.ts); the + and − stay. */
+#bordino-directions .bd-amount.is-plus { color: var(--bd-positive, #236f46); }
+#bordino-directions .bd-amount.is-minus { color: var(--bd-negative, var(--bd-accent)); }
 #bordino-directions .bd-more { align-self: center; margin-top: 12px; }
 
 /* Ball picker and lottery numbers. */

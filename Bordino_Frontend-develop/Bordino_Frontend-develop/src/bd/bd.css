@@ -198,7 +198,7 @@
 #bordino-directions fieldset.rt-field{ flex-direction:row; align-items:center; gap:24px; border:0; padding:0}
 #bordino-directions .rt-field legend{ font-size:12px}
 #bordino-directions .rt-field input[type=radio]{ accent-color:var(--bd-accent)}
-#bordino-directions .rt-notice{ margin:16px 0; padding:12px; background:var(--bd-tint); color:var(--bd-accent); border-radius:10px; font-size:12px}
+#bordino-directions .rt-notice{ margin:16px 0; padding:12px; background:var(--bd-tint); color:var(--bd-accent-ink, var(--bd-accent)); border-radius:10px; font-size:13px}
 #bordino-directions .rt-empty{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; padding:32px 10px}
 #bordino-directions .rt-empty>svg{ width:42px; height:42px; color:var(--bd-accent)}
 #bordino-directions .rt-empty p{ color:var(--bd-muted); font-size:12px}
@@ -228,7 +228,7 @@
 #bordino-directions .rt-setting input{ width:22px; height:22px; accent-color:var(--bd-accent); flex:none}
 #bordino-directions .rt-theme-options{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0}
 #bordino-directions .rt-theme-option{ padding:12px!important; background:var(--bd-bg)!important; border:1px solid var(--bd-border)!important; border-radius:12px}
-#bordino-directions .rt-theme-option[aria-pressed=true]{ border-color:var(--bd-accent)!important; color:var(--bd-accent)}
+#bordino-directions .rt-theme-option[aria-checked=true]{ border-color:var(--bd-accent)!important; color:var(--bd-accent-ink, var(--bd-accent)); box-shadow:0 0 0 2px var(--bd-accent)}
 #bordino-directions .rt-theme-swatch{ display:grid; grid-template-columns:1fr 2fr; gap:5px; border:1px solid var(--bd-border); padding:9px; height:80px; border-radius:6px; margin-bottom:10px; background:#f6f5f9}
 :root[data-bd-scheme="dark"] #bordino-directions .rt-theme-swatch{ background:#eeedf3}
 #bordino-directions .rt-theme-swatch i{ background:#dedce7; border-radius:3px}

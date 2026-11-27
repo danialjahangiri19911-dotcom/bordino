@@ -1,35 +1,33 @@
-/* The two styles a player can pick in «ظاهر برنامه» beside the default neobrutalism (brutal-a,
-   bd.css + app.css, untouched): neon «نبض بنفش» (neon-a, always dark) and neumorphism «نرم و روشن»
-   (neu-a, light and dark). Palettes from the handoffs' design/tokens.css and reference ui.js; the
+/* The styles a player can pick in «ظاهر برنامه»: neon «نبض بنفش» (neon-a, light and dark since
+   2026-11-27) and neumorphism «نرم و روشن» (neu-a, light and dark). Their COLOURS (page, card, text,
+   accent, selected, amounts, focus) come from bd/palettes.ts (PALETTE_CSS in the root layout); the
+   blocks below keep only the rest of each style (shadows, borders, radii). Palettes from the handoffs' design/tokens.css and reference ui.js; the
    style rules from reference/ui.css (light-dark() pairs written out per scheme, as app.css does).
    The surface classes come from appearance.ts styleClass(): .st-neon.bd-night / .st-neu. */
 
-html[data-bd-style="neon"] { background: #0e1020; }
-html[data-bd-style="neu"] { background: #eceef2; }
-html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 
 /* ── palettes (the :root[data-bd-scheme] prefix outranks bd.css's dark defaults) ── */
 
 :root[data-bd-scheme] #bordino-directions .bd-product.st-neon {
-	--bd-accent: #b781ff; --bd-tint: #24183d; --bd-bg: #0e1020; --bd-surface: #191c30; --bd-on: #150c28;
 	--bd-hi: #55556b; --bd-lo: #12131b; --ng-second: #51e4ff;
-	--bd-fg: #fcfdff; --bd-muted: #d9e2f1; --bd-border: #465570; --bd-shadow: #0008;
+	--bd-border: #465570; --bd-shadow: #0008;
 	--bd-outline: #465570; --bd-hard-shadow: transparent;
-	color-scheme: dark;
 	border-color: var(--bd-border);
 }
+:root[data-bd-scheme="light"] #bordino-directions .bd-product.st-neon {
+	--bd-hi: #ffffff; --bd-lo: #dcd8ee; --ng-second: #0b7f9c;
+	--bd-border: #d6d0ef; --bd-shadow: #6340b51f; --bd-outline: #d6d0ef;
+}
 :root[data-bd-scheme] #bordino-directions .bd-product.st-neu {
-	--bd-accent: #6757ba; --bd-tint: #e6e3ee; --bd-bg: #eceef2; --bd-surface: #eceef2; --bd-on: #ffffff;
 	--bd-hi: #ffffff; --bd-lo: #d1d5de;
-	--bd-fg: #25252b; --bd-muted: #68666e; --bd-border: #d0d4dc;
+	--bd-border: #d0d4dc;
 	--bd-outline: transparent; --bd-hard-shadow: transparent;
 	--bd-radius: 23px;
 	border-color: transparent;
 }
 :root[data-bd-scheme="dark"] #bordino-directions .bd-product.st-neu {
-	--bd-accent: #c0b2ff; --bd-tint: #343340; --bd-bg: #292e37; --bd-surface: #292e37; --bd-on: #221d29;
 	--bd-hi: #3c4350; --bd-lo: #1b1e25;
-	--bd-fg: #f5f7fb; --bd-muted: #c2cad7; --bd-border: #56616f;
+	--bd-border: #56616f;
 }
 
 /* ── shared text rules of the reference ── */
@@ -71,7 +69,7 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 #bordino-directions .bd-night .bd-panel,
 #bordino-directions .bd-night .bd-step,
 #bordino-directions .bd-night .bd-ticket { background: var(--bd-surface); border: 1px solid var(--bd-border); border-radius: 14px; box-shadow: 0 5px 18px var(--bd-shadow); }
-#bordino-directions .bd-night .bd-tag { background: var(--bd-tint); color: var(--bd-accent); border-color: transparent; }
+#bordino-directions .bd-night .bd-tag { background: var(--bd-tint); color: var(--bd-accent-ink, var(--bd-accent)); border-color: transparent; }
 #bordino-directions .bd-night .ng-banner { background: var(--bd-surface); box-shadow: inset 0 0 35px color-mix(in srgb, var(--bd-accent) 7%, transparent); }
 #bordino-directions .bd-night .ng-banner > div:first-child { position: relative; z-index: 2; }
 #bordino-directions .st-neon .ng-hero { background: radial-gradient(ellipse at 70% 50%, color-mix(in srgb, var(--bd-accent) 9%, transparent), transparent 65%); }
@@ -80,10 +78,10 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 #bordino-directions .bd-night .ng-side { flex-wrap: wrap; }
 #bordino-directions .bd-night .ng-side .bd-nav-item { white-space: nowrap; }
 #bordino-directions .bd-night .bd-sidebar .bd-nav-item[aria-pressed=true],
-#bordino-directions .bd-night .bd-sidebar .bd-nav-item[aria-current=page] { background: var(--bd-tint) !important; color: var(--bd-accent) !important; }
+#bordino-directions .bd-night .bd-sidebar .bd-nav-item[aria-current=page] { background: var(--bd-tint) !important; color: var(--bd-accent-ink, var(--bd-accent)) !important; }
 #bordino-directions .bd-night button:disabled { opacity: 1; color: var(--bd-muted) !important; background: var(--bd-surface) !important; border: 1px solid var(--bd-border) !important; box-shadow: none; }
 #bordino-directions .bd-night :is(input,select,textarea):not([type=checkbox]):not([type=radio]) { background: var(--bd-bg); border-color: var(--bd-border) !important; color: var(--bd-fg); }
-#bordino-directions .bd-night :is(input,select,textarea):focus-visible { outline: 2px solid var(--bd-accent); outline-offset: 1px; box-shadow: 0 0 14px color-mix(in srgb, var(--bd-accent) 35%, transparent); }
+#bordino-directions .bd-night :is(input,select,textarea):focus-visible { outline: 2px solid var(--bd-focus, var(--bd-accent)); outline-offset: 1px; box-shadow: 0 0 14px color-mix(in srgb, var(--bd-accent) 35%, transparent); }
 #bordino-directions .st-neon :is(.au-welcome,.au-intro-art) { background: var(--bd-surface); border: 1px solid var(--bd-border); }
 #bordino-directions .st-neon .au-main-symbol { box-shadow: 0 0 40px color-mix(in srgb, var(--bd-accent) 28%, transparent); }
 #bordino-directions .st-neon .au-orbit { border-color: var(--bd-accent); box-shadow: 0 0 25px color-mix(in srgb, var(--bd-accent) 15%, transparent); }
@@ -93,7 +91,7 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 /* Hard offset shadows go (--bd-hard-shadow is transparent); outlines turn into the style's line. */
 #bordino-directions .st-neu .bd-sheet,
 #bordino-directions .st-neu .bd-mission-icon { border-color: transparent; box-shadow: 7px 7px 15px var(--bd-lo), -7px -7px 15px var(--bd-hi); }
-#bordino-directions .bd-night .bd-sheet { border: 1px solid var(--bd-border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px #0008; }
+#bordino-directions .bd-night .bd-sheet { border: 1px solid var(--bd-border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px var(--bd-shadow); }
 #bordino-directions :is(.st-neu,.bd-night) .bd-sheet-backdrop { backdrop-filter: blur(2px); }
 /* «معمای شهری» and the missions */
 #bordino-directions .st-neu :is(.my-cover,.my-clue-image,.my-place-head img,.my-step-number) { border-color: transparent; box-shadow: 4px 4px 9px var(--bd-lo), -4px -4px 9px var(--bd-hi); border-radius: 12px; }
@@ -102,7 +100,7 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 #bordino-directions .st-neu :is(.my-clue,.my-hint,.my-note,.my-offer,.my-locked) { border-radius: 14px; }
 #bordino-directions .bd-night :is(.my-cover,.my-clue-image,.my-place-head img,.my-step-number,.my-progress,.my-problem,.my-hint-ask) { border-width: 1px; border-color: var(--bd-border); border-radius: 8px; }
 #bordino-directions .bd-night .my-progress span { box-shadow: 0 0 12px color-mix(in srgb, var(--bd-accent) 60%, transparent); }
-#bordino-directions .bd-night :is(.my-done .my-step-number) { background: #2f8f5b; border-color: #2f8f5b; }
+#bordino-directions .bd-night :is(.my-done .my-step-number) { background: var(--bd-positive); border-color: var(--bd-positive); color: var(--bd-bg); }
 #bordino-directions .bd-night .my-clue { border-inline-start-color: var(--bd-accent); background: color-mix(in srgb, var(--bd-accent) 12%, var(--bd-surface)); }
 #bordino-directions .bd-night .mi-points, #bordino-directions .bd-night .my-step-points { text-shadow: 0 0 10px color-mix(in srgb, var(--bd-accent) 50%, transparent); }
 
@@ -110,21 +108,20 @@ html[data-bd-style="neu"][data-bd-scheme="dark"] { background: #292e37; }
 #bordino-directions .rt-style-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 12px; }
 #bordino-directions .rt-style-option { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px; border: 2px solid var(--bd-border); border-radius: 12px; background: var(--bd-surface); color: var(--bd-fg); font: inherit; font-size: 13px; cursor: pointer; text-align: center; }
 #bordino-directions .rt-style-option[aria-checked=true] { border-color: var(--bd-accent); box-shadow: 0 0 0 2px var(--bd-accent); }
-#bordino-directions .rt-style-option small { color: var(--bd-muted); font-size: 10px; line-height: 1.6; }
-#bordino-directions .rt-style-swatch { display: grid; gap: 5px; padding: 9px 8px; height: 76px; border-radius: 8px; align-content: center; }
-#bordino-directions .rt-style-swatch i { display: block; height: 12px; border-radius: 3px; }
-#bordino-directions .rt-style-swatch i:nth-child(2) { width: 70%; }
-#bordino-directions .rt-style-swatch i:nth-child(3) { width: 45%; height: 16px; justify-self: end; }
-#bordino-directions .sw-brutal { background: #fff8eb; border: 2px solid #25252b; box-shadow: 3px 3px 0 #25252b; }
-#bordino-directions .sw-brutal i { background: #25252b; border-radius: 0; }
-#bordino-directions .sw-brutal i:nth-child(3) { background: #d64142; }
-#bordino-directions .sw-neon { background: #0e1020; border: 1px solid #465570; }
-#bordino-directions .sw-neon i { background: #25203e; }
-#bordino-directions .sw-neon i:nth-child(3) { background: #b781ff; box-shadow: 0 0 10px #b781ffaa; }
-#bordino-directions .sw-neu { background: #eceef2; box-shadow: 4px 4px 9px #d1d5de, -4px -4px 9px #fff; }
-#bordino-directions .sw-neu i { background: #eceef2; box-shadow: inset 2px 2px 4px #d1d5de, inset -2px -2px 4px #fff; }
-#bordino-directions .sw-neu i:nth-child(3) { background: #6757ba; box-shadow: none; border-radius: 10px; }
-#bordino-directions .rt-theme-option[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
+#bordino-directions .rt-style-option small { color: var(--bd-muted); font-size: 12px; line-height: 1.6; }
+/* The preview (bd/palettes.ts colours in the scheme on screen): a page, a card with text, a button. */
+#bordino-directions .rt-style-preview { display: grid; gap: 6px; padding: 8px; border-radius: 9px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); min-height: 84px; align-content: center; }
+#bordino-directions .rt-pv-card { display: grid; gap: 1px; padding: 6px 8px; border-radius: 7px; text-align: right; }
+#bordino-directions .rt-pv-card b { font-size: 12px; line-height: 1.5; }
+#bordino-directions .rt-pv-card small { font-size: 11px; line-height: 1.5; color: inherit; }
+#bordino-directions .rt-pv-button { justify-self: start; padding: 3px 12px; border-radius: 7px; font-size: 12px; font-weight: 700; line-height: 1.6; }
+#bordino-directions .pv-brutal .rt-pv-card { border: 2px solid currentColor; border-radius: 2px; }
+#bordino-directions .pv-brutal .rt-pv-button { border: 2px solid #29231e; border-radius: 2px; }
+#bordino-directions .pv-neon .rt-pv-button { border-radius: 30px; }
+#bordino-directions .pv-neu .rt-pv-card, #bordino-directions .pv-neu .rt-pv-button { border-radius: 12px; }
+#bordino-directions .rt-style-name { display: flex; align-items: center; gap: 6px; }
+#bordino-directions .rt-style-mark { width: 18px; height: 18px; flex: none; color: var(--bd-muted); }
+#bordino-directions .rt-style-option[aria-checked=true] .rt-style-mark { color: var(--bd-accent-ink, var(--bd-accent)); }
 @media (max-width: 380px) { #bordino-directions .rt-style-options { gap: 8px; } #bordino-directions .rt-style-option { font-size: 12px; padding: 6px; } }
 
 /* ── the game pages' surroundings (app.css paints them neobrutalism's paper) ── */
