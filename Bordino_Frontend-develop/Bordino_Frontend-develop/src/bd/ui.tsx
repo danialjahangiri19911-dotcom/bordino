@@ -11,6 +11,7 @@ import { styleClass, useArt, useBdStyle } from "./appearance";
 import { confirmLeave } from "./back";
 import { useDismissOutside } from "./dismiss";
 import { HOME_VISIBLE } from "./features";
+import { useSeesaw } from "./seesaw";
 import { fa } from "./format";
 import { takePendingInvite, takePendingQr } from "./missions/pendingQr";
 import { reconcilePushOwner } from "./push";
@@ -248,6 +249,9 @@ function SignedInShell({
 	const st = styleClass(useBdStyle());
 	useProfileSync();
 	usePendingQr();
+	// «Seesaw tilt»: the bar tilts toward the tapped side, then springs back (seesaw.ts).
+	const navRef = useRef<HTMLElement>(null);
+	const seesaw = useSeesaw(navRef);
 	return (
 		<article className={`bd-product bd-app rt-product ${st} lay-1 bd-page`} aria-label={title}>
 			<header className="bd-app-top">
@@ -261,7 +265,7 @@ function SignedInShell({
 				</div>
 			</header>
 			<div className="bd-shell">
-				<nav className="bd-sidebar" aria-label="ناوبری اصلی">
+				<nav ref={navRef} className="bd-sidebar" aria-label="ناوبری اصلی" onPointerDown={seesaw}>
 					{NAV.map((item) => (
 						<Link
 							key={item.key}
