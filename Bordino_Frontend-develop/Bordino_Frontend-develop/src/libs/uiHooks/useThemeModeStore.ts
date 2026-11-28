@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-/** What the player picked in «ظاهر برنامه»: a fixed scheme, or follow the device. */
-export type Appearance = "light" | "dark" | "system";
+/** What the player picked in «ظاهر برنامه»: a fixed scheme, follow the device, or «سفارشی» (each
+ * style's custom palette, bd/palettes.ts CUSTOM). */
+export type Appearance = "light" | "dark" | "system" | "custom";
 
 /**
  * The app's look (its design style): neobrutalism «پوستر قرمز» (brutal-a), neon «نبض بنفش» (neon-a)

@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 
-import { PALETTES } from "./palettes";
+import { CUSTOM_BASE, paletteFor } from "./palettes";
 import useThemeModeStore, { type Appearance, type BdStyle, DEFAULT_STYLE } from "@libs/uiHooks/useThemeModeStore";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -14,10 +14,10 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
  * html[data-bd-style] (themes.css). Every style has light and dark (Neon too since 2026-11-27); a
  * store from before that (version < 2) with Neon keeps the dark it always had.
  */
-export const APPEARANCE_SCRIPT = `(function(){try{var m="system",t="neu";var s=localStorage.getItem("lt-theme-store");if(s){var v=JSON.parse(s);if(v&&v.state&&["light","dark","system"].indexOf(v.state.mode)>=0)m=v.state.mode;if(v&&v.state&&["brutal","neon","neu"].indexOf(v.state.style)>=0)t=v.state.style;if(t==="brutal"&&!(v.version>=1))t="neu";if(t==="neon"&&!(v.version>=2))m="dark";}var d=m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("${DARK_QUERY}").matches);var e=document.documentElement;e.setAttribute("data-bd-scheme",d?"dark":"light");e.setAttribute("data-bd-style",t);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`;
+export const APPEARANCE_SCRIPT = `(function(){try{var m="system",t="neu";var s=localStorage.getItem("lt-theme-store");if(s){var v=JSON.parse(s);if(v&&v.state&&["light","dark","system","custom"].indexOf(v.state.mode)>=0)m=v.state.mode;if(v&&v.state&&["brutal","neon","neu"].indexOf(v.state.style)>=0)t=v.state.style;if(t==="brutal"&&!(v.version>=1))t="neu";if(t==="neon"&&!(v.version>=2))m="dark";}var d=m==="custom"?t==="neon":m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("${DARK_QUERY}").matches);var e=document.documentElement;if(m==="custom")e.setAttribute("data-bd-variant","custom");else e.removeAttribute("data-bd-variant");e.setAttribute("data-bd-scheme",d?"dark":"light");e.setAttribute("data-bd-style",t);e.style.colorScheme=d?"dark":"light";}catch(_){}})();`;
 
 /** The page background before and around the app, per style and scheme (the browser bar too). */
-const pageColor = (style: BdStyle, scheme: "light" | "dark") => PALETTES[style][scheme].page;
+const pageColor = (style: BdStyle, scheme: "light" | "dark", custom = false) => paletteFor(style, scheme, custom).page;
 
 function systemDark() {
 	return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia(DARK_QUERY).matches;
@@ -31,7 +31,8 @@ function subscribeSystem(onChange: () => void) {
 }
 
 export function resolveScheme(mode: Appearance, deviceDark: boolean, style: BdStyle = DEFAULT_STYLE): "light" | "dark" {
-	void style; // (every style has both schemes; kept in the signature for its callers)
+	// «سفارشی» draws on its style's own base scheme (Liquid Glass is dark, the others light).
+	if (mode === "custom") return CUSTOM_BASE[style];
 	return mode === "dark" || (mode === "system" && deviceDark) ? "dark" : "light";
 }
 
@@ -85,13 +86,16 @@ export function useResolvedScheme(): "light" | "dark" {
 export function useApplyScheme() {
 	const scheme = useResolvedScheme();
 	const style = useBdStyle();
+	const custom = useThemeModeStore((s) => s.mode) === "custom";
 	useEffect(() => {
 		const root = document.documentElement;
 		root.setAttribute("data-bd-scheme", scheme);
 		root.setAttribute("data-bd-style", style);
+		if (custom) root.setAttribute("data-bd-variant", "custom");
+		else root.removeAttribute("data-bd-variant");
 		root.style.colorScheme = scheme;
 		const meta = document.querySelector('meta[name="theme-color"]');
-		if (meta) meta.setAttribute("content", pageColor(style, scheme));
-	}, [scheme, style]);
+		if (meta) meta.setAttribute("content", pageColor(style, scheme, custom));
+	}, [scheme, style, custom]);
 	return scheme;
 }

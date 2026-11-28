@@ -45,6 +45,22 @@ export const PALETTES: Record<Style, Record<Scheme, Palette>> = {
 	},
 };
 
+/**
+ * «سفارشی» (2026-11-28, the owner's choice from a design reel): a third look per theme beside light and
+ * dark — Neumorphism for «اسمورفی», Brutalism for «ماجراجویانه», Liquid Glass for «نئونی». Each sits on a
+ * light or dark base (CUSTOM_BASE: the scheme the rest of the CSS draws with). Hues from the reel's
+ * frames; shades nudged only where a pair fell under WCAG AA (≥ 4.5:1 text, ≥ 3:1 focus).
+ */
+export const CUSTOM: Record<Style, Palette> = {
+	neu: p("#E3E7ED", "#F1F3F7", "#1F2430", "#525A69", "#335AB2", "#FFFFFF", "#D3DEF6", "#284A93", "#256C30", "#A3343C", "#335AB2"),
+	brutal: p("#EEEEEE", "#FFFFFF", "#070606", "#4A4747", "#7330DD", "#FFFFFF", "#D0F700", "#070606", "#1E7334", "#B3261E", "#7330DD"),
+	neon: p("#112779", "#25338C", "#F3F0FF", "#CDD0F5", "#B9BCF8", "#0E1B5E", "#4249AB", "#FFFFFF", "#8FE6B6", "#FFB4C9", "#E3CCFF"),
+};
+export const CUSTOM_BASE: Record<Style, Scheme> = { neu: "light", brutal: "light", neon: "dark" };
+
+/** The palette on screen for a style, a scheme and whether «سفارشی» is chosen. */
+export const paletteFor = (style: Style, scheme: Scheme, custom = false): Palette => (custom ? CUSTOM[style] : PALETTES[style][scheme]);
+
 const TOKENS: [keyof Palette, string][] = [
 	["page", "--bd-bg"],
 	["card", "--bd-surface"],
@@ -74,6 +90,17 @@ export const PALETTE_CSS = (Object.keys(PALETTES) as Style[])
 			return (
 				`:root[data-bd-style="${style}"][data-bd-scheme="${scheme}"] #bordino-directions .bd-product.${CLASS[style]}{${vars};color-scheme:${scheme}}` +
 				`html[data-bd-style="${style}"][data-bd-scheme="${scheme}"]{background:${pal.page}}`
+			);
+		}),
+	)
+	.concat(
+		// «سفارشی»: one more attribute (data-bd-variant), so it outranks that style's light/dark tokens.
+		(Object.keys(CUSTOM) as Style[]).map((style) => {
+			const pal = CUSTOM[style];
+			const vars = TOKENS.map(([role, token]) => `${token}:${pal[role]}`).join(";");
+			return (
+				`:root[data-bd-style="${style}"][data-bd-scheme][data-bd-variant="custom"] #bordino-directions .bd-product.${CLASS[style]}{${vars};color-scheme:${CUSTOM_BASE[style]}}` +
+				`html[data-bd-style="${style}"][data-bd-scheme][data-bd-variant="custom"]{background:${pal.page}}`
 			);
 		}),
 	)

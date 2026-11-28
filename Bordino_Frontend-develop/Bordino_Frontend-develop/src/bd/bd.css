@@ -226,7 +226,8 @@
 #bordino-directions .rt-profile-row small,#bordino-directions .rt-setting small{ display:block; color:var(--bd-muted)}
 #bordino-directions .rt-setting{ display:flex; justify-content:space-between; align-items:center; gap:20px; padding:20px 0; border-bottom:1px solid var(--bd-border)}
 #bordino-directions .rt-setting input{ width:22px; height:22px; accent-color:var(--bd-accent); flex:none}
-#bordino-directions .rt-theme-options{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:20px 0}
+#bordino-directions .rt-theme-options{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:20px 0}
+@media(max-width:540px){#bordino-directions .rt-theme-options{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px}}
 #bordino-directions .rt-theme-option{ padding:12px!important; background:var(--bd-bg)!important; border:1px solid var(--bd-border)!important; border-radius:12px}
 #bordino-directions .rt-theme-option[aria-checked=true]{ border-color:var(--bd-accent)!important; color:var(--bd-accent-ink, var(--bd-accent)); box-shadow:0 0 0 2px var(--bd-accent)}
 #bordino-directions .rt-theme-swatch{ display:grid; grid-template-columns:1fr 2fr; gap:5px; border:1px solid var(--bd-border); padding:9px; height:80px; border-radius:6px; margin-bottom:10px; background:#f6f5f9}

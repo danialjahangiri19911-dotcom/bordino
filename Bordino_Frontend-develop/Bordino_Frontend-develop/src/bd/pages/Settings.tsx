@@ -7,7 +7,7 @@ import Link from "next/link";
 
 import { useResolvedScheme } from "../appearance";
 import Icon from "../Icon";
-import { PALETTES } from "../palettes";
+import { paletteFor } from "../palettes";
 import { BadgeArt, type BadgeFacts, badgeStates } from "../achievements";
 import {
 	type NotificationPrefs,
@@ -292,6 +292,8 @@ export function Notifications() {
 const THEMES: [Appearance, string, string][] = [
 	["light", "روشن", "swatch-light"],
 	["dark", "تیره", "swatch-dark"],
+	// each style's own custom palette (bd/palettes.ts CUSTOM): Neumorphism, Brutalism, Liquid Glass
+	["custom", "سفارشی", "swatch-custom"],
 	["system", "مطابق دستگاه", "swatch-auto"],
 ];
 
@@ -303,8 +305,8 @@ const STYLES: [BdStyle, string, string][] = [
 ];
 
 /** A style's look in the scheme on screen now, drawn from the same palette as the app (bd/palettes.ts). */
-function StylePreview({ style, scheme }: { style: BdStyle; scheme: "light" | "dark" }) {
-	const pal = PALETTES[style][scheme];
+function StylePreview({ style, scheme, custom }: { style: BdStyle; scheme: "light" | "dark"; custom: boolean }) {
+	const pal = paletteFor(style, scheme, custom);
 	return (
 		<span className={`rt-style-preview pv-${style}`} aria-hidden="true" style={{ background: pal.page, color: pal.text }}>
 			<span className="rt-pv-card" style={{ background: pal.card, color: pal.text }}>
@@ -335,7 +337,7 @@ export function AppearancePage() {
 							aria-checked={style === value}
 							onClick={() => setStyle(value)}
 						>
-							<StylePreview style={value} scheme={scheme} />
+							<StylePreview style={value} scheme={scheme} custom={mode === "custom"} />
 							<span className="rt-style-name">
 								<Icon name={style === value ? "circle-check" : "circle"} className="rt-style-mark" />
 								<b>{label}</b>
@@ -357,11 +359,20 @@ export function AppearancePage() {
 							aria-checked={mode === value}
 							onClick={() => setMode(value)}
 						>
-							<span className={`rt-theme-swatch ${swatch}`}>
-								<i />
-								<i />
-								<i />
-							</span>
+							{value === "custom" ? (
+								// (drawn from the chosen style's own custom palette)
+								<span className={`rt-theme-swatch ${swatch}`} style={{ background: paletteFor(style, "light", true).page }}>
+									<i style={{ background: paletteFor(style, "light", true).card }} />
+									<i style={{ background: paletteFor(style, "light", true).selected }} />
+									<i style={{ background: paletteFor(style, "light", true).primary }} />
+								</span>
+							) : (
+								<span className={`rt-theme-swatch ${swatch}`}>
+									<i />
+									<i />
+									<i />
+								</span>
+							)}
 							<span className="rt-style-name">
 								<Icon name={mode === value ? "circle-check" : "circle"} className="rt-style-mark" />
 								{label}
@@ -370,7 +381,7 @@ export function AppearancePage() {
 					))}
 				</div>
 				<small className="bd-muted">
-					طرح و روشن/تیره جدا از هم انتخاب می‌شوند؛ «مطابق دستگاه» با عوض شدن تنظیم گوشی همان لحظه عوض می‌شود. انتخاب روی همین دستگاه ذخیره می‌شود.
+					طرح و حالت جدا از هم انتخاب می‌شوند. «سفارشی» رنگ‌های ویژهٔ هر طرح است (اسمورفی، بروتالیسم، شیشهٔ مایع)؛ «مطابق دستگاه» با عوض شدن تنظیم گوشی همان لحظه عوض می‌شود. انتخاب روی همین دستگاه ذخیره می‌شود.
 				</small>
 			</Panel>
 		</AppShell>
