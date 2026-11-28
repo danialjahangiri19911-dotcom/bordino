@@ -2,7 +2,6 @@ import React from "react";
 
 import type { Metadata, Viewport } from "next";
 
-import QueryProvider from "@libs/http/Provider";
 
 import { APPEARANCE_SCRIPT } from "@/bd/appearance";
 import { PALETTE_CSS } from "@/bd/palettes";
@@ -11,7 +10,7 @@ import "@/bd/bd.css";
 import "@/bd/app.css";
 // The neon and neumorphism styles a player can pick (neumorphism is the default since 2026-11-26).
 import "@/bd/themes.css";
-import Layout from "@/libs/components/layouts/Layout";
+import AppRoot from "@/libs/components/layouts/AppRoot";
 
 import "./globals.css";
 
@@ -50,9 +49,8 @@ export default function RootLayout({
 				<style id="bd-palettes" dangerouslySetInnerHTML={{ __html: PALETTE_CSS }} />
 			</head>
 			<body dir="rtl">
-				<QueryProvider>
-					<Layout>{children}</Layout>
-				</QueryProvider>
+				{/* One client root (AppRoot): the app is not rebuilt on every navigation. */}
+				<AppRoot>{children}</AppRoot>
 			</body>
 		</html>
 	);

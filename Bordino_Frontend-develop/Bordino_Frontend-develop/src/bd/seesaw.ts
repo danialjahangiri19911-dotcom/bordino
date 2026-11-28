@@ -12,7 +12,7 @@ import { type PointerEvent as ReactPointerEvent, type RefObject, useEffect } fro
  * tilt in progress is kept here and the next page's bar picks it up where it was.
  */
 const DURATION = 620;
-const MAX_DEG = 11;
+const MAX_DEG = 18;
 
 let current: { axis: "x" | "y"; deg: number; start: number } | null = null;
 
@@ -20,7 +20,7 @@ const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia
 
 /** Dip toward the tap, overshoot back past level a little, settle (a spring). */
 function frames(axis: "x" | "y", deg: number): Keyframe[] {
-	const t = (d: number) => `perspective(520px) rotate${axis === "y" ? "Y" : "X"}(${d.toFixed(2)}deg)`;
+	const t = (d: number) => `perspective(460px) rotate${axis === "y" ? "Y" : "X"}(${d.toFixed(2)}deg)`;
 	return [
 		{ transform: t(0), offset: 0 },
 		{ transform: t(deg), offset: 0.28, easing: "cubic-bezier(.3,.7,.4,1)" },

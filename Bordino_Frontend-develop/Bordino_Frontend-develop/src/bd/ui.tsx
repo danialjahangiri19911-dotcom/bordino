@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -203,14 +203,125 @@ interface ShellProps {
 	children: ReactNode;
 }
 
+/**
+ * The /pwa frame (app/pwa/layout.tsx, 2026-11-28): the header and the main navigation are drawn here
+ * ONCE for every page that uses AppShell, so moving between those pages changes only the page — the
+ * header, the navigation, its icons and the avatar stay as they are (before, each page drew its own
+ * copy and a tap rebuilt all of it). A page claims the frame while it is shown (AppShell, before the
+ * first paint); pages without AppShell (games, sign-in, Game Master) get no header. The page always
+ * sits at the same place in the tree, so showing or hiding the header never rebuilds it.
+ */
+interface FrameApi {
+	claim(nav: NavKey, title: string): () => void;
+}
+const FrameContext = createContext<FrameApi | null>(null);
+
+export function AppFrame({ children }: { children: ReactNode }) {
+	const st = styleClass(useBdStyle());
+	const { isLoggedIn } = useAuthStore();
+	const [page, setPage] = useState<{ nav: NavKey; title: string } | null>(null);
+	const claims = useRef(0);
+	const api = useMemo<FrameApi>(
+		() => ({
+			claim(nav, title) {
+				claims.current += 1;
+				setPage({ nav, title });
+				return () => {
+					claims.current -= 1;
+					// (a page leaving and the next one arriving happen in one commit: only a page with no
+					// successor takes the header away)
+					if (claims.current === 0) setPage(null);
+				};
+			},
+		}),
+		[],
+	);
+	const chrome = !!page && isLoggedIn;
+	return (
+		<FrameContext.Provider value={api}>
+			<article className={chrome ? `bd-product bd-app rt-product ${st} lay-1 bd-page` : "bd-frame-bare"} aria-label={chrome ? page.title : undefined}>
+				{chrome ? <ShellHeader /> : null}
+				<div className={chrome ? "bd-shell" : "bd-frame-bare"}>
+					{chrome ? <ShellNav nav={page.nav} /> : null}
+					{children}
+				</div>
+			</article>
+		</FrameContext.Provider>
+	);
+}
+
+/** The header of the signed-in app (brand, wheel, greeting, avatar): kept by the frame across pages. */
+function ShellHeader() {
+	const { user } = useUserStore();
+	useProfileSync();
+	usePendingQr();
+	return (
+		<header className="bd-app-top">
+			<Brand />
+			<div className="bd-user">
+				<Link href={R.wheel} className="bd-avatar bd-wheel-link" aria-label="گردونهٔ شانس">
+					<img src="/media/App/wheel-icon.svg" alt="" width={22} height={22} />
+				</Link>
+				{user?.username ? <span>سلام، {user.username}</span> : null}
+				<Avatar />
+			</div>
+		</header>
+	);
+}
+
+/** The main navigation (sidebar; a row on phones), with the «seesaw tilt» (seesaw.ts). */
+function ShellNav({ nav }: { nav: NavKey }) {
+	const navRef = useRef<HTMLElement>(null);
+	const seesaw = useSeesaw(navRef);
+	return (
+		<nav ref={navRef} className="bd-sidebar" aria-label="ناوبری اصلی" onPointerDown={seesaw}>
+			{NAV.map((item) => (
+				<Link
+					key={item.key}
+					href={item.href}
+					className="bd-nav-item"
+					aria-current={item.key === (nav === "home" && !HOME_VISIBLE ? "games" : nav) ? "page" : undefined}
+				>
+					<Icon name={item.icon} />
+					{item.label}
+				</Link>
+			))}
+		</nav>
+	);
+}
+
+/** A page's own part of the signed-in app: its heading and content. */
+function ShellMain({ title, heading, headingExtra, children }: Pick<ShellProps, "title" | "heading" | "headingExtra" | "children">) {
+	return (
+		<main className="bd-dash rt-content" id="main">
+			{heading ?? (
+				<div className="rt-page-heading">
+					<div>
+						<p className="bd-muted">بردینو / {title}</p>
+						<h2>{title}</h2>
+					</div>
+					{headingExtra}
+				</div>
+			)}
+			<div className="rt-page-body">{children}</div>
+		</main>
+	);
+}
+
 /** The signed-in app: brand header, main navigation (sidebar, a row on phones) and the page. */
 export function AppShell({ nav, title, heading, headingExtra, allowGuest = false, children }: Readonly<ShellProps>) {
 	const st = styleClass(useBdStyle());
 	const loggedIn = useRequireLogin(allowGuest);
 	const { user } = useUserStore();
+	const frame = useContext(FrameContext);
 	useEffect(() => {
 		document.title = `${title} | بردینو`;
 	}, [title]);
+	// Inside the /pwa frame: the header and navigation are the frame's (claimed before the first paint).
+	useLayoutEffect(() => {
+		if (frame && loggedIn) return frame.claim(nav, title);
+		return undefined;
+	}, [frame, loggedIn, nav, title]);
 	if (!loggedIn) {
 		if (!allowGuest) return null;
 		return (
@@ -233,6 +344,13 @@ export function AppShell({ nav, title, heading, headingExtra, allowGuest = false
 					</main>
 				</div>
 			</article>
+		);
+	}
+	if (frame) {
+		return (
+			<ShellMain title={title} heading={heading} headingExtra={headingExtra}>
+				{children}
+			</ShellMain>
 		);
 	}
 	return <SignedInShell nav={nav} title={title} heading={heading} headingExtra={headingExtra} username={user?.username}>{children}</SignedInShell>;

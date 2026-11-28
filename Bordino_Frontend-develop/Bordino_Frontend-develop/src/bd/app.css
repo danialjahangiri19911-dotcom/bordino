@@ -946,3 +946,6 @@ body { margin: 0; }
 /* A cost tag sits right after the button's label (the buttons lay their parts out with a gap). */
 #bordino-directions .dr button > .bd-cost-tag { margin-inline-start: -8px; }
 #bordino-directions .sp button > .bd-cost-tag { margin-inline-start: -10px; }
+
+/* The /pwa frame's wrappers while a page has no header (games, sign-in): no box of their own. */
+#bordino-directions .bd-frame-bare { display: contents; }
